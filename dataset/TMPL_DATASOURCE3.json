@@ -2,7 +2,7 @@
 	"name": "TMPL_DATASOURCE3",
 	"properties": {
 		"linkedServiceName": {
-			"referenceName": "ivsdatastorage",
+			"referenceName": "ivs-synapse-WorkspaceDefaultStorage",
 			"type": "LinkedServiceReference"
 		},
 		"annotations": [],
