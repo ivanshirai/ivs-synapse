@@ -1,0 +1,24 @@
+{
+	"name": "TMPL_DATASOURCE2",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "ivs-synapse-WorkspaceDefaultStorage",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "DelimitedText",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobFSLocation",
+				"fileName": "TMPL_DATASOURCE2.csv",
+				"folderPath": "source",
+				"fileSystem": "adftemplate"
+			},
+			"columnDelimiter": ",",
+			"escapeChar": "\\",
+			"quoteChar": "\""
+		},
+		"schema": []
+	},
+	"type": "Microsoft.Synapse/workspaces/datasets"
+}
