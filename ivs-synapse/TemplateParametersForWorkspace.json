@@ -1,0 +1,21 @@
+{
+	"$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"workspaceName": {
+			"value": "ivs-synapse"
+		},
+		"ivs-synapse-WorkspaceDefaultSqlServer_connectionString": {
+			"value": ""
+		},
+		"ivsdatastorage_accountKey": {
+			"value": ""
+		},
+		"ivs-synapse-WorkspaceDefaultStorage_properties_typeProperties_url": {
+			"value": "https://ivsdatastorage.dfs.core.windows.net"
+		},
+		"ivsdatastorage_properties_typeProperties_url": {
+			"value": "https://ivsdatastorage.dfs.core.windows.net"
+		}
+	}
+}
