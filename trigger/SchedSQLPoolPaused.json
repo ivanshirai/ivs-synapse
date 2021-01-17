@@ -1,0 +1,38 @@
+{
+	"name": "SchedSQLPoolPaused",
+	"properties": {
+		"annotations": [],
+		"runtimeState": "Started",
+		"pipelines": [
+			{
+				"pipelineReference": {
+					"referenceName": "SQLPoolPause",
+					"type": "PipelineReference"
+				},
+				"parameters": {
+					"p_subscription": "f939f8f3-2652-4a45-88ae-78a7782ec9df",
+					"p_resourceGroup": "ivs-dwh-rg",
+					"p_workspace": "ivs-synapse",
+					"p_sqlPool": "ivs_sqlpool"
+				}
+			}
+		],
+		"type": "ScheduleTrigger",
+		"typeProperties": {
+			"recurrence": {
+				"frequency": "Day",
+				"interval": 1,
+				"startTime": "2021-01-17T04:03:00",
+				"timeZone": "Atlantic Standard Time",
+				"schedule": {
+					"minutes": [
+						0
+					],
+					"hours": [
+						1
+					]
+				}
+			}
+		}
+	}
+}
