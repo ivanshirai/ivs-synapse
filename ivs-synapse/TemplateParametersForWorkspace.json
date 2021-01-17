@@ -8,14 +8,20 @@
 		"ivs-synapse-WorkspaceDefaultSqlServer_connectionString": {
 			"value": ""
 		},
-		"ivsdatastorage_accountKey": {
-			"value": ""
-		},
 		"ivs-synapse-WorkspaceDefaultStorage_properties_typeProperties_url": {
 			"value": "https://ivsdatastorage.dfs.core.windows.net"
 		},
-		"ivsdatastorage_properties_typeProperties_url": {
-			"value": "https://ivsdatastorage.dfs.core.windows.net"
+		"SchedSQLPoolPaused_properties_SQLPoolPause_parameters_p_subscription": {
+			"value": "f939f8f3-2652-4a45-88ae-78a7782ec9df"
+		},
+		"SchedSQLPoolPaused_properties_SQLPoolPause_parameters_p_resourceGroup": {
+			"value": "ivs-dwh-rg"
+		},
+		"SchedSQLPoolPaused_properties_SQLPoolPause_parameters_p_workspace": {
+			"value": "ivs-synapse"
+		},
+		"SchedSQLPoolPaused_properties_SQLPoolPause_parameters_p_sqlPool": {
+			"value": "ivs_sqlpool"
 		}
 	}
 }

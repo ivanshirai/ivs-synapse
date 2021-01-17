@@ -11,17 +11,25 @@
 			"type": "secureString",
 			"metadata": "Secure string for 'connectionString' of 'ivs-synapse-WorkspaceDefaultSqlServer'"
 		},
-		"ivsdatastorage_accountKey": {
-			"type": "secureString",
-			"metadata": "Secure string for 'accountKey' of 'ivsdatastorage'"
-		},
 		"ivs-synapse-WorkspaceDefaultStorage_properties_typeProperties_url": {
 			"type": "string",
 			"defaultValue": "https://ivsdatastorage.dfs.core.windows.net"
 		},
-		"ivsdatastorage_properties_typeProperties_url": {
+		"SchedSQLPoolPaused_properties_SQLPoolPause_parameters_p_subscription": {
 			"type": "string",
-			"defaultValue": "https://ivsdatastorage.dfs.core.windows.net"
+			"defaultValue": "f939f8f3-2652-4a45-88ae-78a7782ec9df"
+		},
+		"SchedSQLPoolPaused_properties_SQLPoolPause_parameters_p_resourceGroup": {
+			"type": "string",
+			"defaultValue": "ivs-dwh-rg"
+		},
+		"SchedSQLPoolPaused_properties_SQLPoolPause_parameters_p_workspace": {
+			"type": "string",
+			"defaultValue": "ivs-synapse"
+		},
+		"SchedSQLPoolPaused_properties_SQLPoolPause_parameters_p_sqlPool": {
+			"type": "string",
+			"defaultValue": "ivs_sqlpool"
 		}
 	},
 	"variables": {
@@ -98,29 +106,6 @@
 				"type": "AzureBlobFS",
 				"typeProperties": {
 					"url": "[parameters('ivs-synapse-WorkspaceDefaultStorage_properties_typeProperties_url')]"
-				},
-				"connectVia": {
-					"referenceName": "AutoResolveIntegrationRuntime",
-					"type": "IntegrationRuntimeReference"
-				}
-			},
-			"dependsOn": [
-				"[concat(variables('workspaceId'), '/integrationRuntimes/AutoResolveIntegrationRuntime')]"
-			]
-		},
-		{
-			"name": "[concat(parameters('workspaceName'), '/ivsdatastorage')]",
-			"type": "Microsoft.Synapse/workspaces/linkedServices",
-			"apiVersion": "2019-06-01-preview",
-			"properties": {
-				"annotations": [],
-				"type": "AzureBlobFS",
-				"typeProperties": {
-					"url": "[parameters('ivsdatastorage_properties_typeProperties_url')]",
-					"accountKey": {
-						"type": "SecureString",
-						"value": "[parameters('ivsdatastorage_accountKey')]"
-					}
 				},
 				"connectVia": {
 					"referenceName": "AutoResolveIntegrationRuntime",
@@ -211,6 +196,167 @@
 			},
 			"dependsOn": [
 				"[concat(variables('workspaceId'), '/linkedServices/ivs-synapse-WorkspaceDefaultStorage')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/SQLPoolPause')]",
+			"type": "Microsoft.Synapse/workspaces/pipelines",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"activities": [
+					{
+						"name": "SQLPoolGetStatus",
+						"type": "WebActivity",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 2,
+							"retryIntervalInSeconds": 200,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"url": {
+								"value": "@concat('https://management.azure.com/subscriptions/', pipeline().parameters.p_subscription, '/resourceGroups/', pipeline().parameters.p_resourceGroup, '/providers/Microsoft.Synapse/workspaces/', pipeline().parameters.p_workspace, '/sqlPools/', pipeline().parameters.p_sqlPool, '/?api-version=2019-06-01-preview')",
+								"type": "Expression"
+							},
+							"connectVia": {
+								"referenceName": "AutoResolveIntegrationRuntime",
+								"type": "IntegrationRuntimeReference"
+							},
+							"method": "GET",
+							"headers": {},
+							"body": {
+								"sku": {
+									"name": "DW100c"
+								}
+							},
+							"authentication": {
+								"type": "MSI",
+								"resource": "https://management.azure.com/"
+							}
+						}
+					},
+					{
+						"name": "StatusCheck",
+						"type": "IfCondition",
+						"dependsOn": [
+							{
+								"activity": "SQLPoolGetStatus",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"expression": {
+								"value": "@equals(activity('SQLPoolGetStatus').output.properties.status, 'Paused')",
+								"type": "Expression"
+							},
+							"ifFalseActivities": [
+								{
+									"name": "SQLPoolPause",
+									"type": "WebActivity",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "7.00:00:00",
+										"retry": 2,
+										"retryIntervalInSeconds": 200,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"url": {
+											"value": "@concat('https://management.azure.com/subscriptions/', pipeline().parameters.p_subscription, '/resourceGroups/', pipeline().parameters.p_resourceGroup, '/providers/Microsoft.Synapse/workspaces/', pipeline().parameters.p_workspace, '/sqlPools/', pipeline().parameters.p_sqlPool, '/pause?api-version=2019-06-01-preview')",
+											"type": "Expression"
+										},
+										"method": "POST",
+										"headers": {},
+										"body": {
+											"value": "'{ ]'",
+											"type": "Expression"
+										},
+										"authentication": {
+											"type": "MSI",
+											"resource": "https://management.azure.com/"
+										}
+									}
+								}
+							]
+						}
+					}
+				],
+				"parameters": {
+					"p_subscription": {
+						"type": "string",
+						"defaultValue": "f939f8f3-2652-4a45-88ae-78a7782ec9df"
+					},
+					"p_resourceGroup": {
+						"type": "string",
+						"defaultValue": "ivs-dwh-rg"
+					},
+					"p_workspace": {
+						"type": "string",
+						"defaultValue": "ivs-synapse"
+					},
+					"p_sqlPool": {
+						"type": "string",
+						"defaultValue": "ivs_sqlpool"
+					}
+				},
+				"folder": {
+					"name": "Scheduled"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/integrationRuntimes/AutoResolveIntegrationRuntime')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/SchedSQLPoolPaused')]",
+			"type": "Microsoft.Synapse/workspaces/triggers",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"annotations": [],
+				"runtimeState": "Started",
+				"pipelines": [
+					{
+						"pipelineReference": {
+							"referenceName": "SQLPoolPause",
+							"type": "PipelineReference"
+						},
+						"parameters": {
+							"p_subscription": "[parameters('SchedSQLPoolPaused_properties_SQLPoolPause_parameters_p_subscription')]",
+							"p_resourceGroup": "[parameters('SchedSQLPoolPaused_properties_SQLPoolPause_parameters_p_resourceGroup')]",
+							"p_workspace": "[parameters('SchedSQLPoolPaused_properties_SQLPoolPause_parameters_p_workspace')]",
+							"p_sqlPool": "[parameters('SchedSQLPoolPaused_properties_SQLPoolPause_parameters_p_sqlPool')]"
+						}
+					}
+				],
+				"type": "ScheduleTrigger",
+				"typeProperties": {
+					"recurrence": {
+						"frequency": "Day",
+						"interval": 1,
+						"startTime": "2021-01-17T04:03:00",
+						"timeZone": "Atlantic Standard Time",
+						"schedule": {
+							"minutes": [
+								0
+							],
+							"hours": [
+								1
+							]
+						}
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/pipelines/SQLPoolPause')]"
 			]
 		}
 	]
