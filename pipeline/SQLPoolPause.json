@@ -28,6 +28,10 @@
 						"sku": {
 							"name": "DW100c"
 						}
+					},
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://management.azure.com/"
 					}
 				}
 			},
