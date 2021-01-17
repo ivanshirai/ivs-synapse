@@ -1,0 +1,107 @@
+{
+	"name": "SQLPoolPause",
+	"properties": {
+		"activities": [
+			{
+				"name": "SQLPoolGetStatus",
+				"type": "WebActivity",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 200,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@concat('https://management.azure.com/subscriptions/', pipeline().parameters.p_subscription, '/resourceGroups/', pipeline().parameters.p_resourceGroup, '/providers/Microsoft.Synapse/workspaces/', pipeline().parameters.p_workspace, '/sqlPools/', pipeline().parameters.p_sqlPool, '/?api-version=2019-06-01-preview')",
+						"type": "Expression"
+					},
+					"method": "GET",
+					"body": {
+						"sku": {
+							"name": "DW100c"
+						}
+					},
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://management.azure.com/"
+					}
+				}
+			},
+			{
+				"name": "StatusCheck",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "SQLPoolGetStatus",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@equals(activity('SQLPoolGetStatus').output.properties.status, 'Paused')",
+						"type": "Expression"
+					},
+					"ifFalseActivities": [
+						{
+							"name": "SQLPoolPause",
+							"type": "WebActivity",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "7.00:00:00",
+								"retry": 2,
+								"retryIntervalInSeconds": 200,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"url": {
+									"value": "@concat('https://management.azure.com/subscriptions/', pipeline().parameters.p_subscription, '/resourceGroups/', pipeline().parameters.p_resourceGroup, '/providers/Microsoft.Synapse/workspaces/', pipeline().parameters.p_workspace, '/sqlPools/', pipeline().parameters.p_sqlPool, '/pause?api-version=2019-06-01-preview')",
+									"type": "Expression"
+								},
+								"method": "POST",
+								"body": {
+									"value": "'{ ]'",
+									"type": "Expression"
+								},
+								"authentication": {
+									"type": "MSI",
+									"resource": "https://management.azure.com/"
+								}
+							}
+						}
+					]
+				}
+			}
+		],
+		"parameters": {
+			"p_subscription": {
+				"type": "string",
+				"defaultValue": "f939f8f3-2652-4a45-88ae-78a7782ec9df"
+			},
+			"p_resourceGroup": {
+				"type": "string",
+				"defaultValue": "ivs-dwh-rg"
+			},
+			"p_workspace": {
+				"type": "string",
+				"defaultValue": "ivs-synapse"
+			},
+			"p_sqlPool": {
+				"type": "string",
+				"defaultValue": "ivs_sqlpool"
+			}
+		},
+		"folder": {
+			"name": "Scheduled"
+		},
+		"annotations": []
+	}
+}
