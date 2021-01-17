@@ -19,15 +19,15 @@
 						"value": "@concat('https://management.azure.com/subscriptions/', pipeline().parameters.p_subscription, '/resourceGroups/', pipeline().parameters.p_resourceGroup, '/providers/Microsoft.Synapse/workspaces/', pipeline().parameters.p_workspace, '/sqlPools/', pipeline().parameters.p_sqlPool, '/?api-version=2019-06-01-preview')",
 						"type": "Expression"
 					},
+					"connectVia": {
+						"referenceName": "AutoResolveIntegrationRuntime",
+						"type": "IntegrationRuntimeReference"
+					},
 					"method": "GET",
 					"body": {
 						"sku": {
 							"name": "DW100c"
 						}
-					},
-					"authentication": {
-						"type": "MSI",
-						"resource": "https://management.azure.com/"
 					}
 				}
 			},
