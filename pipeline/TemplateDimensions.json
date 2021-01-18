@@ -55,7 +55,7 @@
 							"referenceName": "ivs-synapse-WorkspaceDefaultStorage",
 							"type": "LinkedServiceReference"
 						},
-						"folderPath": "template/staging/dimension2"
+						"folderPath": "adftemplate/staging"
 					},
 					"compute": {
 						"coreCount": 8,
