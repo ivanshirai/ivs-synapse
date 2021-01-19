@@ -1,0 +1,16 @@
+{
+	"name": "TMPL_DelimTextCsv",
+	"properties": {
+		"content": {
+			"query": "CREATE EXTERNAL FILE FORMAT [TMPL_DelimTextCsv] WITH \n(  \n\tFORMAT_TYPE = DELIMITEDTEXT,\n\tFORMAT_OPTIONS(\n          FIELD_TERMINATOR = ',',\n          STRING_DELIMITER = '\"',\n          FIRST_ROW = 2, \n          USE_TYPE_DEFAULT = False)\n)",
+			"metadata": {
+				"language": "sql"
+			},
+			"currentConnection": {
+				"poolName": "ivs_sqlpool",
+				"databaseName": "ivs_sqlpool"
+			}
+		},
+		"type": "SqlQuery"
+	}
+}
