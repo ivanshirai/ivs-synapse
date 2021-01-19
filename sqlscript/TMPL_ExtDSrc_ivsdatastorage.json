@@ -2,7 +2,7 @@
 	"name": "TMPL_ExtDSrc_ivsdatastorage",
 	"properties": {
 		"content": {
-			"query": "--CREATE MASTER KEY ENCRYPTION BY PASSWORD = '<password>' ;\n\n--CREATE DATABASE SCOPED CREDENTIAL ADLS_credential\n--WITH\n-- IDENTITY = '<storage_account_name>' ,\n-- SECRET = '<storage_account_key>';\n\nDROP EXTERNAL DATA SOURCE TMPL_ExtDSrc_ivsdatastorage\n\nCREATE EXTERNAL DATA SOURCE TMPL_ExtDSrc_ivsdatastorage\nWITH\n  ( LOCATION = 'wasbs://adftemplate@ivsdatastorage.blob.core.windows.net',\n    CREDENTIAL = ADLS_credential,\n    TYPE = HADOOP\n  );",
+			"query": "--CREATE MASTER KEY ENCRYPTION BY PASSWORD = '<password>' ;\n\n--CREATE DATABASE SCOPED CREDENTIAL ADLS_credential\n--WITH\n-- IDENTITY = '<storage_account_name>' ,\n-- SECRET = '<storage_account_key>';\n\nCREATE EXTERNAL DATA SOURCE TMPL_ExtDSrc_ivsdatastorage\nWITH\n  ( LOCATION = 'wasbs://adftemplate@ivsdatastorage.blob.core.windows.net',\n    CREDENTIAL = ADLS_credential,\n    TYPE = HADOOP\n  );",
 			"metadata": {
 				"language": "sql"
 			},
