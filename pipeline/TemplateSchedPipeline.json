@@ -1,0 +1,140 @@
+{
+	"name": "TemplateSchedPipeline",
+	"properties": {
+		"activities": [
+			{
+				"name": "TemplateDimensions",
+				"description": "",
+				"type": "ExecutePipeline",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "TemplateDimensions",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true
+				}
+			},
+			{
+				"name": "TemplateFact",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "TemplateDimensions",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "TemplateFact",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true
+				}
+			},
+			{
+				"name": "WarningEmail_Fact",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "TemplateFact",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 200,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@pipeline().parameters.LogicAppWarningMsgURL",
+						"type": "Expression"
+					},
+					"connectVia": {
+						"referenceName": "AutoResolveIntegrationRuntime",
+						"type": "IntegrationRuntimeReference"
+					},
+					"method": "POST",
+					"headers": {
+						"Content-Type": "application/json"
+					},
+					"body": {
+						"dataFactoryName": "@{pipeline().DataFactory}",
+						"message": "@{activity('TemplateFact').error.message}",
+						"receiver": "@pipeline().parameters.receiver",
+						"CCreceiver": "@pipeline().parameters.CCreceiver",
+						"pipelineName": "@{pipeline().Pipeline}"
+					}
+				}
+			},
+			{
+				"name": "WarningEmail_Dimensions",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "TemplateDimensions",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "7.00:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 200,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"url": {
+						"value": "@pipeline().parameters.LogicAppWarningMsgURL",
+						"type": "Expression"
+					},
+					"connectVia": {
+						"referenceName": "AutoResolveIntegrationRuntime",
+						"type": "IntegrationRuntimeReference"
+					},
+					"method": "POST",
+					"headers": {
+						"Content-Type": "application/json"
+					},
+					"body": {
+						"dataFactoryName": "@{pipeline().DataFactory}",
+						"message": "@{activity('TemplateDimensions').error.message}",
+						"receiver": "@pipeline().parameters.receiver",
+						"CCreceiver": "@pipeline().parameters.CCreceiver",
+						"pipelineName": "@{pipeline().Pipeline}"
+					}
+				}
+			}
+		],
+		"parameters": {
+			"LogicAppWarningMsgURL": {
+				"type": "string",
+				"defaultValue": "https://prod-10.westus.logic.azure.com:443/workflows/f49c4216e70e4cc18183fab9a232493a/triggers/manual/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=XZiMf38VXfSaEQ20r6vHVaF_vMFledUOwCtz66JKUZs"
+			},
+			"receiver": {
+				"type": "string",
+				"defaultValue": "ivan.v.shirai@gmail.com"
+			},
+			"CCreceiver": {
+				"type": "string"
+			}
+		},
+		"folder": {
+			"name": "Templates"
+		},
+		"annotations": []
+	}
+}
