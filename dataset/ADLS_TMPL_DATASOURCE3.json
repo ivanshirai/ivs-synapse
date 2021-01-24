@@ -1,0 +1,18 @@
+{
+	"name": "ADLS_TMPL_DATASOURCE3",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "ivs-synapse-WorkspaceDefaultSqlServer",
+			"type": "LinkedServiceReference",
+			"parameters": {
+				"DBName": "ivs_sqlpool"
+			}
+		},
+		"annotations": [],
+		"type": "AzureSqlDWTable",
+		"schema": [],
+		"typeProperties": {
+			"tableName": "dbo.ADLS_TMPL_DATASOURCE3"
+		}
+	}
+}
