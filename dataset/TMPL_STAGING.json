@@ -1,0 +1,20 @@
+{
+	"name": "TMPL_STAGING",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "ivs-synapse-WorkspaceDefaultStorage",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "Parquet",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobFSLocation",
+				"folderPath": "staging/data",
+				"fileSystem": "adftemplate"
+			},
+			"compressionCodec": "snappy"
+		},
+		"schema": []
+	}
+}
