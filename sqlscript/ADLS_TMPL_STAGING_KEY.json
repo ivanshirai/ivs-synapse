@@ -1,8 +1,8 @@
 {
-	"name": "SQL script 1",
+	"name": "ADLS_TMPL_STAGING_KEY",
 	"properties": {
 		"content": {
-			"query": "CREATE EXTERNAL TABLE [dbo].[ExternalTable]\n(\n\t [Id] INT NOT NULL\n)\nWITH\n(\n\tLOCATION = '/folder/file',\n\tDATA_SOURCE = [DataSource1],\n\tFILE_FORMAT = [FileFormat1]\n)\n",
+			"query": "CREATE EXTERNAL TABLE [dbo].[ADLS_TMPL_STAGING_KEY] \n(  \n\t [SRC1_SOURCE1_ID] INT NULL,\n\t [SRC1_SOURCE2_REF_ID] INT NULL,\n\t [SRC1_SOURCE3_REF_ID] INT NULL\n)\nWITH  \n(  \n\tLOCATION = 'staging/key',  \n\tDATA_SOURCE = TMPL_ExtDSrc_ivsdatastorage ,\n    FILE_FORMAT = TMPL_ParquetSnappy\n) \n\n",
 			"metadata": {
 				"language": "sql"
 			},

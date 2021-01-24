@@ -1,0 +1,16 @@
+{
+	"name": "TMPL_FACT",
+	"properties": {
+		"content": {
+			"query": "CREATE TABLE [dbo].[TMPL_FACT]\n(\n    [DIMENSION1_KEY] [int] NOT NULL,\n\t[DIMENSION2_KEY] [int] NOT NULL,\n\t[SOURCE1_ID] [int] NOT NULL,\n\t[SRC1_MEASURE1] [decimal](18, 4) NULL,\n\t[SRC1_MEASURE2] [decimal](18, 4) NULL,\n\t[SRC2_MEASURE1] [decimal](18, 4) NULL,\n\t[SRC2_MEASURE2] [decimal](18, 4) NULL,\n\t[SRC3_MEASURE1] [decimal](18, 4) NULL,\n\t[SRC3_MEASURE2] [decimal](18, 4) NULL,\n\t[SRC1_CDC_TIMESTAMP] [datetime] NULL,\n\t[DSS_CREATE_TIME] [datetime] NULL,\n\t[DSS_UPDATE_TIME] [datetime] NULL\n)\nWITH\n(\n    DISTRIBUTION = HASH (SOURCE1_ID),\n    CLUSTERED COLUMNSTORE INDEX\n)\nGO\n",
+			"metadata": {
+				"language": "sql"
+			},
+			"currentConnection": {
+				"poolName": "ivs_sqlpool",
+				"databaseName": "ivs_sqlpool"
+			}
+		},
+		"type": "SqlQuery"
+	}
+}
