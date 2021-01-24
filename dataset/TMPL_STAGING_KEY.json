@@ -5,9 +5,6 @@
 			"referenceName": "ivs-synapse-WorkspaceDefaultStorage",
 			"type": "LinkedServiceReference"
 		},
-		"folder": {
-			"name": "Templates"
-		},
 		"annotations": [],
 		"type": "Parquet",
 		"typeProperties": {
