@@ -10,7 +10,51 @@
 		},
 		"annotations": [],
 		"type": "AzureSqlDWTable",
-		"schema": [],
+		"schema": [
+			{
+				"name": "SOURCE3_ID",
+				"type": "int",
+				"precision": 10
+			},
+			{
+				"name": "NCHAR_VALUE1",
+				"type": "nvarchar"
+			},
+			{
+				"name": "NCHAR_VALUE2",
+				"type": "nvarchar"
+			},
+			{
+				"name": "NUMERIC_VALUE1",
+				"type": "decimal",
+				"precision": 12,
+				"scale": 6
+			},
+			{
+				"name": "NUMERIC_VALUE2",
+				"type": "decimal",
+				"precision": 12,
+				"scale": 6
+			},
+			{
+				"name": "DATETIME_VALUE1",
+				"type": "datetime",
+				"precision": 23,
+				"scale": 3
+			},
+			{
+				"name": "DATETIME_VALUE2",
+				"type": "datetime",
+				"precision": 23,
+				"scale": 3
+			},
+			{
+				"name": "CDC_TIMESTAMP",
+				"type": "datetime",
+				"precision": 23,
+				"scale": 3
+			}
+		],
 		"typeProperties": {
 			"tableName": "dbo.ADLS_TMPL_DATASOURCE3"
 		}
