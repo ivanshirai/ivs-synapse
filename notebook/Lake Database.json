@@ -1,0 +1,76 @@
+{
+	"name": "Lake Database",
+	"properties": {
+		"nbformat": 4,
+		"nbformat_minor": 2,
+		"bigDataPool": {
+			"referenceName": "ivsspark",
+			"type": "BigDataPoolReference"
+		},
+		"sessionProperties": {
+			"driverMemory": "28g",
+			"driverCores": 4,
+			"executorMemory": "28g",
+			"executorCores": 4,
+			"numExecutors": 2,
+			"conf": {
+				"spark.dynamicAllocation.enabled": "false",
+				"spark.dynamicAllocation.minExecutors": "2",
+				"spark.dynamicAllocation.maxExecutors": "2",
+				"spark.autotune.trackingId": "c6bea6f7-b4b1-4292-944e-4d69127c9fe5"
+			}
+		},
+		"metadata": {
+			"saveOutput": true,
+			"enableDebugMode": false,
+			"kernelspec": {
+				"name": "synapse_pyspark",
+				"display_name": "Synapse PySpark"
+			},
+			"language_info": {
+				"name": "python"
+			},
+			"a365ComputeOptions": {
+				"id": "/subscriptions/f939f8f3-2652-4a45-88ae-78a7782ec9df/resourceGroups/ivs-dwh-rg/providers/Microsoft.Synapse/workspaces/ivs-synapse/bigDataPools/ivsspark",
+				"name": "ivsspark",
+				"type": "Spark",
+				"endpoint": "https://ivs-synapse.dev.azuresynapse.net/livyApi/versions/2019-11-01-preview/sparkPools/ivsspark",
+				"auth": {
+					"type": "AAD",
+					"authResource": "https://dev.azuresynapse.net"
+				},
+				"sparkVersion": "3.1",
+				"nodeCount": 3,
+				"cores": 4,
+				"memory": 28,
+				"automaticScaleJobs": false
+			},
+			"sessionKeepAliveTimeout": 30
+		},
+		"cells": [
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					},
+					"microsoft": {
+						"language": "sparksql"
+					},
+					"collapsed": false
+				},
+				"source": [
+					"%%sql\r\n",
+					"INSERT INTO `ivs-synapse-dldb`.`Customer` VALUES (1,cast('2021-02-18'as date),1022,557,101,'Tailspin Toys (Head Office)','Waldemar Fisar',90410,466);"
+				],
+				"execution_count": 4
+			}
+		]
+	}
+}
