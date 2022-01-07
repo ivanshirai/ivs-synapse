@@ -1,0 +1,23 @@
+{
+	"name": "ivs-synapse-dldb",
+	"properties": {
+		"Origin": {
+			"Type": "SPARK"
+		},
+		"Properties": {
+			"IsSyMSCDMDatabase": true,
+			"DerivedModelDBInfo": "{\"ModelDirectives\":{\"BaseModel\":{\"Name\":\"Retail\",\"Version\":\"0.1.0\"}}}"
+		},
+		"Name": "ivs-synapse-dldb",
+		"EntityType": "DATABASE",
+		"Source": {
+			"Provider": "ADLS",
+			"Location": "abfss://synapse@ivsdatastorage.dfs.core.windows.net/ivs-synapse-dldb",
+			"Properties": {
+				"FormatType": "csv",
+				"LinkedServiceName": "ivs-synapse-WorkspaceDefaultStorage"
+			}
+		}
+	},
+	"type": "DATABASE"
+}
