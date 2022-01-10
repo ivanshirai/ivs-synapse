@@ -14,7 +14,7 @@
 			"Provider": "ADLS",
 			"Location": "abfss://synapse@ivsdatastorage.dfs.core.windows.net/ivs-synapse-dldb",
 			"Properties": {
-				"FormatType": "csv",
+				"FormatType": "parquet",
 				"LinkedServiceName": "ivs-synapse-WorkspaceDefaultStorage"
 			}
 		}

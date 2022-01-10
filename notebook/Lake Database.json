@@ -17,7 +17,7 @@
 				"spark.dynamicAllocation.enabled": "false",
 				"spark.dynamicAllocation.minExecutors": "2",
 				"spark.dynamicAllocation.maxExecutors": "2",
-				"spark.autotune.trackingId": "c6bea6f7-b4b1-4292-944e-4d69127c9fe5"
+				"spark.autotune.trackingId": "0a7b0612-af72-44ba-8be9-c1bf37d39c76"
 			}
 		},
 		"metadata": {
@@ -70,6 +70,30 @@
 					"INSERT INTO `ivs-synapse-dldb`.`Customer` VALUES (1,cast('2021-02-18'as date),1022,557,101,'Tailspin Toys (Head Office)','Waldemar Fisar',90410,466);"
 				],
 				"execution_count": 4
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					},
+					"microsoft": {
+						"language": "sparksql"
+					}
+				},
+				"source": [
+					"%%sql\r\n",
+					"CONVERT to delta `ivs-synapse-dldb`.`Customer`\r\n",
+					"partitioned by (CustomerId integer)\r\n",
+					""
+				],
+				"execution_count": 1
 			}
 		]
 	}

@@ -16,10 +16,6 @@
 				{
 					"Name": "TransactionId",
 					"Description": "The unique identifier of a Transaction.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "TransactionId"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "long",
 						"IsComplexType": false,
@@ -27,15 +23,15 @@
 						"Properties": {
 							"HIVE_TYPE_STRING": "long"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "TransactionId"
 					}
 				},
 				{
 					"Name": "TransactionLineItemId",
 					"Description": "The unique identifier that identifies the Transaction Line Item.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "TransactionLineItemId"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "integer",
 						"IsComplexType": false,
@@ -43,15 +39,15 @@
 						"Properties": {
 							"HIVE_TYPE_STRING": "integer"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "TransactionLineItemId"
 					}
 				},
 				{
 					"Name": "TransactionLineItemStartTimestamp",
 					"Description": "The timestamp the transaction line item was started.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "TransactionLineItemStartTimestamp"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "timestamp",
 						"IsComplexType": false,
@@ -60,15 +56,15 @@
 							"TimestampFormat": "YYYY-MM-DD HH:MM:SS.fffffffff",
 							"HIVE_TYPE_STRING": "timestamp"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "TransactionLineItemStartTimestamp"
 					}
 				},
 				{
 					"Name": "TransactionLineItemCompletedTimestamp",
 					"Description": "The timestamp that the transaction line item was completed or closed.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "TransactionLineItemCompletedTimestamp"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "timestamp",
 						"IsComplexType": false,
@@ -77,15 +73,15 @@
 							"TimestampFormat": "YYYY-MM-DD HH:MM:SS.fffffffff",
 							"HIVE_TYPE_STRING": "timestamp"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "TransactionLineItemCompletedTimestamp"
 					}
 				},
 				{
 					"Name": "ProductId",
 					"Description": "The unique identifier of a Product.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "ProductId"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "long",
 						"IsComplexType": false,
@@ -93,15 +89,15 @@
 						"Properties": {
 							"HIVE_TYPE_STRING": "long"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "ProductId"
 					}
 				},
 				{
 					"Name": "ItemSku",
 					"Description": "The Stock Keeping Unit identifier, which is typically used for inventory-related activities.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "ItemSku"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "string",
 						"IsComplexType": false,
@@ -110,15 +106,15 @@
 						"Properties": {
 							"HIVE_TYPE_STRING": "string"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "ItemSku"
 					}
 				},
 				{
 					"Name": "UniversalProductCode",
 					"Description": "A system that identifies products by type and by manufacturer.  \n\nA UPC consists of eleven (11) digits.  Six (6) indicate the Manufacturer and five (5) digits describe the product.\n\nUPCs appear on product packages as bar codes, which are graphic symbols that are read by optical scanner devices.   \n\nUPCs are assigned by the Uniform Code Council of Dayton, Ohio.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "UniversalProductCode"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "decimal",
 						"IsComplexType": false,
@@ -128,15 +124,15 @@
 						"Properties": {
 							"HIVE_TYPE_STRING": "decimal"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "UniversalProductCode"
 					}
 				},
 				{
 					"Name": "Quantity",
 					"Description": "The quantity of Product ordered on the transaction line item.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "Quantity"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "decimal",
 						"IsComplexType": false,
@@ -146,15 +142,15 @@
 						"Properties": {
 							"HIVE_TYPE_STRING": "decimal"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "Quantity"
 					}
 				},
 				{
 					"Name": "UnitOfMeasureId",
 					"Description": "The unique identifier of a Unit Of Measure.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "UnitOfMeasureId"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "integer",
 						"IsComplexType": false,
@@ -162,15 +158,15 @@
 						"Properties": {
 							"HIVE_TYPE_STRING": "integer"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "UnitOfMeasureId"
 					}
 				},
 				{
 					"Name": "PreorderIndicator",
 					"Description": "The quantity of Line Items returned.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "PreorderIndicator"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "boolean",
 						"IsComplexType": false,
@@ -178,15 +174,15 @@
 						"Properties": {
 							"HIVE_TYPE_STRING": "boolean"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "PreorderIndicator"
 					}
 				},
 				{
 					"Name": "ProductListPriceAmount",
 					"Description": "The current per unit list price of the Transaction Line Item products.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "ProductListPriceAmount"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "decimal",
 						"IsComplexType": false,
@@ -196,15 +192,15 @@
 						"Properties": {
 							"HIVE_TYPE_STRING": "decimal"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "ProductListPriceAmount"
 					}
 				},
 				{
 					"Name": "TransactionProductPriceAmount",
 					"Description": "The price of the product as applicable to the Transaction Line Item.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "TransactionProductPriceAmount"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "decimal",
 						"IsComplexType": false,
@@ -214,15 +210,15 @@
 						"Properties": {
 							"HIVE_TYPE_STRING": "decimal"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "TransactionProductPriceAmount"
 					}
 				},
 				{
 					"Name": "IsoCurrencyCode",
 					"Description": "The ISO 4217 currency code.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "IsoCurrencyCode"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "string",
 						"IsComplexType": false,
@@ -231,15 +227,15 @@
 						"Properties": {
 							"HIVE_TYPE_STRING": "string"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "IsoCurrencyCode"
 					}
 				},
 				{
 					"Name": "FreeSampleIndicator",
 					"Description": "Indicates that product was provided as a free sample.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "FreeSampleIndicator"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "boolean",
 						"IsComplexType": false,
@@ -247,15 +243,15 @@
 						"Properties": {
 							"HIVE_TYPE_STRING": "boolean"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "FreeSampleIndicator"
 					}
 				},
 				{
 					"Name": "TotalTransactionLineItemAmount",
 					"Description": "The total amount of line item charges related to the quantity of products sold at the actual selling price less rebates and discounts.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "TotalTransactionLineItemAmount"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "decimal",
 						"IsComplexType": false,
@@ -265,15 +261,15 @@
 						"Properties": {
 							"HIVE_TYPE_STRING": "decimal"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "TotalTransactionLineItemAmount"
 					}
 				},
 				{
 					"Name": "TotalTransactionSalesPriceAmount",
 					"Description": "The total amount of line item charges including all rebates and discount and taxes.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "TotalTransactionSalesPriceAmount"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "decimal",
 						"IsComplexType": false,
@@ -283,15 +279,15 @@
 						"Properties": {
 							"HIVE_TYPE_STRING": "decimal"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "TotalTransactionSalesPriceAmount"
 					}
 				},
 				{
 					"Name": "TransactionLineEntryMethodId",
 					"Description": "The unique identifier of a Transaction Line Entry Method.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "TransactionLineEntryMethodId"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "integer",
 						"IsComplexType": false,
@@ -299,15 +295,15 @@
 						"Properties": {
 							"HIVE_TYPE_STRING": "integer"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "TransactionLineEntryMethodId"
 					}
 				},
 				{
 					"Name": "TransactionLineItemScanTimestamp",
 					"Description": "The timestamp the transaction line item was scanned.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "TransactionLineItemScanTimestamp"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "timestamp",
 						"IsComplexType": false,
@@ -316,15 +312,15 @@
 							"TimestampFormat": "YYYY-MM-DD HH:MM:SS.fffffffff",
 							"HIVE_TYPE_STRING": "timestamp"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "TransactionLineItemScanTimestamp"
 					}
 				},
 				{
 					"Name": "PosDeviceId",
 					"Description": "The unique identifier of a POS Device.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "PosDeviceId"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "integer",
 						"IsComplexType": false,
@@ -332,15 +328,15 @@
 						"Properties": {
 							"HIVE_TYPE_STRING": "integer"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "PosDeviceId"
 					}
 				},
 				{
 					"Name": "ScaleUsedIndicator",
 					"Description": "Indicates that the scale was used to determine the weight of the item.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "ScaleUsedIndicator"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "boolean",
 						"IsComplexType": false,
@@ -348,15 +344,15 @@
 						"Properties": {
 							"HIVE_TYPE_STRING": "boolean"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "ScaleUsedIndicator"
 					}
 				},
 				{
 					"Name": "ScaleMeasuredItemWeight",
 					"Description": "The weight of the line item on the scale for pricing purposes.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "ScaleMeasuredItemWeight"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "decimal",
 						"IsComplexType": false,
@@ -366,15 +362,15 @@
 						"Properties": {
 							"HIVE_TYPE_STRING": "decimal"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "ScaleMeasuredItemWeight"
 					}
 				},
 				{
 					"Name": "WeightUomId",
 					"Description": "The unique identifier of a Unit Of Measure.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "WeightUomId"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "integer",
 						"IsComplexType": false,
@@ -382,15 +378,15 @@
 						"Properties": {
 							"HIVE_TYPE_STRING": "integer"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "WeightUomId"
 					}
 				},
 				{
 					"Name": "ScaleQuantity",
 					"Description": "The quantity of Product ordered placed on the scale.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "ScaleQuantity"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "decimal",
 						"IsComplexType": false,
@@ -400,15 +396,15 @@
 						"Properties": {
 							"HIVE_TYPE_STRING": "decimal"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "ScaleQuantity"
 					}
 				},
 				{
 					"Name": "TransactionLineVolume",
 					"Description": "The volume of the line item for pricing purposes.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "TransactionLineVolume"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "decimal",
 						"IsComplexType": false,
@@ -418,15 +414,15 @@
 						"Properties": {
 							"HIVE_TYPE_STRING": "decimal"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "TransactionLineVolume"
 					}
 				},
 				{
 					"Name": "VolumeUomId",
 					"Description": "The unique identifier of a Unit Of Measure.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "VolumeUomId"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "integer",
 						"IsComplexType": false,
@@ -434,15 +430,15 @@
 						"Properties": {
 							"HIVE_TYPE_STRING": "integer"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "VolumeUomId"
 					}
 				},
 				{
 					"Name": "ProductPriceOverrideIndicator",
 					"Description": "Indicates that the standard product price amount from the price list has been overridden.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "ProductPriceOverrideIndicator"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "boolean",
 						"IsComplexType": false,
@@ -450,15 +446,15 @@
 						"Properties": {
 							"HIVE_TYPE_STRING": "boolean"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "ProductPriceOverrideIndicator"
 					}
 				},
 				{
 					"Name": "ProductPriceAdjustmentAmount",
 					"Description": "The per product unit adjustment amount applied to each product unit.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "ProductPriceAdjustmentAmount"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "decimal",
 						"IsComplexType": false,
@@ -468,15 +464,15 @@
 						"Properties": {
 							"HIVE_TYPE_STRING": "decimal"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "ProductPriceAdjustmentAmount"
 					}
 				},
 				{
 					"Name": "ProductPriceAdjustmentPercentage",
 					"Description": "The per product unit adjustment percentage applied to each product unit.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "ProductPriceAdjustmentPercentage"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "decimal",
 						"IsComplexType": false,
@@ -486,15 +482,15 @@
 						"Properties": {
 							"HIVE_TYPE_STRING": "decimal"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "ProductPriceAdjustmentPercentage"
 					}
 				},
 				{
 					"Name": "TotalLineItemAdjustmentAmount",
 					"Description": "The amount of adjustment for all line items.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "TotalLineItemAdjustmentAmount"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "decimal",
 						"IsComplexType": false,
@@ -504,15 +500,15 @@
 						"Properties": {
 							"HIVE_TYPE_STRING": "decimal"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "TotalLineItemAdjustmentAmount"
 					}
 				},
 				{
 					"Name": "LineItemNote",
 					"Description": "A note, comment or additional information regarding the Line Item.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "LineItemNote"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "string",
 						"IsComplexType": false,
@@ -521,15 +517,15 @@
 						"Properties": {
 							"HIVE_TYPE_STRING": "string"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "LineItemNote"
 					}
 				},
 				{
 					"Name": "QuantityBooked",
 					"Description": "The quantity of Product booked.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "QuantityBooked"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "integer",
 						"IsComplexType": false,
@@ -537,15 +533,15 @@
 						"Properties": {
 							"HIVE_TYPE_STRING": "integer"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "QuantityBooked"
 					}
 				},
 				{
 					"Name": "QuantityBilled",
 					"Description": "The quantity billed.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "QuantityBilled"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "integer",
 						"IsComplexType": false,
@@ -553,15 +549,15 @@
 						"Properties": {
 							"HIVE_TYPE_STRING": "integer"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "QuantityBilled"
 					}
 				},
 				{
 					"Name": "QuantityBacklog",
 					"Description": "The quantity on backlog.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "QuantityBacklog"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "integer",
 						"IsComplexType": false,
@@ -569,15 +565,15 @@
 						"Properties": {
 							"HIVE_TYPE_STRING": "integer"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "QuantityBacklog"
 					}
 				},
 				{
 					"Name": "AcceptedQuantity",
 					"Description": "The quantity of Line Item products accepted.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "AcceptedQuantity"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "decimal",
 						"IsComplexType": false,
@@ -587,15 +583,15 @@
 						"Properties": {
 							"HIVE_TYPE_STRING": "decimal"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "AcceptedQuantity"
 					}
 				},
 				{
 					"Name": "QuantityCancelled",
 					"Description": "The quantity of Line Items cancelled.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "QuantityCancelled"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "integer",
 						"IsComplexType": false,
@@ -603,15 +599,15 @@
 						"Properties": {
 							"HIVE_TYPE_STRING": "integer"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "QuantityCancelled"
 					}
 				},
 				{
 					"Name": "QuantityReturned",
 					"Description": "The quantity of Line Items returned.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "QuantityReturned"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "integer",
 						"IsComplexType": false,
@@ -619,15 +615,15 @@
 						"Properties": {
 							"HIVE_TYPE_STRING": "integer"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "QuantityReturned"
 					}
 				},
 				{
 					"Name": "BookedTimestamp",
 					"Description": "The booked date of the Line Items.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "BookedTimestamp"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "timestamp",
 						"IsComplexType": false,
@@ -636,15 +632,15 @@
 							"TimestampFormat": "YYYY-MM-DD HH:MM:SS.fffffffff",
 							"HIVE_TYPE_STRING": "timestamp"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "BookedTimestamp"
 					}
 				},
 				{
 					"Name": "BilledTimestamp",
 					"Description": "The billed date of the Line Items.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "BilledTimestamp"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "timestamp",
 						"IsComplexType": false,
@@ -653,15 +649,15 @@
 							"TimestampFormat": "YYYY-MM-DD HH:MM:SS.fffffffff",
 							"HIVE_TYPE_STRING": "timestamp"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "BilledTimestamp"
 					}
 				},
 				{
 					"Name": "CancelledTimestamp",
 					"Description": "The date  and time that Line Items were cancelled.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "CancelledTimestamp"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "timestamp",
 						"IsComplexType": false,
@@ -670,15 +666,15 @@
 							"TimestampFormat": "YYYY-MM-DD HH:MM:SS.fffffffff",
 							"HIVE_TYPE_STRING": "timestamp"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "CancelledTimestamp"
 					}
 				},
 				{
 					"Name": "ReturnedTimestamp",
 					"Description": "The date that Line Items were returned.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "ReturnedTimestamp"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "timestamp",
 						"IsComplexType": false,
@@ -687,15 +683,15 @@
 							"TimestampFormat": "YYYY-MM-DD HH:MM:SS.fffffffff",
 							"HIVE_TYPE_STRING": "timestamp"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "ReturnedTimestamp"
 					}
 				},
 				{
 					"Name": "CommittedShipmentTimestamp",
 					"Description": "The timestamp committed for shipment of the Line Item.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "CommittedShipmentTimestamp"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "timestamp",
 						"IsComplexType": false,
@@ -704,15 +700,15 @@
 							"TimestampFormat": "YYYY-MM-DD HH:MM:SS.fffffffff",
 							"HIVE_TYPE_STRING": "timestamp"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "CommittedShipmentTimestamp"
 					}
 				},
 				{
 					"Name": "RequestedDeliveryTimestamp",
 					"Description": "The timestamp for delivery of the Line Item requested by the Customer/Customer Account.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "RequestedDeliveryTimestamp"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "timestamp",
 						"IsComplexType": false,
@@ -721,15 +717,15 @@
 							"TimestampFormat": "YYYY-MM-DD HH:MM:SS.fffffffff",
 							"HIVE_TYPE_STRING": "timestamp"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "RequestedDeliveryTimestamp"
 					}
 				},
 				{
 					"Name": "CommittedDeliveryTimestamp",
 					"Description": "The timestamp committed for delivery of the Line Item.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "CommittedDeliveryTimestamp"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "timestamp",
 						"IsComplexType": false,
@@ -738,15 +734,15 @@
 							"TimestampFormat": "YYYY-MM-DD HH:MM:SS.fffffffff",
 							"HIVE_TYPE_STRING": "timestamp"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "CommittedDeliveryTimestamp"
 					}
 				},
 				{
 					"Name": "CommittedAvailableForPickupTimestamp",
 					"Description": "The timestamp committed for the Line Item to be available for pickup.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "CommittedAvailableForPickupTimestamp"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "timestamp",
 						"IsComplexType": false,
@@ -755,15 +751,15 @@
 							"TimestampFormat": "YYYY-MM-DD HH:MM:SS.fffffffff",
 							"HIVE_TYPE_STRING": "timestamp"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "CommittedAvailableForPickupTimestamp"
 					}
 				},
 				{
 					"Name": "PlannedPickTimestamp",
 					"Description": "The planned inventory pick timestamp for the Line Items.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "PlannedPickTimestamp"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "timestamp",
 						"IsComplexType": false,
@@ -772,15 +768,15 @@
 							"TimestampFormat": "YYYY-MM-DD HH:MM:SS.fffffffff",
 							"HIVE_TYPE_STRING": "timestamp"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "PlannedPickTimestamp"
 					}
 				},
 				{
 					"Name": "ActualPickTimestamp",
 					"Description": "The actual inventory pick timestamp for the Line Items.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "ActualPickTimestamp"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "timestamp",
 						"IsComplexType": false,
@@ -789,15 +785,15 @@
 							"TimestampFormat": "YYYY-MM-DD HH:MM:SS.fffffffff",
 							"HIVE_TYPE_STRING": "timestamp"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "ActualPickTimestamp"
 					}
 				},
 				{
 					"Name": "PlannedShipmentTimestamp",
 					"Description": "The planned shipment timestamp of the Line Items.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "PlannedShipmentTimestamp"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "timestamp",
 						"IsComplexType": false,
@@ -806,15 +802,15 @@
 							"TimestampFormat": "YYYY-MM-DD HH:MM:SS.fffffffff",
 							"HIVE_TYPE_STRING": "timestamp"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "PlannedShipmentTimestamp"
 					}
 				},
 				{
 					"Name": "ActualShipmentTimestamp",
 					"Description": "The actual shipment timestamp of the Line Items.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "ActualShipmentTimestamp"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "timestamp",
 						"IsComplexType": false,
@@ -823,15 +819,15 @@
 							"TimestampFormat": "YYYY-MM-DD HH:MM:SS.fffffffff",
 							"HIVE_TYPE_STRING": "timestamp"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "ActualShipmentTimestamp"
 					}
 				},
 				{
 					"Name": "PlannedDeliveryTimestamp",
 					"Description": "The planned delivery timestamp of the Line Items.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "PlannedDeliveryTimestamp"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "timestamp",
 						"IsComplexType": false,
@@ -840,15 +836,15 @@
 							"TimestampFormat": "YYYY-MM-DD HH:MM:SS.fffffffff",
 							"HIVE_TYPE_STRING": "timestamp"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "PlannedDeliveryTimestamp"
 					}
 				},
 				{
 					"Name": "ActualDeliveryTimestamp",
 					"Description": "The actual delivery timestamp of the line items.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "ActualDeliveryTimestamp"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "timestamp",
 						"IsComplexType": false,
@@ -857,15 +853,15 @@
 							"TimestampFormat": "YYYY-MM-DD HH:MM:SS.fffffffff",
 							"HIVE_TYPE_STRING": "timestamp"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "ActualDeliveryTimestamp"
 					}
 				},
 				{
 					"Name": "DeliveryConfirmationTimestamp",
 					"Description": "The timestamp that the shipment/delivery confirmation notice was sent to the Customer/Customer Account.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "DeliveryConfirmationTimestamp"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "timestamp",
 						"IsComplexType": false,
@@ -874,15 +870,15 @@
 							"TimestampFormat": "YYYY-MM-DD HH:MM:SS.fffffffff",
 							"HIVE_TYPE_STRING": "timestamp"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "DeliveryConfirmationTimestamp"
 					}
 				},
 				{
 					"Name": "ShipmentChargeAmount",
 					"Description": "The amount the customer has been charged for shipping.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "ShipmentChargeAmount"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "decimal",
 						"IsComplexType": false,
@@ -892,15 +888,15 @@
 						"Properties": {
 							"HIVE_TYPE_STRING": "decimal"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "ShipmentChargeAmount"
 					}
 				},
 				{
 					"Name": "ShipmentCostAmount",
 					"Description": "The amount that the shipping cost.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "ShipmentCostAmount"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "decimal",
 						"IsComplexType": false,
@@ -910,15 +906,15 @@
 						"Properties": {
 							"HIVE_TYPE_STRING": "decimal"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "ShipmentCostAmount"
 					}
 				},
 				{
 					"Name": "PickPackageCostAmount",
 					"Description": "The cost associated with picking a packing the item. This amount is normally included in the overall shipment cost.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "PickPackageCostAmount"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "decimal",
 						"IsComplexType": false,
@@ -928,15 +924,15 @@
 						"Properties": {
 							"HIVE_TYPE_STRING": "decimal"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "PickPackageCostAmount"
 					}
 				},
 				{
 					"Name": "ShippingLocationId",
 					"Description": "The unique identifier of a Location.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "ShippingLocationId"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "integer",
 						"IsComplexType": false,
@@ -944,15 +940,15 @@
 						"Properties": {
 							"HIVE_TYPE_STRING": "integer"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "ShippingLocationId"
 					}
 				},
 				{
 					"Name": "ShipmentMethodId",
 					"Description": "The unique identifier of a Shipment Method.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "ShipmentMethodId"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "integer",
 						"IsComplexType": false,
@@ -960,15 +956,15 @@
 						"Properties": {
 							"HIVE_TYPE_STRING": "integer"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "ShipmentMethodId"
 					}
 				},
 				{
 					"Name": "DropShipLineItemIndicator",
 					"Description": "Indicates that the Line Item(s) are to be drop shipped.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "DropShipLineItemIndicator"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "boolean",
 						"IsComplexType": false,
@@ -976,15 +972,15 @@
 						"Properties": {
 							"HIVE_TYPE_STRING": "boolean"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "DropShipLineItemIndicator"
 					}
 				},
 				{
 					"Name": "WaybillNumber",
 					"Description": "The shipment waybill number.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "WaybillNumber"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "integer",
 						"IsComplexType": false,
@@ -992,15 +988,15 @@
 						"Properties": {
 							"HIVE_TYPE_STRING": "integer"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "WaybillNumber"
 					}
 				},
 				{
 					"Name": "TareWeight",
 					"Description": "The weight of the line items excluding packaging.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "TareWeight"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "decimal",
 						"IsComplexType": false,
@@ -1010,15 +1006,15 @@
 						"Properties": {
 							"HIVE_TYPE_STRING": "decimal"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "TareWeight"
 					}
 				},
 				{
 					"Name": "NetWeight",
 					"Description": "The weight of the line items including packaging.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "NetWeight"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "decimal",
 						"IsComplexType": false,
@@ -1028,15 +1024,15 @@
 						"Properties": {
 							"HIVE_TYPE_STRING": "decimal"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "NetWeight"
 					}
 				},
 				{
 					"Name": "ShipCompleteIndicator",
 					"Description": "Indicates that the Transaction item(s) are only to be shipped when complete - no partial shipments.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "ShipCompleteIndicator"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "boolean",
 						"IsComplexType": false,
@@ -1044,15 +1040,15 @@
 						"Properties": {
 							"HIVE_TYPE_STRING": "boolean"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "ShipCompleteIndicator"
 					}
 				},
 				{
 					"Name": "EarliestDeliveryWindowTimestamp",
 					"Description": "The earliest timestamp that the transaction should be made available for delivery.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "EarliestDeliveryWindowTimestamp"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "timestamp",
 						"IsComplexType": false,
@@ -1061,15 +1057,15 @@
 							"TimestampFormat": "YYYY-MM-DD HH:MM:SS.fffffffff",
 							"HIVE_TYPE_STRING": "timestamp"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "EarliestDeliveryWindowTimestamp"
 					}
 				},
 				{
 					"Name": "LatestDeliveryWindowTimestamp",
 					"Description": "The latest timestamp that the transaction should be made available for delivery.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "LatestDeliveryWindowTimestamp"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "timestamp",
 						"IsComplexType": false,
@@ -1078,15 +1074,15 @@
 							"TimestampFormat": "YYYY-MM-DD HH:MM:SS.fffffffff",
 							"HIVE_TYPE_STRING": "timestamp"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "LatestDeliveryWindowTimestamp"
 					}
 				},
 				{
 					"Name": "ReturnOfTransactionId",
 					"Description": "The unique identifier of a Transaction.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "ReturnOfTransactionId"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "long",
 						"IsComplexType": false,
@@ -1094,15 +1090,15 @@
 						"Properties": {
 							"HIVE_TYPE_STRING": "long"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "ReturnOfTransactionId"
 					}
 				},
 				{
 					"Name": "ReturnOfTransactionLineItemId",
 					"Description": "The unique identifier that identifies the Transaction Line Item.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "ReturnOfTransactionLineItemId"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "integer",
 						"IsComplexType": false,
@@ -1110,15 +1106,15 @@
 						"Properties": {
 							"HIVE_TYPE_STRING": "integer"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "ReturnOfTransactionLineItemId"
 					}
 				},
 				{
 					"Name": "ReturnToStockIndicator",
 					"Description": "Indicates that the Line Item(s) were returned to stock.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "ReturnToStockIndicator"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "boolean",
 						"IsComplexType": false,
@@ -1126,15 +1122,15 @@
 						"Properties": {
 							"HIVE_TYPE_STRING": "boolean"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "ReturnToStockIndicator"
 					}
 				},
 				{
 					"Name": "ReturnToStoreIndicator",
 					"Description": "Indicates that the Line Item(s) were returned to the store from which they were purchased.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "ReturnToStoreIndicator"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "boolean",
 						"IsComplexType": false,
@@ -1142,15 +1138,15 @@
 						"Properties": {
 							"HIVE_TYPE_STRING": "boolean"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "ReturnToStoreIndicator"
 					}
 				},
 				{
 					"Name": "ApprovedByEmployeeId",
 					"Description": "The unique identifier of an Employee.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "ApprovedByEmployeeId"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "integer",
 						"IsComplexType": false,
@@ -1158,15 +1154,15 @@
 						"Properties": {
 							"HIVE_TYPE_STRING": "integer"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "ApprovedByEmployeeId"
 					}
 				},
 				{
 					"Name": "SalesChannelId",
 					"Description": "The unique identifier of a Channel.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "SalesChannelId"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "integer",
 						"IsComplexType": false,
@@ -1174,15 +1170,15 @@
 						"Properties": {
 							"HIVE_TYPE_STRING": "integer"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "SalesChannelId"
 					}
 				},
 				{
 					"Name": "DistributionChannelId",
 					"Description": "The unique identifier of a Channel.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "DistributionChannelId"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "integer",
 						"IsComplexType": false,
@@ -1190,15 +1186,15 @@
 						"Properties": {
 							"HIVE_TYPE_STRING": "integer"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "DistributionChannelId"
 					}
 				},
 				{
 					"Name": "TransactionLineItemTypeId",
 					"Description": "The unique identifier of a Transaction Line Item Type.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "TransactionLineItemTypeId"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "integer",
 						"IsComplexType": false,
@@ -1206,15 +1202,15 @@
 						"Properties": {
 							"HIVE_TYPE_STRING": "integer"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "TransactionLineItemTypeId"
 					}
 				},
 				{
 					"Name": "FuelPumpId",
 					"Description": "The unique identifier of a Fuel Pump.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "FuelPumpId"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "integer",
 						"IsComplexType": false,
@@ -1222,15 +1218,15 @@
 						"Properties": {
 							"HIVE_TYPE_STRING": "integer"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "FuelPumpId"
 					}
 				},
 				{
 					"Name": "BuyClassId",
 					"Description": "The unique identifier of a Buy Class.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "BuyClassId"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "integer",
 						"IsComplexType": false,
@@ -1238,15 +1234,15 @@
 						"Properties": {
 							"HIVE_TYPE_STRING": "integer"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "BuyClassId"
 					}
 				},
 				{
 					"Name": "PromotionId",
 					"Description": "The unique identifier of a Promotion.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "PromotionId"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "integer",
 						"IsComplexType": false,
@@ -1254,15 +1250,15 @@
 						"Properties": {
 							"HIVE_TYPE_STRING": "integer"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "PromotionId"
 					}
 				},
 				{
 					"Name": "PharmacyId",
 					"Description": "The number assigned by the NABP to identify the pharmacy",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "PharmacyId"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "integer",
 						"IsComplexType": false,
@@ -1270,15 +1266,15 @@
 						"Properties": {
 							"HIVE_TYPE_STRING": "integer"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "PharmacyId"
 					}
 				},
 				{
 					"Name": "PharmacyTransactionId",
 					"Description": "The number assigned by the Pharmacy to identify prescription fulfillment.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "PharmacyTransactionId"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "long",
 						"IsComplexType": false,
@@ -1286,15 +1282,15 @@
 						"Properties": {
 							"HIVE_TYPE_STRING": "long"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "PharmacyTransactionId"
 					}
 				},
 				{
 					"Name": "PromotionOfferId",
 					"Description": "The unique identifier of a Promotion Offer. The Promotion Offer ID is unique to each account or party that is offered to.",
-					"BaseAttributeReference": {
-						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
-						"Name": "PromotionOfferId"
-					},
 					"OriginDataTypeName": {
 						"TypeName": "integer",
 						"IsComplexType": false,
@@ -1302,24 +1298,21 @@
 						"Properties": {
 							"HIVE_TYPE_STRING": "integer"
 						}
+					},
+					"BaseAttributeReference": {
+						"Entity": "TransactionLineItem.cdm.json/TransactionLineItem",
+						"Name": "PromotionOfferId"
 					}
 				}
 			],
 			"Format": {
-				"InputFormat": "org.apache.hadoop.mapred.SequenceFileInputFormat",
-				"OutputFormat": "org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat",
-				"FormatType": "csv",
-				"SerializeLib": "org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe",
+				"InputFormat": "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat",
+				"OutputFormat": "org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat",
+				"FormatType": "parquet",
+				"SerializeLib": "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe",
 				"Properties": {
 					"path": "abfss://synapse@ivsdatastorage.dfs.core.windows.net/ivs-synapse-dldb/TransactionLineItem",
-					"delimiter": ",",
-					"multiLine": "false",
-					"firstRowAsHeader": "false",
-					"serialization.format": "1",
-					"escape": "\\",
-					"quote": "\"",
-					"FormatTypeSetToDatabaseDefault": true,
-					"header": "false"
+					"FormatTypeSetToDatabaseDefault": true
 				}
 			},
 			"Source": {
@@ -1343,7 +1336,7 @@
 			"Description": "The components of an Transaction broken down by Product and Quantity, one per line item.",
 			"DisplayFolderInfo": "{\"name\":\"Transaction\",\"colorCode\":\"#F775C5\"}",
 			"PrimaryKeys": "TransactionId,TransactionLineItemId",
-			"spark.sql.sources.provider": "csv"
+			"spark.sql.sources.provider": "parquet"
 		},
 		"Retention": 0,
 		"Temporary": false,
