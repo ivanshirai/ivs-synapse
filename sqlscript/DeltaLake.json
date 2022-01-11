@@ -1,0 +1,17 @@
+{
+	"name": "DeltaLake",
+	"properties": {
+		"content": {
+			"query": "SELECT TOP 10 *\nFROM OPENROWSET(\n    BULK 'https://ivsdatastorage.blob.core.windows.net/synapse/ivs-synapse-dldb/Party/',\n    FORMAT = 'delta') as rows;\n\nCREATE OR ALTER VIEW dbo.Party_delta AS\nSELECT * FROM\nOPENROWSET( BULK 'https://ivsdatastorage.blob.core.windows.net/synapse/ivs-synapse-dldb/Party/', \nFORMAT = 'delta') as r\n\nselect * from dbo.Party_delta",
+			"metadata": {
+				"language": "sql"
+			},
+			"currentConnection": {
+				"databaseName": "ivs_od_sqlpool",
+				"poolName": "Built-in"
+			},
+			"resultLimit": 5000
+		},
+		"type": "SqlQuery"
+	}
+}
