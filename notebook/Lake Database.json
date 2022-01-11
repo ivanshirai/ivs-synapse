@@ -17,7 +17,7 @@
 				"spark.dynamicAllocation.enabled": "false",
 				"spark.dynamicAllocation.minExecutors": "2",
 				"spark.dynamicAllocation.maxExecutors": "2",
-				"spark.autotune.trackingId": "4c424811-e2e6-4508-974e-2d6ae019ef85"
+				"spark.autotune.trackingId": "550f10fe-563b-4938-a81e-efedf1a63f89"
 			}
 		},
 		"metadata": {
@@ -230,10 +230,10 @@
 				},
 				"source": [
 					"%%sql\r\n",
-					"UPDATE Party_delta SET PartyName = 'TestPartyUpserted'\r\n",
-					"    where partyId = 2"
+					"UPDATE Party_delta SET dte = '2021-03-16'\r\n",
+					"    where partyId = 1"
 				],
-				"execution_count": 18
+				"execution_count": 19
 			},
 			{
 				"cell_type": "code",
