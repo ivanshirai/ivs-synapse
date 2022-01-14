@@ -1,0 +1,41 @@
+{
+	"name": "serverlessview",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "ivs_od_sqlpool",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "AzureSqlDWTable",
+		"schema": [
+			{
+				"name": "PartyId",
+				"type": "bigint",
+				"precision": 19
+			},
+			{
+				"name": "PartyName",
+				"type": "varchar"
+			},
+			{
+				"name": "PartyTypeId",
+				"type": "int",
+				"precision": 10
+			},
+			{
+				"name": "GlobalLocationNumber",
+				"type": "decimal",
+				"precision": 13,
+				"scale": 0
+			},
+			{
+				"name": "dte",
+				"type": "date"
+			}
+		],
+		"typeProperties": {
+			"schema": "dbo",
+			"table": "Party_delta"
+		}
+	}
+}
