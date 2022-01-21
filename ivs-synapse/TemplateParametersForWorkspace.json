@@ -8,6 +8,9 @@
 		"ivs-synapse-WorkspaceDefaultSqlServer_connectionString": {
 			"value": ""
 		},
+		"ivs_od_sqlpool_connectionString": {
+			"value": ""
+		},
 		"ivs-synapse-WorkspaceDefaultStorage_properties_typeProperties_url": {
 			"value": "https://ivsdatastorage.dfs.core.windows.net"
 		},
