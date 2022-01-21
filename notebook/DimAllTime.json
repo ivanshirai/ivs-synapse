@@ -1,0 +1,160 @@
+{
+	"name": "DimAllTime",
+	"properties": {
+		"nbformat": 4,
+		"nbformat_minor": 2,
+		"bigDataPool": {
+			"referenceName": "ivsspark",
+			"type": "BigDataPoolReference"
+		},
+		"sessionProperties": {
+			"driverMemory": "28g",
+			"driverCores": 4,
+			"executorMemory": "28g",
+			"executorCores": 4,
+			"numExecutors": 2,
+			"conf": {
+				"spark.dynamicAllocation.enabled": "false",
+				"spark.dynamicAllocation.minExecutors": "2",
+				"spark.dynamicAllocation.maxExecutors": "2",
+				"spark.autotune.trackingId": "f52d8cc9-2a77-4df8-ae69-6c980336dc57"
+			}
+		},
+		"metadata": {
+			"saveOutput": true,
+			"enableDebugMode": false,
+			"kernelspec": {
+				"name": "synapse_pyspark",
+				"display_name": "Synapse PySpark"
+			},
+			"language_info": {
+				"name": "python"
+			},
+			"a365ComputeOptions": {
+				"id": "/subscriptions/f939f8f3-2652-4a45-88ae-78a7782ec9df/resourceGroups/ivs-dwh-rg/providers/Microsoft.Synapse/workspaces/ivs-synapse/bigDataPools/ivsspark",
+				"name": "ivsspark",
+				"type": "Spark",
+				"endpoint": "https://ivs-synapse.dev.azuresynapse.net/livyApi/versions/2019-11-01-preview/sparkPools/ivsspark",
+				"auth": {
+					"type": "AAD",
+					"authResource": "https://dev.azuresynapse.net"
+				},
+				"sparkVersion": "3.1",
+				"nodeCount": 3,
+				"cores": 4,
+				"memory": 28,
+				"automaticScaleJobs": false
+			},
+			"sessionKeepAliveTimeout": 30
+		},
+		"cells": [
+			{
+				"cell_type": "markdown",
+				"metadata": {
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"Read csvs and create temp views"
+				]
+			},
+			{
+				"cell_type": "code",
+				"source": [
+					"fiscal_year = spark.read.csv('abfss://spark@ivsdatastorage.dfs.core.windows.net/source/FiscalYear.csv', \r\n",
+					"    header = True)\r\n",
+					"\r\n",
+					"fiscal_year.createOrReplaceTempView('fy_view')\r\n",
+					"\r\n",
+					"fiscal_period = spark.read.csv('abfss://spark@ivsdatastorage.dfs.core.windows.net/source/FiscalPeriod.csv', \r\n",
+					"    header = True)\r\n",
+					"\r\n",
+					"fiscal_period.createOrReplaceTempView('fp_view')\r\n",
+					""
+				],
+				"execution_count": 17
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					},
+					"microsoft": {
+						"language": "sparksql"
+					},
+					"collapsed": false
+				},
+				"source": [
+					"%%sql\r\n",
+					"CREATE OR REPLACE TEMP VIEW DimAllTimeStg1 AS\r\n",
+					"\r\n",
+					"SELECT concat(CALENDAR, ',YEAR,', FISCALYEAR) DIM_ALL_TIME_ID,\r\n",
+					"'YEAR' GRAIN_LEVEL,\r\n",
+					"CALENDAR,\r\n",
+					"FISCALYEAR,\r\n",
+					"CAST(STARTDATE as timestamp) STARTDATE,\r\n",
+					"CAST(ENDDATE as timestamp) ENDDATE,\r\n",
+					"NULL CALENDARTYPE,\r\n",
+					"NULL QUARTER,\r\n",
+					"NULL MONTH,\r\n",
+					"NULL PERIODNAME,\r\n",
+					"NULL SHORTNAME,\r\n",
+					"NULL TYPE,\r\n",
+					"NULL DAYS\r\n",
+					"FROM fy_view\r\n",
+					"\r\n",
+					"UNION\r\n",
+					"\r\n",
+					"SELECT concat(CALENDAR, ',PERIOD,', FISCALYEAR, ',', replace(PERIODNAME, 'Period ', '')) DIM_ALL_TIME_ID,\r\n",
+					"'PERIOD' GRAIN_LEVEL,\r\n",
+					"CALENDAR,\r\n",
+					"FISCALYEAR,\r\n",
+					"CAST(STARTDATE as timestamp) STARTDATE,\r\n",
+					"CAST(ENDDATE as timestamp) ENDDATE,\r\n",
+					"CALENDARTYPE,\r\n",
+					"QUARTER,\r\n",
+					"MONTH,\r\n",
+					"PERIODNAME,\r\n",
+					"SHORTNAME,\r\n",
+					"TYPE,\r\n",
+					"DAYS\r\n",
+					"FROM fp_view"
+				],
+				"execution_count": 27
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					},
+					"microsoft": {
+						"language": "sparksql"
+					},
+					"collapsed": false
+				},
+				"source": [
+					"%%sql\r\n",
+					"SELECT * FROM DimAllTimeStg1 LIMIT 10"
+				],
+				"execution_count": 30
+			}
+		]
+	}
+}
