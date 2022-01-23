@@ -1879,7 +1879,7 @@
 						"spark.dynamicAllocation.enabled": "false",
 						"spark.dynamicAllocation.minExecutors": "2",
 						"spark.dynamicAllocation.maxExecutors": "2",
-						"spark.autotune.trackingId": "bb43e681-492f-4b15-83b4-3b3943092b02"
+						"spark.autotune.trackingId": "4ca85c32-02f2-4a9d-a9aa-f9e4bbaadba8"
 					}
 				},
 				"metadata": {
@@ -1904,10 +1904,8 @@
 						"sparkVersion": "3.1",
 						"nodeCount": 3,
 						"cores": 4,
-						"memory": 28,
-						"automaticScaleJobs": false
-					},
-					"sessionKeepAliveTimeout": 30
+						"memory": 28
+					}
 				},
 				"cells": [
 					{
@@ -1925,7 +1923,6 @@
 					},
 					{
 						"cell_type": "code",
-						"metadata": {},
 						"source": [
 							"new_rows = [('CA',22, 45000),(\"WA\",35,65000) ,(\"WA\",50,85000)]\r\n",
 							"demo_df = spark.createDataFrame(new_rows, ['state', 'age', 'salary'])\r\n",
@@ -2094,7 +2091,7 @@
 			"dependsOn": []
 		},
 		{
-			"name": "[concat(parameters('workspaceName'), '/Lake Database')]",
+			"name": "[concat(parameters('workspaceName'), '/DimAllTime')]",
 			"type": "Microsoft.Synapse/workspaces/notebooks",
 			"apiVersion": "2019-06-01-preview",
 			"properties": {
@@ -2114,7 +2111,7 @@
 						"spark.dynamicAllocation.enabled": "false",
 						"spark.dynamicAllocation.minExecutors": "2",
 						"spark.dynamicAllocation.maxExecutors": "2",
-						"spark.autotune.trackingId": "1370b42b-24c2-42ad-b82a-f0adc2630c64"
+						"spark.autotune.trackingId": "1e06df33-fcd8-4dad-bade-ea9507efa2b2"
 					}
 				},
 				"metadata": {
@@ -2143,6 +2140,173 @@
 						"automaticScaleJobs": false
 					},
 					"sessionKeepAliveTimeout": 30
+				},
+				"cells": [
+					{
+						"cell_type": "markdown",
+						"metadata": {
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"Read csvs and create temp views"
+						]
+					},
+					{
+						"cell_type": "code",
+						"metadata": {},
+						"source": [
+							"fiscal_year = spark.read.csv('abfss://spark@ivsdatastorage.dfs.core.windows.net/source/FiscalYear.csv', \r\n",
+							"    header = True)\r\n",
+							"\r\n",
+							"fiscal_year.createOrReplaceTempView('fy_view')\r\n",
+							"\r\n",
+							"fiscal_period = spark.read.csv('abfss://spark@ivsdatastorage.dfs.core.windows.net/source/FiscalPeriod.csv', \r\n",
+							"    header = True)\r\n",
+							"\r\n",
+							"fiscal_period.createOrReplaceTempView('fp_view')\r\n",
+							""
+						],
+						"outputs": [],
+						"execution_count": 8
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							},
+							"microsoft": {},
+							"collapsed": false
+						},
+						"source": [
+							"df_stg = spark.sql(\"SELECT concat(CALENDAR, ',YEAR,', FISCALYEAR) DIM_ALL_TIME_ID, \" +\r\n",
+							"    \"'YEAR' GRAIN_LEVEL, \"+\r\n",
+							"    \"CALENDAR, \" +\r\n",
+							"    \"FISCALYEAR, \" +\r\n",
+							"    \"CAST(STARTDATE as timestamp) STARTDATE, \" +\r\n",
+							"    \"CAST(ENDDATE as timestamp) ENDDATE, \" +\r\n",
+							"    \"NULL CALENDARTYPE, \" +\r\n",
+							"    \"NULL QUARTER, \" +\r\n",
+							"    \"NULL MONTH, \" +\r\n",
+							"    \"NULL PERIODNAME, \" +\r\n",
+							"    \"NULL SHORTNAME, \" +\r\n",
+							"    \"NULL TYPE, \" +\r\n",
+							"    \"NULL DAYS \" +\r\n",
+							"    \"FROM fy_view \" +\r\n",
+							"    \"UNION \" +\r\n",
+							"    \"SELECT concat(CALENDAR, ',PERIOD,', FISCALYEAR, ',', replace(PERIODNAME, 'Period ', '')) DIM_ALL_TIME_ID, \" +\r\n",
+							"    \"'PERIOD' GRAIN_LEVEL, \" +\r\n",
+							"    \"CALENDAR, \" +\r\n",
+							"    \"FISCALYEAR, \" +\r\n",
+							"    \"CAST(STARTDATE as timestamp) STARTDATE, \" +\r\n",
+							"    \"CAST(ENDDATE as timestamp) ENDDATE, \" +\r\n",
+							"    \"CALENDARTYPE, \" +\r\n",
+							"    \"QUARTER, \" +\r\n",
+							"    \"MONTH, \" +\r\n",
+							"    \"PERIODNAME, \" +\r\n",
+							"    \"SHORTNAME, \" +\r\n",
+							"    \"TYPE, \" +\r\n",
+							"    \"DAYS \" +\r\n",
+							"    \"FROM fp_view \")\r\n",
+							"\r\n",
+							"df_stg.show()"
+						],
+						"outputs": [],
+						"execution_count": 49
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							},
+							"microsoft": {},
+							"collapsed": false
+						},
+						"source": [
+							"from pyspark.sql.functions import lit\r\n",
+							"\r\n",
+							"df_stg = df_stg.withColumn('CALYEAR', lit(None).cast('integer'))\r\n",
+							"\r\n",
+							"for row in df_stg.where(\"CALENDAR = 'Fiscal' and GRAIN_LEVEL = 'YEAR'\").collect():\r\n",
+							"    newrow = spark.createDataFrame([('Gegorian,YEAR,' + row['FISCALYEAR'], row['GRAIN_LEVEL'], 'Gregorian', row['FISCALYEAR'], row['FISCALYEAR'] + '-01-01', row['FISCALYEAR'] + '-12-31')],\r\n",
+							"        ['DIM_ALL_TIME_ID', 'GRAIN_LEVEL', 'CALENDAR', 'CALYEAR', 'STARTDATE', 'ENDDATE'])\r\n",
+							"    df_stg = df_stg.unionByName(newrow, allowMissingColumns=True)\r\n",
+							"\r\n",
+							"df_stg.where(\"GRAIN_LEVEL = 'YEAR'\").show()\r\n",
+							""
+						],
+						"outputs": [],
+						"execution_count": 57
+					}
+				]
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/Lake Database')]",
+			"type": "Microsoft.Synapse/workspaces/notebooks",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"nbformat": 4,
+				"nbformat_minor": 2,
+				"bigDataPool": {
+					"referenceName": "ivsspark",
+					"type": "BigDataPoolReference"
+				},
+				"sessionProperties": {
+					"driverMemory": "28g",
+					"driverCores": 4,
+					"executorMemory": "28g",
+					"executorCores": 4,
+					"numExecutors": 2,
+					"conf": {
+						"spark.dynamicAllocation.enabled": "false",
+						"spark.dynamicAllocation.minExecutors": "2",
+						"spark.dynamicAllocation.maxExecutors": "2",
+						"spark.autotune.trackingId": "7bbea90f-984d-46b3-ac0e-10b17a70747d"
+					}
+				},
+				"metadata": {
+					"saveOutput": true,
+					"enableDebugMode": false,
+					"kernelspec": {
+						"name": "synapse_pyspark",
+						"display_name": "Synapse PySpark"
+					},
+					"language_info": {
+						"name": "python"
+					},
+					"a365ComputeOptions": {
+						"id": "/subscriptions/f939f8f3-2652-4a45-88ae-78a7782ec9df/resourceGroups/ivs-dwh-rg/providers/Microsoft.Synapse/workspaces/ivs-synapse/bigDataPools/ivsspark",
+						"name": "ivsspark",
+						"type": "Spark",
+						"endpoint": "https://ivs-synapse.dev.azuresynapse.net/livyApi/versions/2019-11-01-preview/sparkPools/ivsspark",
+						"auth": {
+							"type": "AAD",
+							"authResource": "https://dev.azuresynapse.net"
+						},
+						"sparkVersion": "3.1",
+						"nodeCount": 3,
+						"cores": 4,
+						"memory": 28
+					}
 				},
 				"cells": [
 					{
@@ -2843,173 +3007,6 @@
 			"apiVersion": "2019-06-01-preview",
 			"properties": {
 				"annotations": []
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('workspaceName'), '/DimAllTime')]",
-			"type": "Microsoft.Synapse/workspaces/notebooks",
-			"apiVersion": "2019-06-01-preview",
-			"properties": {
-				"nbformat": 4,
-				"nbformat_minor": 2,
-				"bigDataPool": {
-					"referenceName": "ivsspark",
-					"type": "BigDataPoolReference"
-				},
-				"sessionProperties": {
-					"driverMemory": "28g",
-					"driverCores": 4,
-					"executorMemory": "28g",
-					"executorCores": 4,
-					"numExecutors": 2,
-					"conf": {
-						"spark.dynamicAllocation.enabled": "false",
-						"spark.dynamicAllocation.minExecutors": "2",
-						"spark.dynamicAllocation.maxExecutors": "2",
-						"spark.autotune.trackingId": "77e2c7b9-38d2-4d1e-ace9-431b86b3417a"
-					}
-				},
-				"metadata": {
-					"saveOutput": true,
-					"enableDebugMode": false,
-					"kernelspec": {
-						"name": "synapse_pyspark",
-						"display_name": "Synapse PySpark"
-					},
-					"language_info": {
-						"name": "python"
-					},
-					"a365ComputeOptions": {
-						"id": "/subscriptions/f939f8f3-2652-4a45-88ae-78a7782ec9df/resourceGroups/ivs-dwh-rg/providers/Microsoft.Synapse/workspaces/ivs-synapse/bigDataPools/ivsspark",
-						"name": "ivsspark",
-						"type": "Spark",
-						"endpoint": "https://ivs-synapse.dev.azuresynapse.net/livyApi/versions/2019-11-01-preview/sparkPools/ivsspark",
-						"auth": {
-							"type": "AAD",
-							"authResource": "https://dev.azuresynapse.net"
-						},
-						"sparkVersion": "3.1",
-						"nodeCount": 3,
-						"cores": 4,
-						"memory": 28,
-						"automaticScaleJobs": false
-					},
-					"sessionKeepAliveTimeout": 30
-				},
-				"cells": [
-					{
-						"cell_type": "markdown",
-						"metadata": {
-							"nteract": {
-								"transient": {
-									"deleting": false
-								}
-							}
-						},
-						"source": [
-							"Read csvs and create temp views"
-						]
-					},
-					{
-						"cell_type": "code",
-						"metadata": {},
-						"source": [
-							"fiscal_year = spark.read.csv('abfss://spark@ivsdatastorage.dfs.core.windows.net/source/FiscalYear.csv', \r\n",
-							"    header = True)\r\n",
-							"\r\n",
-							"fiscal_year.createOrReplaceTempView('fy_view')\r\n",
-							"\r\n",
-							"fiscal_period = spark.read.csv('abfss://spark@ivsdatastorage.dfs.core.windows.net/source/FiscalPeriod.csv', \r\n",
-							"    header = True)\r\n",
-							"\r\n",
-							"fiscal_period.createOrReplaceTempView('fp_view')\r\n",
-							""
-						],
-						"outputs": [],
-						"execution_count": 17
-					},
-					{
-						"cell_type": "code",
-						"metadata": {
-							"jupyter": {
-								"source_hidden": false,
-								"outputs_hidden": false
-							},
-							"nteract": {
-								"transient": {
-									"deleting": false
-								}
-							},
-							"microsoft": {
-								"language": "sparksql"
-							},
-							"collapsed": false
-						},
-						"source": [
-							"%%sql\r\n",
-							"CREATE OR REPLACE TEMP VIEW DimAllTimeStg1 AS\r\n",
-							"\r\n",
-							"SELECT concat(CALENDAR, ',YEAR,', FISCALYEAR) DIM_ALL_TIME_ID,\r\n",
-							"'YEAR' GRAIN_LEVEL,\r\n",
-							"CALENDAR,\r\n",
-							"FISCALYEAR,\r\n",
-							"CAST(STARTDATE as timestamp) STARTDATE,\r\n",
-							"CAST(ENDDATE as timestamp) ENDDATE,\r\n",
-							"NULL CALENDARTYPE,\r\n",
-							"NULL QUARTER,\r\n",
-							"NULL MONTH,\r\n",
-							"NULL PERIODNAME,\r\n",
-							"NULL SHORTNAME,\r\n",
-							"NULL TYPE,\r\n",
-							"NULL DAYS\r\n",
-							"FROM fy_view\r\n",
-							"\r\n",
-							"UNION\r\n",
-							"\r\n",
-							"SELECT concat(CALENDAR, ',PERIOD,', FISCALYEAR, ',', replace(PERIODNAME, 'Period ', '')) DIM_ALL_TIME_ID,\r\n",
-							"'PERIOD' GRAIN_LEVEL,\r\n",
-							"CALENDAR,\r\n",
-							"FISCALYEAR,\r\n",
-							"CAST(STARTDATE as timestamp) STARTDATE,\r\n",
-							"CAST(ENDDATE as timestamp) ENDDATE,\r\n",
-							"CALENDARTYPE,\r\n",
-							"QUARTER,\r\n",
-							"MONTH,\r\n",
-							"PERIODNAME,\r\n",
-							"SHORTNAME,\r\n",
-							"TYPE,\r\n",
-							"DAYS\r\n",
-							"FROM fp_view"
-						],
-						"outputs": [],
-						"execution_count": 27
-					},
-					{
-						"cell_type": "code",
-						"metadata": {
-							"jupyter": {
-								"source_hidden": false,
-								"outputs_hidden": false
-							},
-							"nteract": {
-								"transient": {
-									"deleting": false
-								}
-							},
-							"microsoft": {
-								"language": "sparksql"
-							},
-							"collapsed": false
-						},
-						"source": [
-							"%%sql\r\n",
-							"SELECT * FROM DimAllTimeStg1 LIMIT 10"
-						],
-						"outputs": [],
-						"execution_count": 30
-					}
-				]
 			},
 			"dependsOn": []
 		}
