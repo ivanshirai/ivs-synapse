@@ -17,7 +17,7 @@
 				"spark.dynamicAllocation.enabled": "false",
 				"spark.dynamicAllocation.minExecutors": "2",
 				"spark.dynamicAllocation.maxExecutors": "2",
-				"spark.autotune.trackingId": "f52d8cc9-2a77-4df8-ae69-6c980336dc57"
+				"spark.autotune.trackingId": "eb986576-31db-4f1b-a8e0-e74529f63b39"
 			}
 		},
 		"metadata": {
@@ -75,7 +75,7 @@
 					"fiscal_period.createOrReplaceTempView('fp_view')\r\n",
 					""
 				],
-				"execution_count": 17
+				"execution_count": 8
 			},
 			{
 				"cell_type": "code",
@@ -89,48 +89,42 @@
 							"deleting": false
 						}
 					},
-					"microsoft": {
-						"language": "sparksql"
-					},
 					"collapsed": false
 				},
 				"source": [
-					"%%sql\r\n",
-					"CREATE OR REPLACE TEMP VIEW DimAllTimeStg1 AS\r\n",
+					"df_stg = spark.sql(\"SELECT concat(CALENDAR, ',YEAR,', FISCALYEAR) DIM_ALL_TIME_ID, \" +\r\n",
+					"    \"'YEAR' GRAIN_LEVEL, \"+\r\n",
+					"    \"CALENDAR, \" +\r\n",
+					"    \"FISCALYEAR, \" +\r\n",
+					"    \"CAST(STARTDATE as timestamp) STARTDATE, \" +\r\n",
+					"    \"CAST(ENDDATE as timestamp) ENDDATE, \" +\r\n",
+					"    \"NULL CALENDARTYPE, \" +\r\n",
+					"    \"NULL QUARTER, \" +\r\n",
+					"    \"NULL MONTH, \" +\r\n",
+					"    \"NULL PERIODNAME, \" +\r\n",
+					"    \"NULL SHORTNAME, \" +\r\n",
+					"    \"NULL TYPE, \" +\r\n",
+					"    \"NULL DAYS \" +\r\n",
+					"    \"FROM fy_view \" +\r\n",
+					"    \"UNION \" +\r\n",
+					"    \"SELECT concat(CALENDAR, ',PERIOD,', FISCALYEAR, ',', replace(PERIODNAME, 'Period ', '')) DIM_ALL_TIME_ID, \" +\r\n",
+					"    \"'PERIOD' GRAIN_LEVEL, \" +\r\n",
+					"    \"CALENDAR, \" +\r\n",
+					"    \"FISCALYEAR, \" +\r\n",
+					"    \"CAST(STARTDATE as timestamp) STARTDATE, \" +\r\n",
+					"    \"CAST(ENDDATE as timestamp) ENDDATE, \" +\r\n",
+					"    \"CALENDARTYPE, \" +\r\n",
+					"    \"QUARTER, \" +\r\n",
+					"    \"MONTH, \" +\r\n",
+					"    \"PERIODNAME, \" +\r\n",
+					"    \"SHORTNAME, \" +\r\n",
+					"    \"TYPE, \" +\r\n",
+					"    \"DAYS \" +\r\n",
+					"    \"FROM fp_view \")\r\n",
 					"\r\n",
-					"SELECT concat(CALENDAR, ',YEAR,', FISCALYEAR) DIM_ALL_TIME_ID,\r\n",
-					"'YEAR' GRAIN_LEVEL,\r\n",
-					"CALENDAR,\r\n",
-					"FISCALYEAR,\r\n",
-					"CAST(STARTDATE as timestamp) STARTDATE,\r\n",
-					"CAST(ENDDATE as timestamp) ENDDATE,\r\n",
-					"NULL CALENDARTYPE,\r\n",
-					"NULL QUARTER,\r\n",
-					"NULL MONTH,\r\n",
-					"NULL PERIODNAME,\r\n",
-					"NULL SHORTNAME,\r\n",
-					"NULL TYPE,\r\n",
-					"NULL DAYS\r\n",
-					"FROM fy_view\r\n",
-					"\r\n",
-					"UNION\r\n",
-					"\r\n",
-					"SELECT concat(CALENDAR, ',PERIOD,', FISCALYEAR, ',', replace(PERIODNAME, 'Period ', '')) DIM_ALL_TIME_ID,\r\n",
-					"'PERIOD' GRAIN_LEVEL,\r\n",
-					"CALENDAR,\r\n",
-					"FISCALYEAR,\r\n",
-					"CAST(STARTDATE as timestamp) STARTDATE,\r\n",
-					"CAST(ENDDATE as timestamp) ENDDATE,\r\n",
-					"CALENDARTYPE,\r\n",
-					"QUARTER,\r\n",
-					"MONTH,\r\n",
-					"PERIODNAME,\r\n",
-					"SHORTNAME,\r\n",
-					"TYPE,\r\n",
-					"DAYS\r\n",
-					"FROM fp_view"
+					"df_stg.show()"
 				],
-				"execution_count": 27
+				"execution_count": 49
 			},
 			{
 				"cell_type": "code",
@@ -144,16 +138,22 @@
 							"deleting": false
 						}
 					},
-					"microsoft": {
-						"language": "sparksql"
-					},
 					"collapsed": false
 				},
 				"source": [
-					"%%sql\r\n",
-					"SELECT * FROM DimAllTimeStg1 LIMIT 10"
+					"from pyspark.sql.functions import lit\r\n",
+					"\r\n",
+					"df_stg = df_stg.withColumn('CALYEAR', lit(None).cast('integer'))\r\n",
+					"\r\n",
+					"for row in df_stg.where(\"CALENDAR = 'Fiscal' and GRAIN_LEVEL = 'YEAR'\").collect():\r\n",
+					"    newrow = spark.createDataFrame([('Gegorian,YEAR,' + row['FISCALYEAR'], row['GRAIN_LEVEL'], 'Gregorian', row['FISCALYEAR'], row['FISCALYEAR'] + '-01-01', row['FISCALYEAR'] + '-12-31')],\r\n",
+					"        ['DIM_ALL_TIME_ID', 'GRAIN_LEVEL', 'CALENDAR', 'CALYEAR', 'STARTDATE', 'ENDDATE'])\r\n",
+					"    df_stg = df_stg.unionByName(newrow, allowMissingColumns=True)\r\n",
+					"\r\n",
+					"df_stg.where(\"GRAIN_LEVEL = 'YEAR'\").show()\r\n",
+					""
 				],
-				"execution_count": 30
+				"execution_count": 57
 			}
 		]
 	}
