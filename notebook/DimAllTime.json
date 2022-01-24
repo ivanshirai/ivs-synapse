@@ -17,7 +17,7 @@
 				"spark.dynamicAllocation.enabled": "false",
 				"spark.dynamicAllocation.minExecutors": "2",
 				"spark.dynamicAllocation.maxExecutors": "2",
-				"spark.autotune.trackingId": "af0895e2-8afa-4cb1-afbe-f1c1e171042b"
+				"spark.autotune.trackingId": "41c91232-6cea-4fca-8cee-669451b3ead9"
 			}
 		},
 		"metadata": {
@@ -75,7 +75,7 @@
 					"fiscal_period.createOrReplaceTempView('fp_view')\r\n",
 					""
 				],
-				"execution_count": 1
+				"execution_count": 15
 			},
 			{
 				"cell_type": "markdown",
@@ -137,7 +137,7 @@
 					"\r\n",
 					"df_stg.show()"
 				],
-				"execution_count": null
+				"execution_count": 16
 			},
 			{
 				"cell_type": "markdown",
@@ -192,9 +192,9 @@
 					"        df_stg = df_stg.unionByName(newrow, allowMissingColumns=True)\r\n",
 					"\r\n",
 					"\r\n",
-					"df_stg.where(\"GRAIN_LEVEL = 'MONTH' and CALENDAR = 'Gregorian' and CALYEAR = 2021\").show()"
+					"df_stg.where(\"CALENDAR = 'Gregorian' and CALYEAR = 2021\").show()"
 				],
-				"execution_count": null
+				"execution_count": 17
 			},
 			{
 				"cell_type": "markdown",
@@ -223,7 +223,7 @@
 					}
 				},
 				"source": [
-					"from datetime import datetime\r\n",
+					"from datetime import datetime, timedelta\r\n",
 					"\r\n",
 					"df_stg = df_stg.select(['DIM_ALL_TIME_ID','GRAIN_LEVEL','CALENDAR','FISCALYEAR','STARTDATE','ENDDATE','CALENDARTYPE','QUARTER','MONTH','PERIODNAME','SHORTNAME','TYPE','DAYS', \r\n",
 					"    'CALYEAR','CALMONTH','CALMONTH_NUM','CLOSEDMONTH', \r\n",
@@ -231,19 +231,23 @@
 					"    lit(None).cast('integer').alias('PERIODNUMBER')])\r\n",
 					"\r\n",
 					"for row in df_stg.where(\"CALENDAR = 'Fiscal' and GRAIN_LEVEL = 'PERIOD' and TYPE = 1\").collect():\r\n",
+					"    monthRow = []\r\n",
 					"    for i in range(0, (datetime.strptime(row['ENDDATE'], '%Y-%m-%d %H:%M:%S') - datetime.strptime(row['STARTDATE'], '%Y-%m-%d %H:%M:%S')).days + 1):\r\n",
 					"        calDay = datetime.strptime(row['STARTDATE'], '%Y-%m-%d %H:%M:%S') + timedelta(days = i)\r\n",
-					"        newrow = spark.createDataFrame([('Fiscal,DAY,' + str(calDay.year) + f'{calDay.month:02}' + f'{calDay.day:02}', 'DAY', row['CALENDAR'], row['FISCALYEAR'], row['PERIODNAME'],\r\n",
+					"        dayRow = ['Fiscal,DAY,' + str(calDay.year) + f'{calDay.month:02}' + f'{calDay.day:02}', 'DAY', row['CALENDAR'], row['FISCALYEAR'], row['PERIODNAME'],\r\n",
 					"            calDay, calDay, calDay, row['QUARTER'], row['MONTH'], calDay.year, f'{calDay.month:02}', calDay.month,\r\n",
 					"            1 if date(calDay.year, calDay.month, monthrange(calDay.year, calDay.month)[1]) < date.today() else 0,\r\n",
-					"            int(row['PERIODNAME'].replace('Period ', '')))],\r\n",
-					"            ['DIM_ALL_TIME_ID', 'GRAIN_LEVEL', 'CALENDAR', 'FISCALYEAR', 'PERIODNAME', 'CALENDARDATE', 'STARTDATE', 'ENDDATE', 'QUARTER', 'MONTH', \r\n",
-					"            'CALYEAR', 'CALMONTH', 'CALMONTH_NUM', 'CLOSEDMONTH', 'PERIODNUMBER'])\r\n",
-					"        df_stg = df_stg.unionByName(newrow, allowMissingColumns=True)\r\n",
+					"            int(row['PERIODNAME'].replace('Period ', ''))]\r\n",
+					"        monthRow.append(dayRow)\r\n",
+					"    newPeriod = spark.createDataFrame(monthRow, ['DIM_ALL_TIME_ID', 'GRAIN_LEVEL', 'CALENDAR', 'FISCALYEAR', 'PERIODNAME', 'CALENDARDATE', \r\n",
+					"        'STARTDATE', 'ENDDATE', 'QUARTER', 'MONTH', 'CALYEAR', 'CALMONTH', 'CALMONTH_NUM', 'CLOSEDMONTH', 'PERIODNUMBER'])\r\n",
+					"    df_stg = df_stg.unionByName(newPeriod, allowMissingColumns=True)\r\n",
 					"\r\n",
-					"df_stg.where(\"CALENDAR = 'Fiscal' and GRAIN_LEVEL = 'DAY' and FISCALYEAR = 2022 and PERIODNAME = 'Period 1'\").show()"
+					"df_stg.createOrReplaceTempView('AllTimeStg')\r\n",
+					"\r\n",
+					"df_stg.where(\"CALENDAR = 'Fiscal' and GRAIN_LEVEL = 'DAY' and FISCALYEAR = 2021 and PERIODNAME = 'Period 1'\").show()"
 				],
-				"execution_count": 53
+				"execution_count": 18
 			},
 			{
 				"cell_type": "code",
@@ -256,12 +260,20 @@
 						"transient": {
 							"deleting": false
 						}
-					}
+					},
+					"microsoft": {
+						"language": "sparksql"
+					},
+					"collapsed": false
 				},
 				"source": [
-					"df_stg.where(\"CALENDAR = 'Fiscal' and GRAIN_LEVEL = 'DAY' and FISCALYEAR = 2022\").show()"
+					"%%sql\r\n",
+					"select * from AllTimeStg\r\n",
+					"where fiscalyear = 2019\r\n",
+					"order by startdate\r\n",
+					"limit 20"
 				],
-				"execution_count": 55
+				"execution_count": 20
 			}
 		]
 	}
