@@ -1381,7 +1381,7 @@
 							"name": "AlterRow"
 						}
 					],
-					"script": "source(output(\n\t\tSOURCE2_ID as string,\n\t\tNCHAR_VALUE1 as string,\n\t\tNCHAR_VALUE2 as string,\n\t\tNUMERIC_VALUE1 as double,\n\t\tNUMERIC_VALUE2 as double,\n\t\tDATETIME_VALUE1 as string,\n\t\tDATETIME_VALUE2 as string\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tignoreNoFilesFound: false) ~> DataSource\nsource(output(\n\t\tDIMENSION1_KEY as string,\n\t\tSOURCE2_ID as string,\n\t\tNCHAR_ATTRIBUTE1 as string,\n\t\tNCHAR_ATTRIBUTE2 as string,\n\t\tDATETIME_ATTRIBUTE1 as string,\n\t\tDATETIME_ATTRIBUTE2 as string,\n\t\tDSS_CREATE_TIME as string,\n\t\tDSS_UPDATE_TIME as string\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tisolationLevel: 'READ_UNCOMMITTED',\n\tformat: 'table',\n\tstaged: false) ~> Dimension\nDimension select(mapColumn(\n\t\teach(match(true()),\n\t\t\t'DIMPREFIX_'+$$ = $$)\n\t),\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> SelectDimension\nDataSource, SelectDimension lookup(SOURCE2_ID == DIMPREFIX_SOURCE2_ID,\n\tmultiple: false,\n\tpickup: 'any',\n\tbroadcast: 'auto')~> LookupDimension\nLookupDimension select(mapColumn(\n\t\tDSS_CREATE_TIME = DIMPREFIX_DSS_CREATE_TIME,\n\t\teach(match(left(name,length('DIMPREFIX_'))!='DIMPREFIX_'),\n\t\t\treplace($$,'VALUE','ATTRIBUTE') = $$)\n\t),\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> SelectColumns\nSelectColumns derive(DSS_CREATE_TIME = iif(isNull(DSS_CREATE_TIME), toString(currentTimestamp()), DSS_CREATE_TIME),\n\t\tDSS_UPDATE_TIME = toString(currentTimestamp())) ~> DerivedColumns\nDerivedColumns alterRow(upsertIf(true())) ~> AlterRow\nAlterRow sink(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tinput(\n\t\tDIMENSION1_KEY as integer,\n\t\tSOURCE2_ID as integer,\n\t\tNCHAR_ATTRIBUTE1 as string,\n\t\tNCHAR_ATTRIBUTE2 as string,\n\t\tDATETIME_ATTRIBUTE1 as timestamp,\n\t\tDATETIME_ATTRIBUTE2 as timestamp,\n\t\tDSS_CREATE_TIME as timestamp,\n\t\tDSS_UPDATE_TIME as timestamp\n\t),\n\tdeletable:false,\n\tinsertable:false,\n\tupdateable:false,\n\tupsertable:true,\n\tkeys:['SOURCE2_ID'],\n\tformat: 'table',\n\tstaged: true,\n\tpreSQLs:['EXEC\t[dbo].[ZeroRow]\\n\t\t@p_tabname = N\\'TMPL_DIMENSION1\\',\\n\t\t@p_keycolname = N\\'DIMENSION1_KEY\\',\\n\t\t@p_varchar = N\\'Unknown\\',\\n\t\t@p_numeric = NULL,\\n\t\t@p_date = NULL,\\n\t\t@p_time = NULL,\\n\t\t@p_bit = NULL'],\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true,\n\terrorHandlingOption: 'stopOnFirstError') ~> DimensionSink"
+					"script": "source(output(\n\t\tSOURCE2_ID as string,\n\t\tNCHAR_VALUE1 as string,\n\t\tNCHAR_VALUE2 as string,\n\t\tNUMERIC_VALUE1 as double,\n\t\tNUMERIC_VALUE2 as double,\n\t\tDATETIME_VALUE1 as string,\n\t\tDATETIME_VALUE2 as string\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tignoreNoFilesFound: false) ~> DataSource\nsource(output(\n\t\tDIMENSION1_KEY as string,\n\t\tSOURCE2_ID as string,\n\t\tNCHAR_ATTRIBUTE1 as string,\n\t\tNCHAR_ATTRIBUTE2 as string,\n\t\tDATETIME_ATTRIBUTE1 as string,\n\t\tDATETIME_ATTRIBUTE2 as string,\n\t\tDSS_CREATE_TIME as string,\n\t\tDSS_UPDATE_TIME as string\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tisolationLevel: 'READ_UNCOMMITTED',\n\tformat: 'table',\n\tstaged: false) ~> Dimension\nDimension select(mapColumn(\n\t\teach(match(true()),\n\t\t\t'DIMPREFIX_'+$$ = $$)\n\t),\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> SelectDimension\nDataSource, SelectDimension lookup(SOURCE2_ID == DIMPREFIX_SOURCE2_ID,\n\tmultiple: false,\n\tpickup: 'any',\n\tbroadcast: 'auto')~> LookupDimension\nLookupDimension select(mapColumn(\n\t\tDSS_CREATE_TIME = DIMPREFIX_DSS_CREATE_TIME,\n\t\teach(match(left(name,length('DIMPREFIX_'))!='DIMPREFIX_'),\n\t\t\treplace($$,'VALUE','ATTRIBUTE') = $$)\n\t),\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> SelectColumns\nSelectColumns derive(DSS_CREATE_TIME = iif(isNull(DSS_CREATE_TIME), toString(currentTimestamp()), DSS_CREATE_TIME),\n\t\tDSS_UPDATE_TIME = toString(currentTimestamp())) ~> DerivedColumns\nDerivedColumns alterRow(upsertIf(true())) ~> AlterRow\nAlterRow sink(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tinput(\n\t\tDIMENSION1_KEY as integer,\n\t\tSOURCE2_ID as integer,\n\t\tNCHAR_ATTRIBUTE1 as string,\n\t\tNCHAR_ATTRIBUTE2 as string,\n\t\tDATETIME_ATTRIBUTE1 as timestamp,\n\t\tDATETIME_ATTRIBUTE2 as timestamp,\n\t\tDSS_CREATE_TIME as timestamp,\n\t\tDSS_UPDATE_TIME as timestamp\n\t),\n\tdeletable:false,\n\tinsertable:false,\n\tupdateable:false,\n\tupsertable:true,\n\tkeys:['SOURCE2_ID'],\n\tformat: 'table',\n\tstaged: true,\n\tallowCopyCommand: true,\n\tpreSQLs:['EXEC\t[dbo].[ZeroRow]\\n\t\t@p_tabname = N\\'TMPL_DIMENSION1\\',\\n\t\t@p_keycolname = N\\'DIMENSION1_KEY\\',\\n\t\t@p_varchar = N\\'Unknown\\',\\n\t\t@p_numeric = NULL,\\n\t\t@p_date = NULL,\\n\t\t@p_time = NULL,\\n\t\t@p_bit = NULL'],\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true,\n\terrorHandlingOption: 'stopOnFirstError') ~> DimensionSink"
 				}
 			},
 			"dependsOn": [
@@ -1441,7 +1441,7 @@
 							"name": "AlterRow"
 						}
 					],
-					"script": "source(output(\n\t\tSOURCE3_ID as short,\n\t\tNCHAR_VALUE1 as string,\n\t\tNCHAR_VALUE2 as string,\n\t\tNUMERIC_VALUE1 as double,\n\t\tNUMERIC_VALUE2 as double,\n\t\tDATETIME_VALUE1 as string,\n\t\tDATETIME_VALUE2 as string,\n\t\tCDC_TIMESTAMP as string\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tignoreNoFilesFound: false) ~> DataSource\nsource(output(\n\t\tDIMENSION2_KEY as integer,\n\t\tSOURCE3_ID as integer,\n\t\tNCHAR_ATTRIBUTE1 as string,\n\t\tNCHAR_ATTRIBUTE2 as string,\n\t\tDATETIME_ATTRIBUTE1 as timestamp,\n\t\tDATETIME_ATTRIBUTE2 as timestamp,\n\t\tDSS_CREATE_TIME as timestamp,\n\t\tDSS_UPDATE_TIME as timestamp\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tisolationLevel: 'READ_UNCOMMITTED',\n\tformat: 'table',\n\tstaged: false) ~> Dimension\nDimension select(mapColumn(\n\t\teach(match(true()),\n\t\t\t'DIMPREFIX_'+$$ = $$)\n\t),\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> SelectDimension\nDataSource, SelectDimension lookup(SOURCE3_ID == DIMPREFIX_SOURCE3_ID,\n\tmultiple: false,\n\tpickup: 'any',\n\tbroadcast: 'auto')~> LookupDimension\nLookupDimension select(mapColumn(\n\t\tSOURCE3_ID,\n\t\tDSS_CREATE_TIME = DIMPREFIX_DSS_CREATE_TIME,\n\t\teach(match(left(name,length('DIMPREFIX_'))!='DIMPREFIX_'),\n\t\t\treplace($$,'VALUE','ATTRIBUTE') = $$)\n\t),\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> SelectColumns\nSelectColumns derive(DSS_CREATE_TIME = iif(isNull(DSS_CREATE_TIME), currentTimestamp(), DSS_CREATE_TIME),\n\t\tDSS_UPDATE_TIME = toString(currentTimestamp())) ~> DerivedColumns\nDerivedColumns alterRow(upsertIf(true())) ~> AlterRow\nAlterRow sink(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tinput(\n\t\tDIMENSION2_KEY as integer,\n\t\tSOURCE3_ID as integer,\n\t\tNCHAR_ATTRIBUTE1 as string,\n\t\tNCHAR_ATTRIBUTE2 as string,\n\t\tDATETIME_ATTRIBUTE1 as timestamp,\n\t\tDATETIME_ATTRIBUTE2 as timestamp,\n\t\tDSS_CREATE_TIME as timestamp,\n\t\tDSS_UPDATE_TIME as timestamp\n\t),\n\tdeletable:false,\n\tinsertable:false,\n\tupdateable:false,\n\tupsertable:true,\n\tkeys:['SOURCE3_ID'],\n\tformat: 'table',\n\tstaged: true,\n\tpreSQLs:['EXEC\t[dbo].[ZeroRow]\\n\t\t@p_tabname = N\\'TMPL_DIMENSION2\\',\\n\t\t@p_keycolname = N\\'DIMENSION2_KEY\\',\\n\t\t@p_varchar = N\\'Unknown\\',\\n\t\t@p_numeric = NULL,\\n\t\t@p_date = NULL,\\n\t\t@p_time = NULL,\\n\t\t@p_bit = NULL'],\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true,\n\terrorHandlingOption: 'stopOnFirstError') ~> DimensionSink"
+					"script": "source(output(\n\t\tSOURCE3_ID as short,\n\t\tNCHAR_VALUE1 as string,\n\t\tNCHAR_VALUE2 as string,\n\t\tNUMERIC_VALUE1 as double,\n\t\tNUMERIC_VALUE2 as double,\n\t\tDATETIME_VALUE1 as string,\n\t\tDATETIME_VALUE2 as string,\n\t\tCDC_TIMESTAMP as string\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tignoreNoFilesFound: false) ~> DataSource\nsource(output(\n\t\tDIMENSION2_KEY as integer,\n\t\tSOURCE3_ID as integer,\n\t\tNCHAR_ATTRIBUTE1 as string,\n\t\tNCHAR_ATTRIBUTE2 as string,\n\t\tDATETIME_ATTRIBUTE1 as timestamp,\n\t\tDATETIME_ATTRIBUTE2 as timestamp,\n\t\tDSS_CREATE_TIME as timestamp,\n\t\tDSS_UPDATE_TIME as timestamp\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tisolationLevel: 'READ_UNCOMMITTED',\n\tformat: 'table',\n\tstaged: false) ~> Dimension\nDimension select(mapColumn(\n\t\teach(match(true()),\n\t\t\t'DIMPREFIX_'+$$ = $$)\n\t),\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> SelectDimension\nDataSource, SelectDimension lookup(SOURCE3_ID == DIMPREFIX_SOURCE3_ID,\n\tmultiple: false,\n\tpickup: 'any',\n\tbroadcast: 'auto')~> LookupDimension\nLookupDimension select(mapColumn(\n\t\tSOURCE3_ID,\n\t\tDSS_CREATE_TIME = DIMPREFIX_DSS_CREATE_TIME,\n\t\teach(match(left(name,length('DIMPREFIX_'))!='DIMPREFIX_'),\n\t\t\treplace($$,'VALUE','ATTRIBUTE') = $$)\n\t),\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> SelectColumns\nSelectColumns derive(DSS_CREATE_TIME = iif(isNull(DSS_CREATE_TIME), currentTimestamp(), DSS_CREATE_TIME),\n\t\tDSS_UPDATE_TIME = toString(currentTimestamp())) ~> DerivedColumns\nDerivedColumns alterRow(upsertIf(true())) ~> AlterRow\nAlterRow sink(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tinput(\n\t\tDIMENSION2_KEY as integer,\n\t\tSOURCE3_ID as integer,\n\t\tNCHAR_ATTRIBUTE1 as string,\n\t\tNCHAR_ATTRIBUTE2 as string,\n\t\tDATETIME_ATTRIBUTE1 as timestamp,\n\t\tDATETIME_ATTRIBUTE2 as timestamp,\n\t\tDSS_CREATE_TIME as timestamp,\n\t\tDSS_UPDATE_TIME as timestamp\n\t),\n\tdeletable:false,\n\tinsertable:false,\n\tupdateable:false,\n\tupsertable:true,\n\tkeys:['SOURCE3_ID'],\n\tformat: 'table',\n\tstaged: true,\n\tallowCopyCommand: true,\n\tpreSQLs:['EXEC\t[dbo].[ZeroRow]\\n\t\t@p_tabname = N\\'TMPL_DIMENSION2\\',\\n\t\t@p_keycolname = N\\'DIMENSION2_KEY\\',\\n\t\t@p_varchar = N\\'Unknown\\',\\n\t\t@p_numeric = NULL,\\n\t\t@p_date = NULL,\\n\t\t@p_time = NULL,\\n\t\t@p_bit = NULL'],\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true,\n\terrorHandlingOption: 'stopOnFirstError') ~> DimensionSink"
 				}
 			},
 			"dependsOn": [
@@ -2111,7 +2111,7 @@
 						"spark.dynamicAllocation.enabled": "false",
 						"spark.dynamicAllocation.minExecutors": "2",
 						"spark.dynamicAllocation.maxExecutors": "2",
-						"spark.autotune.trackingId": "1e06df33-fcd8-4dad-bade-ea9507efa2b2"
+						"spark.autotune.trackingId": "42e6559f-c6fc-452f-b37d-a7997c7c9b66"
 					}
 				},
 				"metadata": {
@@ -2171,7 +2171,20 @@
 							""
 						],
 						"outputs": [],
-						"execution_count": 8
+						"execution_count": 2
+					},
+					{
+						"cell_type": "markdown",
+						"metadata": {
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"Create merged dataframe from temporary views"
+						]
 					},
 					{
 						"cell_type": "code",
@@ -2222,7 +2235,20 @@
 							"df_stg.show()"
 						],
 						"outputs": [],
-						"execution_count": 49
+						"execution_count": 63
+					},
+					{
+						"cell_type": "markdown",
+						"metadata": {
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"Add gregorian years and months"
+						]
 					},
 					{
 						"cell_type": "code",
@@ -2242,18 +2268,31 @@
 						"source": [
 							"from pyspark.sql.functions import lit\r\n",
 							"\r\n",
-							"df_stg = df_stg.withColumn('CALYEAR', lit(None).cast('integer'))\r\n",
+							"df_stg = df_stg.select(['*', lit(None).cast('integer').alias('CALYEAR'), \r\n",
+							"    lit(None).cast('string').alias('CALMONTH'), \r\n",
+							"    lit(None).cast('integer').alias('CALMONTH_NUM'), \r\n",
+							"    lit(None).cast('integer').alias('CLOSEDMONTH')])\r\n",
+							"\r\n",
+							"from datetime import date\r\n",
 							"\r\n",
 							"for row in df_stg.where(\"CALENDAR = 'Fiscal' and GRAIN_LEVEL = 'YEAR'\").collect():\r\n",
-							"    newrow = spark.createDataFrame([('Gegorian,YEAR,' + row['FISCALYEAR'], row['GRAIN_LEVEL'], 'Gregorian', row['FISCALYEAR'], row['FISCALYEAR'] + '-01-01', row['FISCALYEAR'] + '-12-31')],\r\n",
+							"    newrow = spark.createDataFrame([('Gegorian,YEAR,' + row['FISCALYEAR'], 'YEAR', 'Gregorian', row['FISCALYEAR'], row['FISCALYEAR'] + '-01-01', row['FISCALYEAR'] + '-12-31')],\r\n",
 							"        ['DIM_ALL_TIME_ID', 'GRAIN_LEVEL', 'CALENDAR', 'CALYEAR', 'STARTDATE', 'ENDDATE'])\r\n",
 							"    df_stg = df_stg.unionByName(newrow, allowMissingColumns=True)\r\n",
+							"    for i in range(1, 13):\r\n",
+							"        newrow = spark.createDataFrame([('Gegorian,MONTH,' + row['FISCALYEAR'] + f'{i:02}', 'MONTH', 'Gregorian', \r\n",
+							"            row['FISCALYEAR'], row['FISCALYEAR'] + '-' + f'{i:02}' + '-01', \r\n",
+							"            row['FISCALYEAR'] + '-' + f'{i:02}' + '-' + str(calendar.monthrange(int(row['FISCALYEAR']), i)[1]),\r\n",
+							"            f'{i:02}', i, \r\n",
+							"            1 if row['FISCALYEAR'] + '-' + f'{i:02}' + '-' + str(calendar.monthrange(int(row['FISCALYEAR']), i)[1]) < str(date.today()) else 0)],\r\n",
+							"            ['DIM_ALL_TIME_ID', 'GRAIN_LEVEL', 'CALENDAR', 'CALYEAR', 'STARTDATE', 'ENDDATE', 'CALMONTH', 'CALMONTH_NUM', 'CLOSEDMONTH'])\r\n",
+							"        df_stg = df_stg.unionByName(newrow, allowMissingColumns=True)\r\n",
 							"\r\n",
-							"df_stg.where(\"GRAIN_LEVEL = 'YEAR'\").show()\r\n",
-							""
+							"\r\n",
+							"df_stg.where(\"GRAIN_LEVEL = 'MONTH' and CALENDAR = 'Gregorian'\").show()"
 						],
 						"outputs": [],
-						"execution_count": 57
+						"execution_count": 64
 					}
 				]
 			},
