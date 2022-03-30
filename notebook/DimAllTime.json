@@ -17,7 +17,7 @@
 				"spark.dynamicAllocation.enabled": "false",
 				"spark.dynamicAllocation.minExecutors": "2",
 				"spark.dynamicAllocation.maxExecutors": "2",
-				"spark.autotune.trackingId": "b9c45d58-8ead-4b5a-bfac-045c4fd29f42"
+				"spark.autotune.trackingId": "40762a98-3359-40f8-9c2e-9de97c44f283"
 			}
 		},
 		"metadata": {
@@ -281,19 +281,21 @@
 					"    'CALYEAR','CALMONTH','CALMONTH_NUM','CLOSEDMONTH','CALENDARDATE','PERIODNUMBER',\r\n",
 					"    lit(None).cast('integer').alias('YEAR_WEEK_IN')])\r\n",
 					"\r\n",
-					"for row in df_stg.where(\"CALENDAR = 'Fiscal' and GRAIN_LEVEL = 'YEAR'\").collect():\r\n",
+					"for row in df_stg.where(\"CALENDAR = 'Fiscal' and GRAIN_LEVEL = 'PERIOD' AND FISCALYEAR = 2020\").collect():\r\n",
 					"    yearRow = []\r\n",
-					"    for i in range(0, (datetime.strptime(row['ENDDATE'], '%Y-%m-%d %H:%M:%S') - datetime.strptime(row['STARTDATE'], '%Y-%m-%d %H:%M:%S')).days/7 - 1):\r\n",
+					"    weekNum = 0\r\n",
+					"    for i in range(0, int((datetime.strptime(row['ENDDATE'], '%Y-%m-%d %H:%M:%S') - datetime.strptime(row['STARTDATE'], '%Y-%m-%d %H:%M:%S')).days/7)):\r\n",
 					"        weekStart = datetime.strptime(row['STARTDATE'], '%Y-%m-%d %H:%M:%S') + timedelta(days = 7*i)\r\n",
-					"        weekRow = ['Fiscal,WEEK,' + str(row['FISCALYEAR']) + ',', str(i + 1), 'WEEK', row['CALENDAR'], row['FISCALYEAR'], row['PERIODNAME'],\r\n",
-					"            weekStart, weekStart + timedelta(days = 7*(i+1)),\r\n",
+					"        weekNum = weekNum + 1\r\n",
+					"        weekRow = ['Fiscal,WEEK,' + str(row['FISCALYEAR']) + ',' + str(weekNum), \r\n",
+					"            'WEEK', row['CALENDAR'], row['FISCALYEAR'], row['PERIODNAME'],\r\n",
+					"            weekStart, weekStart + timedelta(days = 6),\r\n",
 					"            row['QUARTER'], row['MONTH'], int(row['PERIODNAME'].replace('Period ', '')), i + 1]\r\n",
 					"        yearRow.append(weekRow)\r\n",
-					"    newYear = spark.createDataFrame(weekRow, ['DIM_ALL_TIME_ID', 'GRAIN_LEVEL', 'CALENDAR', 'FISCALYEAR', 'PERIODNAME', \r\n",
-					"        'STARTDATE', 'ENDDATE', 'QUARTER', 'MONTH', 'PERIODNUMBER', 'YEAR_WEEK_IN'])\r\n",
-					"    df_stg = df_stg.unionByName(newYear, allowMissingColumns=True)"
+					"    print(yearRow)\r\n",
+					""
 				],
-				"execution_count": null
+				"execution_count": 30
 			},
 			{
 				"cell_type": "code",
@@ -321,7 +323,7 @@
 					"\r\n",
 					""
 				],
-				"execution_count": 5
+				"execution_count": 29
 			}
 		]
 	}
