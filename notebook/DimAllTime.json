@@ -17,7 +17,7 @@
 				"spark.dynamicAllocation.enabled": "false",
 				"spark.dynamicAllocation.minExecutors": "2",
 				"spark.dynamicAllocation.maxExecutors": "2",
-				"spark.autotune.trackingId": "5d1e393c-5a59-45dc-aa9b-20c2719eecf7"
+				"spark.autotune.trackingId": "9785dd08-9020-4c54-a34e-58b0ef9bf223"
 			}
 		},
 		"metadata": {
@@ -140,7 +140,7 @@
 					"\r\n",
 					"df_stg.show()"
 				],
-				"execution_count": 28
+				"execution_count": 34
 			},
 			{
 				"cell_type": "markdown",
@@ -198,7 +198,7 @@
 					"\r\n",
 					"df_stg.where(\"CALENDAR = 'Gregorian' and CALYEAR = 2021\").show()"
 				],
-				"execution_count": null
+				"execution_count": 35
 			},
 			{
 				"cell_type": "markdown",
@@ -227,6 +227,8 @@
 					}
 				},
 				"source": [
+					"from datetime import datetime, timedelta\r\n",
+					"\r\n",
 					"df_stg = df_stg.select(['DIM_ALL_TIME_ID','GRAIN_LEVEL','CALENDAR','FISCALYEAR','STARTDATE','ENDDATE',\r\n",
 					"    'CALENDARTYPE','QUARTER','MONTH','PERIODNAME','SHORTNAME','TYPE','DAYS','PERIODNUMBER',\r\n",
 					"    'CALYEAR','CALMONTH','CALMONTH_NUM','CLOSEDMONTH',\r\n",
@@ -249,7 +251,7 @@
 					"\r\n",
 					"df_stg.createOrReplaceTempView('AllTimeStg')"
 				],
-				"execution_count": 31
+				"execution_count": 36
 			},
 			{
 				"cell_type": "markdown",
@@ -278,30 +280,31 @@
 					}
 				},
 				"source": [
-					"from datetime import datetime, timedelta\r\n",
-					"\r\n",
 					"df_stg = df_stg.select(['DIM_ALL_TIME_ID','GRAIN_LEVEL','CALENDAR','FISCALYEAR','STARTDATE','ENDDATE',\r\n",
 					"    'CALENDARTYPE','QUARTER','MONTH','PERIODNAME','SHORTNAME','TYPE','DAYS','PERIODNUMBER',\r\n",
 					"    'CALYEAR','CALMONTH','CALMONTH_NUM','CLOSEDMONTH','YEAR_WEEK_IN',\r\n",
 					"    lit(None).cast('date').alias('CALENDARDATE')])\r\n",
 					"\r\n",
-					"for row in df_stg.where(\"CALENDAR = 'Fiscal' and GRAIN_LEVEL = 'PERIOD' and TYPE = 1\").collect():\r\n",
-					"    monthRow = []\r\n",
+					"weekRow = []\r\n",
+					"for row in df_stg.where(\"CALENDAR = 'Fiscal' and GRAIN_LEVEL = 'WEEK'\").collect():\r\n",
 					"    for i in range(0, (datetime.strptime(row['ENDDATE'], '%Y-%m-%d %H:%M:%S') - datetime.strptime(row['STARTDATE'], '%Y-%m-%d %H:%M:%S')).days + 1):\r\n",
 					"        calDay = datetime.strptime(row['STARTDATE'], '%Y-%m-%d %H:%M:%S') + timedelta(days = i)\r\n",
 					"        dayRow = ['Fiscal,DAY,' + str(calDay.year) + f'{calDay.month:02}' + f'{calDay.day:02}', 'DAY', row['CALENDAR'], row['FISCALYEAR'], row['PERIODNAME'],\r\n",
 					"            calDay, calDay, calDay, row['PERIODNUMBER'], row['QUARTER'], row['MONTH'], calDay.year, str(calDay.year) + f'{calDay.month:02}', calDay.month,\r\n",
 					"            1 if date(calDay.year, calDay.month, monthrange(calDay.year, calDay.month)[1]) < date.today() else 0, row['YEAR_WEEK_IN']]\r\n",
-					"        monthRow.append(dayRow)\r\n",
-					"    newPeriod = spark.createDataFrame(monthRow, ['DIM_ALL_TIME_ID', 'GRAIN_LEVEL', 'CALENDAR', 'FISCALYEAR', 'PERIODNAME', 'CALENDARDATE', \r\n",
-					"        'STARTDATE', 'ENDDATE', 'PERIODNUMBER', 'QUARTER', 'MONTH', 'CALYEAR', 'CALMONTH', 'CALMONTH_NUM', 'CLOSEDMONTH', 'YEAR_WEEK_IN'])\r\n",
-					"    df_stg = df_stg.unionByName(newPeriod, allowMissingColumns=True)\r\n",
+					"        weekRow.append(dayRow)\r\n",
+					"\r\n",
+					"newWeek = spark.createDataFrame(weekRow, ['DIM_ALL_TIME_ID', 'GRAIN_LEVEL', 'CALENDAR', 'FISCALYEAR', 'PERIODNAME', 'CALENDARDATE', \r\n",
+					"    'STARTDATE', 'ENDDATE', 'PERIODNUMBER', 'QUARTER', 'MONTH', 'CALYEAR', 'CALMONTH', 'CALMONTH_NUM', 'CLOSEDMONTH', 'YEAR_WEEK_IN'])\r\n",
+					"\r\n",
+					"df_stg = df_stg.unionByName(newWeek, allowMissingColumns=True)\r\n",
 					"\r\n",
 					"df_stg.createOrReplaceTempView('AllTimeStg')\r\n",
 					"\r\n",
-					"df_stg.where(\"CALENDAR = 'Fiscal' and GRAIN_LEVEL = 'DAY' and FISCALYEAR = 2021 and PERIODNAME = 'Period 1'\").show()"
+					"df_stg.where(\"CALENDAR = 'Fiscal' and GRAIN_LEVEL = 'DAY' and FISCALYEAR = 2021 and PERIODNAME = 'Period 1'\").show()\r\n",
+					""
 				],
-				"execution_count": 32
+				"execution_count": 53
 			},
 			{
 				"cell_type": "code",
@@ -329,7 +332,7 @@
 					"\r\n",
 					""
 				],
-				"execution_count": 33
+				"execution_count": 54
 			}
 		]
 	}
