@@ -17,7 +17,7 @@
 				"spark.dynamicAllocation.enabled": "false",
 				"spark.dynamicAllocation.minExecutors": "2",
 				"spark.dynamicAllocation.maxExecutors": "2",
-				"spark.autotune.trackingId": "d31e4cb3-80c6-4630-80ad-f9e05b7d0379"
+				"spark.autotune.trackingId": "40ec2dcd-3aaf-4e58-abea-35a84ddef90a"
 			}
 		},
 		"metadata": {
@@ -140,7 +140,7 @@
 					"\r\n",
 					"df_stg.show()"
 				],
-				"execution_count": null
+				"execution_count": 23
 			},
 			{
 				"cell_type": "markdown",
@@ -198,7 +198,7 @@
 					"\r\n",
 					"df_stg.where(\"CALENDAR = 'Gregorian' and CALYEAR = 2021\").show()"
 				],
-				"execution_count": null
+				"execution_count": 24
 			},
 			{
 				"cell_type": "markdown",
@@ -250,7 +250,7 @@
 					"\r\n",
 					"df_stg.where(\"CALENDAR = 'Fiscal' and GRAIN_LEVEL = 'DAY' and FISCALYEAR = 2021 and PERIODNAME = 'Period 1'\").show()"
 				],
-				"execution_count": null
+				"execution_count": 25
 			},
 			{
 				"cell_type": "markdown",
@@ -292,16 +292,16 @@
 					"        weekRow = ['Fiscal,WEEK,' + str(row['FISCALYEAR']) + ',' + str(weekNum), \r\n",
 					"            'WEEK', row['CALENDAR'], row['FISCALYEAR'], row['PERIODNAME'],\r\n",
 					"            weekStart, weekStart + timedelta(days = 6), row['PERIODNUMBER'],\r\n",
-					"            row['QUARTER'], row['MONTH']]\r\n",
+					"            row['QUARTER'], row['MONTH'], weekNum]\r\n",
 					"        yearRow.append(weekRow)\r\n",
 					"    newYear = spark.createDataFrame(yearRow, ['DIM_ALL_TIME_ID', 'GRAIN_LEVEL', 'CALENDAR', 'FISCALYEAR', 'PERIODNAME', \r\n",
-					"        'STARTDATE', 'ENDDATE', 'PERIODNUMBER', 'QUARTER', 'MONTH'])\r\n",
+					"        'STARTDATE', 'ENDDATE', 'PERIODNUMBER', 'QUARTER', 'MONTH', 'YEAR_WEEK_IN'])\r\n",
 					"    df_stg = df_stg.unionByName(newYear, allowMissingColumns=True)\r\n",
 					"\r\n",
 					"df_stg.createOrReplaceTempView('AllTimeStg')\r\n",
 					""
 				],
-				"execution_count": null
+				"execution_count": 26
 			},
 			{
 				"cell_type": "code",
@@ -329,7 +329,7 @@
 					"\r\n",
 					""
 				],
-				"execution_count": null
+				"execution_count": 27
 			}
 		]
 	}
