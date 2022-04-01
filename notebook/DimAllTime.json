@@ -17,7 +17,7 @@
 				"spark.dynamicAllocation.enabled": "false",
 				"spark.dynamicAllocation.minExecutors": "2",
 				"spark.dynamicAllocation.maxExecutors": "2",
-				"spark.autotune.trackingId": "b0c6d463-0b4e-4002-a9b3-9cda6a4274f1"
+				"spark.autotune.trackingId": "f03486a3-4e98-4a92-bbaa-56b5d40e9192"
 			}
 		},
 		"metadata": {
@@ -232,7 +232,13 @@
 					"df_stg = df_stg.select(['DIM_ALL_TIME_ID','GRAIN_LEVEL','CALENDAR','FISCALYEAR','STARTDATE','ENDDATE',\r\n",
 					"    'CALENDARTYPE','QUARTER','MONTH','PERIODNAME','SHORTNAME','TYPE','DAYS','PERIODNUMBER',\r\n",
 					"    'CALYEAR','CALMONTH','CALMONTH_NUM','CLOSEDMONTH',\r\n",
-					"    lit(None).cast('integer').alias('YEAR_WEEK_IN')])\r\n",
+					"    lit(None).cast('integer').alias('YEAR_WEEK_IN'),\r\n",
+					"    lit(None).cast('integer').alias('WEEK_STARTDATE'),\r\n",
+					"    lit(None).cast('integer').alias('WEEK_ENDTDATE'),\r\n",
+					"    lit(None).cast('integer').alias('PERIOD_STARTDATE'),\r\n",
+					"    lit(None).cast('integer').alias('PERIOD_ENDDATE'),\r\n",
+					"    lit(None).cast('integer').alias('YEAR_STARTDATE'),\r\n",
+					"    lit(None).cast('integer').alias('YEAR_ENDDATE')])\r\n",
 					"\r\n",
 					"for row in df_stg.where(\"CALENDAR = 'Fiscal' and GRAIN_LEVEL = 'PERIOD'\").orderBy([\"FISCALYEAR\", \"PERIODNUMBER\"]).collect():\r\n",
 					"    yearRow = []\r\n",
@@ -243,7 +249,7 @@
 					"        weekRow = ['Fiscal,WEEK,' + str(row['FISCALYEAR']) + ',' + str(weekNum), \r\n",
 					"            'WEEK', row['CALENDAR'], row['FISCALYEAR'], row['PERIODNAME'],\r\n",
 					"            weekStart, weekStart + timedelta(days = 6), row['PERIODNUMBER'],\r\n",
-					"            row['QUARTER'], row['MONTH'], weekNum]\r\n",
+					"            row['QUARTER'], row['MONTH'], weekNum, weekStart, weekStart + timedelta(days = 6)]\r\n",
 					"        yearRow.append(weekRow)\r\n",
 					"    newYear = spark.createDataFrame(yearRow, ['DIM_ALL_TIME_ID', 'GRAIN_LEVEL', 'CALENDAR', 'FISCALYEAR', 'PERIODNAME', \r\n",
 					"        'STARTDATE', 'ENDDATE', 'PERIODNUMBER', 'QUARTER', 'MONTH', 'YEAR_WEEK_IN'])\r\n",
@@ -304,7 +310,7 @@
 					"df_stg.where(\"CALENDAR = 'Fiscal' and GRAIN_LEVEL = 'DAY' and FISCALYEAR = 2021 and PERIODNAME = 'Period 1'\").show()\r\n",
 					""
 				],
-				"execution_count": 5
+				"execution_count": null
 			},
 			{
 				"cell_type": "code",
