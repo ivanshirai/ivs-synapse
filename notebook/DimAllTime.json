@@ -17,7 +17,7 @@
 				"spark.dynamicAllocation.enabled": "false",
 				"spark.dynamicAllocation.minExecutors": "2",
 				"spark.dynamicAllocation.maxExecutors": "2",
-				"spark.autotune.trackingId": "6c780441-6c90-4df4-8522-c2d92c13962a"
+				"spark.autotune.trackingId": "67fc11a6-fd2b-4dbe-b125-0e2628288386"
 			}
 		},
 		"metadata": {
@@ -117,7 +117,8 @@
 					"    \"NULL PERIODNAME, \" +\r\n",
 					"    \"NULL SHORTNAME, \" +\r\n",
 					"    \"NULL TYPE, \" +\r\n",
-					"    \"NULL DAYS \" +\r\n",
+					"    \"NULL DAYS, \" +\r\n",
+					"    \"NULL PERIODNUMBER \" +\r\n",
 					"    \"FROM fy_view \" +\r\n",
 					"    \"UNION \" +\r\n",
 					"    \"SELECT concat(CALENDAR, ',PERIOD,', FISCALYEAR, ',', replace(PERIODNAME, 'Period ', '')) DIM_ALL_TIME_ID, \" +\r\n",
@@ -132,13 +133,14 @@
 					"    \"PERIODNAME, \" +\r\n",
 					"    \"SHORTNAME, \" +\r\n",
 					"    \"TYPE, \" +\r\n",
-					"    \"DAYS \" +\r\n",
+					"    \"DAYS, \" +\r\n",
+					"    \"cast(replace(PERIODNAME, 'Period ', '') as int) PERIODNUMBER \" +\r\n",
 					"    \"FROM fp_view \" +\r\n",
 					"    \"WHERE TYPE = 1\")\r\n",
 					"\r\n",
 					"df_stg.show()"
 				],
-				"execution_count": 2
+				"execution_count": 12
 			},
 			{
 				"cell_type": "markdown",
@@ -170,7 +172,8 @@
 				"source": [
 					"from pyspark.sql.functions import lit\r\n",
 					"\r\n",
-					"df_stg = df_stg.select(['DIM_ALL_TIME_ID','GRAIN_LEVEL','CALENDAR','FISCALYEAR','STARTDATE','ENDDATE','CALENDARTYPE','QUARTER','MONTH','PERIODNAME','SHORTNAME','TYPE','DAYS', \r\n",
+					"df_stg = df_stg.select(['DIM_ALL_TIME_ID','GRAIN_LEVEL','CALENDAR','FISCALYEAR','STARTDATE','ENDDATE',\r\n",
+					"    'CALENDARTYPE','QUARTER','MONTH','PERIODNAME','SHORTNAME','TYPE','DAYS','PERIODNUMBER', \r\n",
 					"    lit(None).cast('integer').alias('CALYEAR'), \r\n",
 					"    lit(None).cast('string').alias('CALMONTH'), \r\n",
 					"    lit(None).cast('integer').alias('CALMONTH_NUM'), \r\n",
@@ -195,7 +198,7 @@
 					"\r\n",
 					"df_stg.where(\"CALENDAR = 'Gregorian' and CALYEAR = 2021\").show()"
 				],
-				"execution_count": 3
+				"execution_count": 13
 			},
 			{
 				"cell_type": "markdown",
@@ -226,29 +229,28 @@
 				"source": [
 					"from datetime import datetime, timedelta\r\n",
 					"\r\n",
-					"df_stg = df_stg.select(['DIM_ALL_TIME_ID','GRAIN_LEVEL','CALENDAR','FISCALYEAR','STARTDATE','ENDDATE','CALENDARTYPE','QUARTER','MONTH','PERIODNAME','SHORTNAME','TYPE','DAYS', \r\n",
+					"df_stg = df_stg.select(['DIM_ALL_TIME_ID','GRAIN_LEVEL','CALENDAR','FISCALYEAR','STARTDATE','ENDDATE',\r\n",
+					"    'CALENDARTYPE','QUARTER','MONTH','PERIODNAME','SHORTNAME','TYPE','DAYS', 'PERIODNUMBER',\r\n",
 					"    'CALYEAR','CALMONTH','CALMONTH_NUM','CLOSEDMONTH', \r\n",
-					"    lit(None).cast('date').alias('CALENDARDATE'), \r\n",
-					"    lit(None).cast('integer').alias('PERIODNUMBER')])\r\n",
+					"    lit(None).cast('date').alias('CALENDARDATE')])\r\n",
 					"\r\n",
 					"for row in df_stg.where(\"CALENDAR = 'Fiscal' and GRAIN_LEVEL = 'PERIOD' and TYPE = 1\").collect():\r\n",
 					"    monthRow = []\r\n",
 					"    for i in range(0, (datetime.strptime(row['ENDDATE'], '%Y-%m-%d %H:%M:%S') - datetime.strptime(row['STARTDATE'], '%Y-%m-%d %H:%M:%S')).days + 1):\r\n",
 					"        calDay = datetime.strptime(row['STARTDATE'], '%Y-%m-%d %H:%M:%S') + timedelta(days = i)\r\n",
 					"        dayRow = ['Fiscal,DAY,' + str(calDay.year) + f'{calDay.month:02}' + f'{calDay.day:02}', 'DAY', row['CALENDAR'], row['FISCALYEAR'], row['PERIODNAME'],\r\n",
-					"            calDay, calDay, calDay, row['QUARTER'], row['MONTH'], calDay.year, f'{calDay.month:02}', calDay.month,\r\n",
-					"            1 if date(calDay.year, calDay.month, monthrange(calDay.year, calDay.month)[1]) < date.today() else 0,\r\n",
-					"            int(row['PERIODNAME'].replace('Period ', ''))]\r\n",
+					"            calDay, calDay, calDay, row['PERIODNUMBER'], row['QUARTER'], row['MONTH'], calDay.year, f'{calDay.month:02}', calDay.month,\r\n",
+					"            1 if date(calDay.year, calDay.month, monthrange(calDay.year, calDay.month)[1]) < date.today() else 0]\r\n",
 					"        monthRow.append(dayRow)\r\n",
 					"    newPeriod = spark.createDataFrame(monthRow, ['DIM_ALL_TIME_ID', 'GRAIN_LEVEL', 'CALENDAR', 'FISCALYEAR', 'PERIODNAME', 'CALENDARDATE', \r\n",
-					"        'STARTDATE', 'ENDDATE', 'QUARTER', 'MONTH', 'CALYEAR', 'CALMONTH', 'CALMONTH_NUM', 'CLOSEDMONTH', 'PERIODNUMBER'])\r\n",
+					"        'STARTDATE', 'ENDDATE', 'PERIODNUMBER', 'QUARTER', 'MONTH', 'CALYEAR', 'CALMONTH', 'CALMONTH_NUM', 'CLOSEDMONTH'])\r\n",
 					"    df_stg = df_stg.unionByName(newPeriod, allowMissingColumns=True)\r\n",
 					"\r\n",
 					"df_stg.createOrReplaceTempView('AllTimeStg')\r\n",
 					"\r\n",
 					"df_stg.where(\"CALENDAR = 'Fiscal' and GRAIN_LEVEL = 'DAY' and FISCALYEAR = 2021 and PERIODNAME = 'Period 1'\").show()"
 				],
-				"execution_count": null
+				"execution_count": 14
 			},
 			{
 				"cell_type": "markdown",
@@ -281,21 +283,25 @@
 					"    'CALYEAR','CALMONTH','CALMONTH_NUM','CLOSEDMONTH','CALENDARDATE','PERIODNUMBER',\r\n",
 					"    lit(None).cast('integer').alias('YEAR_WEEK_IN')])\r\n",
 					"\r\n",
-					"for row in df_stg.where(\"CALENDAR = 'Fiscal' and GRAIN_LEVEL = 'PERIOD' AND FISCALYEAR = 2020\").orderBy([\"FISCALYEAR\", \"PERIODNUMBER\"]).collect():\r\n",
+					"for row in df_stg.where(\"CALENDAR = 'Fiscal' and GRAIN_LEVEL = 'PERIOD'\").orderBy([\"FISCALYEAR\", \"PERIODNUMBER\"]).collect():\r\n",
 					"    yearRow = []\r\n",
-					"    weekNum = 0\r\n",
+					"    weekNum = (row['PERIODNUMBER'] - 1) * 4\r\n",
 					"    for i in range(0, int((datetime.strptime(row['ENDDATE'], '%Y-%m-%d %H:%M:%S') - datetime.strptime(row['STARTDATE'], '%Y-%m-%d %H:%M:%S')).days/7)):\r\n",
 					"        weekStart = datetime.strptime(row['STARTDATE'], '%Y-%m-%d %H:%M:%S') + timedelta(days = 7*i)\r\n",
 					"        weekNum = weekNum + 1\r\n",
 					"        weekRow = ['Fiscal,WEEK,' + str(row['FISCALYEAR']) + ',' + str(weekNum), \r\n",
 					"            'WEEK', row['CALENDAR'], row['FISCALYEAR'], row['PERIODNAME'],\r\n",
-					"            weekStart, weekStart + timedelta(days = 6),\r\n",
-					"            row['QUARTER'], row['MONTH'], int(row['PERIODNAME'].replace('Period ', '')), i + 1]\r\n",
+					"            weekStart, weekStart + timedelta(days = 6), row['PERIODNUMBER'],\r\n",
+					"            row['QUARTER'], row['MONTH']]\r\n",
 					"        yearRow.append(weekRow)\r\n",
-					"    print(yearRow)\r\n",
+					"    newYear = spark.createDataFrame(yearRow, ['DIM_ALL_TIME_ID', 'GRAIN_LEVEL', 'CALENDAR', 'FISCALYEAR', 'PERIODNAME', \r\n",
+					"        'STARTDATE', 'ENDDATE', 'PERIODNUMBER', 'QUARTER', 'MONTH'])\r\n",
+					"    df_stg = df_stg.unionByName(newYear, allowMissingColumns=True)\r\n",
+					"\r\n",
+					"df_stg.createOrReplaceTempView('AllTimeStg')\r\n",
 					""
 				],
-				"execution_count": 30
+				"execution_count": 18
 			},
 			{
 				"cell_type": "code",
@@ -323,7 +329,7 @@
 					"\r\n",
 					""
 				],
-				"execution_count": 29
+				"execution_count": 19
 			}
 		]
 	}
