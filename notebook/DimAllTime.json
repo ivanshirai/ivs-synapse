@@ -17,7 +17,7 @@
 				"spark.dynamicAllocation.enabled": "false",
 				"spark.dynamicAllocation.minExecutors": "2",
 				"spark.dynamicAllocation.maxExecutors": "2",
-				"spark.autotune.trackingId": "67fc11a6-fd2b-4dbe-b125-0e2628288386"
+				"spark.autotune.trackingId": "d31e4cb3-80c6-4630-80ad-f9e05b7d0379"
 			}
 		},
 		"metadata": {
@@ -75,7 +75,7 @@
 					"fiscal_period.createOrReplaceTempView('fp_view')\r\n",
 					""
 				],
-				"execution_count": 1
+				"execution_count": 22
 			},
 			{
 				"cell_type": "markdown",
@@ -140,7 +140,7 @@
 					"\r\n",
 					"df_stg.show()"
 				],
-				"execution_count": 12
+				"execution_count": null
 			},
 			{
 				"cell_type": "markdown",
@@ -198,7 +198,7 @@
 					"\r\n",
 					"df_stg.where(\"CALENDAR = 'Gregorian' and CALYEAR = 2021\").show()"
 				],
-				"execution_count": 13
+				"execution_count": null
 			},
 			{
 				"cell_type": "markdown",
@@ -250,7 +250,7 @@
 					"\r\n",
 					"df_stg.where(\"CALENDAR = 'Fiscal' and GRAIN_LEVEL = 'DAY' and FISCALYEAR = 2021 and PERIODNAME = 'Period 1'\").show()"
 				],
-				"execution_count": 14
+				"execution_count": null
 			},
 			{
 				"cell_type": "markdown",
@@ -301,7 +301,7 @@
 					"df_stg.createOrReplaceTempView('AllTimeStg')\r\n",
 					""
 				],
-				"execution_count": 18
+				"execution_count": null
 			},
 			{
 				"cell_type": "code",
@@ -329,7 +329,7 @@
 					"\r\n",
 					""
 				],
-				"execution_count": 19
+				"execution_count": null
 			}
 		]
 	}
