@@ -17,7 +17,7 @@
 				"spark.dynamicAllocation.enabled": "false",
 				"spark.dynamicAllocation.minExecutors": "2",
 				"spark.dynamicAllocation.maxExecutors": "2",
-				"spark.autotune.trackingId": "40762a98-3359-40f8-9c2e-9de97c44f283"
+				"spark.autotune.trackingId": "6c780441-6c90-4df4-8522-c2d92c13962a"
 			}
 		},
 		"metadata": {
@@ -281,7 +281,7 @@
 					"    'CALYEAR','CALMONTH','CALMONTH_NUM','CLOSEDMONTH','CALENDARDATE','PERIODNUMBER',\r\n",
 					"    lit(None).cast('integer').alias('YEAR_WEEK_IN')])\r\n",
 					"\r\n",
-					"for row in df_stg.where(\"CALENDAR = 'Fiscal' and GRAIN_LEVEL = 'PERIOD' AND FISCALYEAR = 2020\").collect():\r\n",
+					"for row in df_stg.where(\"CALENDAR = 'Fiscal' and GRAIN_LEVEL = 'PERIOD' AND FISCALYEAR = 2020\").orderBy([\"FISCALYEAR\", \"PERIODNUMBER\"]).collect():\r\n",
 					"    yearRow = []\r\n",
 					"    weekNum = 0\r\n",
 					"    for i in range(0, int((datetime.strptime(row['ENDDATE'], '%Y-%m-%d %H:%M:%S') - datetime.strptime(row['STARTDATE'], '%Y-%m-%d %H:%M:%S')).days/7)):\r\n",
