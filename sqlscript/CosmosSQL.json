@@ -1,0 +1,17 @@
+{
+	"name": "CosmosSQL",
+	"properties": {
+		"content": {
+			"query": "CREATE CREDENTIAL [cosmos_ivsaccount]\n WITH IDENTITY = 'SHARED ACCESS SIGNATURE',\n SECRET = 'exU9Lv....................................=='\n GO\n\nSELECT TOP 100 *\nFROM OPENROWSET(​PROVIDER = 'CosmosDB',\n                CONNECTION = 'Account=ivsaccount;Database=AdventureWorks',\n                OBJECT = 'Sales',\n                SERVER_CREDENTIAL = 'cosmos_ivsaccount'\n) AS [Sales]\n\n\n SELECT orderdate,\n        COUNT(id) AS ordercount\n FROM OPENROWSET(​PROVIDER = 'CosmosDB',\n                 CONNECTION = 'Account=ivsaccount;Database=AdventureWorks',\n                 OBJECT = 'Sales',\n                 SERVER_CREDENTIAL = 'cosmos_ivsaccount'\n ) AS [Sales]\n GROUP BY orderdate\n ORDER BY orderdate;",
+			"metadata": {
+				"language": "sql"
+			},
+			"currentConnection": {
+				"databaseName": "ivs-synapse-dldb",
+				"poolName": "Built-in"
+			},
+			"resultLimit": 5000
+		},
+		"type": "SqlQuery"
+	}
+}
