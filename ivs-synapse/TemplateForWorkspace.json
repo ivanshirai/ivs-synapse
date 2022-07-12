@@ -7,6 +7,10 @@
 			"metadata": "Workspace name",
 			"defaultValue": "ivs-synapse"
 		},
+		"AdventureWorksSQL_connectionString": {
+			"type": "secureString",
+			"metadata": "Secure string for 'connectionString' of 'AdventureWorksSQL'"
+		},
 		"ivs-synapse-WorkspaceDefaultSqlServer_connectionString": {
 			"type": "secureString",
 			"metadata": "Secure string for 'connectionString' of 'ivs-synapse-WorkspaceDefaultSqlServer'"
@@ -18,6 +22,10 @@
 		"ivs-synapse-WorkspaceDefaultStorage_properties_typeProperties_url": {
 			"type": "string",
 			"defaultValue": "https://ivsdatastorage.dfs.core.windows.net"
+		},
+		"ivs_dwh_kv_properties_typeProperties_baseUrl": {
+			"type": "string",
+			"defaultValue": "https://ivs-dwh-kv.vault.azure.net/"
 		},
 		"SchedSQLPoolPaused_properties_SQLPoolPause_parameters_p_subscription": {
 			"type": "string",
@@ -1173,6 +1181,26 @@
 			]
 		},
 		{
+			"name": "[concat(parameters('workspaceName'), '/AdventureWorksSQL')]",
+			"type": "Microsoft.Synapse/workspaces/linkedServices",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"description": "AdventureWorks Cosmos DB SQL API database",
+				"annotations": [],
+				"type": "CosmosDb",
+				"typeProperties": {
+					"connectionString": "[parameters('AdventureWorksSQL_connectionString')]"
+				},
+				"connectVia": {
+					"referenceName": "AutoResolveIntegrationRuntime",
+					"type": "IntegrationRuntimeReference"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/integrationRuntimes/AutoResolveIntegrationRuntime')]"
+			]
+		},
+		{
 			"name": "[concat(parameters('workspaceName'), '/ivs-synapse-WorkspaceDefaultSqlServer')]",
 			"type": "Microsoft.Synapse/workspaces/linkedServices",
 			"apiVersion": "2019-06-01-preview",
@@ -1214,6 +1242,19 @@
 			"dependsOn": [
 				"[concat(variables('workspaceId'), '/integrationRuntimes/AutoResolveIntegrationRuntime')]"
 			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/ivs_dwh_kv')]",
+			"type": "Microsoft.Synapse/workspaces/linkedServices",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"annotations": [],
+				"type": "AzureKeyVault",
+				"typeProperties": {
+					"baseUrl": "[parameters('ivs_dwh_kv_properties_typeProperties_baseUrl')]"
+				}
+			},
+			"dependsOn": []
 		},
 		{
 			"name": "[concat(parameters('workspaceName'), '/ivs_od_sqlpool')]",
@@ -1381,7 +1422,7 @@
 							"name": "AlterRow"
 						}
 					],
-					"script": "source(output(\n\t\tSOURCE2_ID as string,\n\t\tNCHAR_VALUE1 as string,\n\t\tNCHAR_VALUE2 as string,\n\t\tNUMERIC_VALUE1 as double,\n\t\tNUMERIC_VALUE2 as double,\n\t\tDATETIME_VALUE1 as string,\n\t\tDATETIME_VALUE2 as string\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tignoreNoFilesFound: false) ~> DataSource\nsource(output(\n\t\tDIMENSION1_KEY as string,\n\t\tSOURCE2_ID as string,\n\t\tNCHAR_ATTRIBUTE1 as string,\n\t\tNCHAR_ATTRIBUTE2 as string,\n\t\tDATETIME_ATTRIBUTE1 as string,\n\t\tDATETIME_ATTRIBUTE2 as string,\n\t\tDSS_CREATE_TIME as string,\n\t\tDSS_UPDATE_TIME as string\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tisolationLevel: 'READ_UNCOMMITTED',\n\tformat: 'table',\n\tstaged: false) ~> Dimension\nDimension select(mapColumn(\n\t\teach(match(true()),\n\t\t\t'DIMPREFIX_'+$$ = $$)\n\t),\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> SelectDimension\nDataSource, SelectDimension lookup(SOURCE2_ID == DIMPREFIX_SOURCE2_ID,\n\tmultiple: false,\n\tpickup: 'any',\n\tbroadcast: 'auto')~> LookupDimension\nLookupDimension select(mapColumn(\n\t\tDSS_CREATE_TIME = DIMPREFIX_DSS_CREATE_TIME,\n\t\teach(match(left(name,length('DIMPREFIX_'))!='DIMPREFIX_'),\n\t\t\treplace($$,'VALUE','ATTRIBUTE') = $$)\n\t),\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> SelectColumns\nSelectColumns derive(DSS_CREATE_TIME = iif(isNull(DSS_CREATE_TIME), toString(currentTimestamp()), DSS_CREATE_TIME),\n\t\tDSS_UPDATE_TIME = toString(currentTimestamp())) ~> DerivedColumns\nDerivedColumns alterRow(upsertIf(true())) ~> AlterRow\nAlterRow sink(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tinput(\n\t\tDIMENSION1_KEY as integer,\n\t\tSOURCE2_ID as integer,\n\t\tNCHAR_ATTRIBUTE1 as string,\n\t\tNCHAR_ATTRIBUTE2 as string,\n\t\tDATETIME_ATTRIBUTE1 as timestamp,\n\t\tDATETIME_ATTRIBUTE2 as timestamp,\n\t\tDSS_CREATE_TIME as timestamp,\n\t\tDSS_UPDATE_TIME as timestamp\n\t),\n\tdeletable:false,\n\tinsertable:false,\n\tupdateable:false,\n\tupsertable:true,\n\tkeys:['SOURCE2_ID'],\n\tformat: 'table',\n\tstaged: true,\n\tallowCopyCommand: true,\n\tpreSQLs:['EXEC\t[dbo].[ZeroRow]\\n\t\t@p_tabname = N\\'TMPL_DIMENSION1\\',\\n\t\t@p_keycolname = N\\'DIMENSION1_KEY\\',\\n\t\t@p_varchar = N\\'Unknown\\',\\n\t\t@p_numeric = NULL,\\n\t\t@p_date = NULL,\\n\t\t@p_time = NULL,\\n\t\t@p_bit = NULL'],\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true,\n\terrorHandlingOption: 'stopOnFirstError') ~> DimensionSink"
+					"script": "source(output(\n\t\tSOURCE2_ID as string,\n\t\tNCHAR_VALUE1 as string,\n\t\tNCHAR_VALUE2 as string,\n\t\tNUMERIC_VALUE1 as double,\n\t\tNUMERIC_VALUE2 as double,\n\t\tDATETIME_VALUE1 as string,\n\t\tDATETIME_VALUE2 as string\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tignoreNoFilesFound: false) ~> DataSource\nsource(output(\n\t\tDIMENSION1_KEY as string,\n\t\tSOURCE2_ID as string,\n\t\tNCHAR_ATTRIBUTE1 as string,\n\t\tNCHAR_ATTRIBUTE2 as string,\n\t\tDATETIME_ATTRIBUTE1 as string,\n\t\tDATETIME_ATTRIBUTE2 as string,\n\t\tDSS_CREATE_TIME as string,\n\t\tDSS_UPDATE_TIME as string\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tisolationLevel: 'READ_UNCOMMITTED',\n\tformat: 'table',\n\tstaged: false) ~> Dimension\nDimension select(mapColumn(\n\t\teach(match(true()),\n\t\t\t'DIMPREFIX_'+$$ = $$)\n\t),\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> SelectDimension\nDataSource, SelectDimension lookup(SOURCE2_ID == DIMPREFIX_SOURCE2_ID,\n\tmultiple: false,\n\tpickup: 'any',\n\tbroadcast: 'auto')~> LookupDimension\nLookupDimension select(mapColumn(\n\t\tDSS_CREATE_TIME = DIMPREFIX_DSS_CREATE_TIME,\n\t\teach(match(left(name,length('DIMPREFIX_'))!='DIMPREFIX_'),\n\t\t\treplace($$,'VALUE','ATTRIBUTE') = $$)\n\t),\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> SelectColumns\nSelectColumns derive(DSS_CREATE_TIME = iif(isNull(DSS_CREATE_TIME), toString(currentTimestamp()), DSS_CREATE_TIME),\n\t\tDSS_UPDATE_TIME = toString(currentTimestamp())) ~> DerivedColumns\nDerivedColumns alterRow(upsertIf(true())) ~> AlterRow\nAlterRow sink(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tinput(\n\t\tDIMENSION1_KEY as integer,\n\t\tSOURCE2_ID as integer,\n\t\tNCHAR_ATTRIBUTE1 as string,\n\t\tNCHAR_ATTRIBUTE2 as string,\n\t\tDATETIME_ATTRIBUTE1 as timestamp,\n\t\tDATETIME_ATTRIBUTE2 as timestamp,\n\t\tDSS_CREATE_TIME as timestamp,\n\t\tDSS_UPDATE_TIME as timestamp\n\t),\n\tdeletable:false,\n\tinsertable:false,\n\tupdateable:false,\n\tupsertable:true,\n\tkeys:['SOURCE2_ID'],\n\tformat: 'table',\n\tstaged: true,\n\tpreSQLs:['EXEC\t[dbo].[ZeroRow]\\n\t\t@p_tabname = N\\'TMPL_DIMENSION1\\',\\n\t\t@p_keycolname = N\\'DIMENSION1_KEY\\',\\n\t\t@p_varchar = N\\'Unknown\\',\\n\t\t@p_numeric = NULL,\\n\t\t@p_date = NULL,\\n\t\t@p_time = NULL,\\n\t\t@p_bit = NULL'],\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true,\n\terrorHandlingOption: 'stopOnFirstError') ~> DimensionSink"
 				}
 			},
 			"dependsOn": [
@@ -1441,7 +1482,7 @@
 							"name": "AlterRow"
 						}
 					],
-					"script": "source(output(\n\t\tSOURCE3_ID as short,\n\t\tNCHAR_VALUE1 as string,\n\t\tNCHAR_VALUE2 as string,\n\t\tNUMERIC_VALUE1 as double,\n\t\tNUMERIC_VALUE2 as double,\n\t\tDATETIME_VALUE1 as string,\n\t\tDATETIME_VALUE2 as string,\n\t\tCDC_TIMESTAMP as string\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tignoreNoFilesFound: false) ~> DataSource\nsource(output(\n\t\tDIMENSION2_KEY as integer,\n\t\tSOURCE3_ID as integer,\n\t\tNCHAR_ATTRIBUTE1 as string,\n\t\tNCHAR_ATTRIBUTE2 as string,\n\t\tDATETIME_ATTRIBUTE1 as timestamp,\n\t\tDATETIME_ATTRIBUTE2 as timestamp,\n\t\tDSS_CREATE_TIME as timestamp,\n\t\tDSS_UPDATE_TIME as timestamp\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tisolationLevel: 'READ_UNCOMMITTED',\n\tformat: 'table',\n\tstaged: false) ~> Dimension\nDimension select(mapColumn(\n\t\teach(match(true()),\n\t\t\t'DIMPREFIX_'+$$ = $$)\n\t),\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> SelectDimension\nDataSource, SelectDimension lookup(SOURCE3_ID == DIMPREFIX_SOURCE3_ID,\n\tmultiple: false,\n\tpickup: 'any',\n\tbroadcast: 'auto')~> LookupDimension\nLookupDimension select(mapColumn(\n\t\tSOURCE3_ID,\n\t\tDSS_CREATE_TIME = DIMPREFIX_DSS_CREATE_TIME,\n\t\teach(match(left(name,length('DIMPREFIX_'))!='DIMPREFIX_'),\n\t\t\treplace($$,'VALUE','ATTRIBUTE') = $$)\n\t),\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> SelectColumns\nSelectColumns derive(DSS_CREATE_TIME = iif(isNull(DSS_CREATE_TIME), currentTimestamp(), DSS_CREATE_TIME),\n\t\tDSS_UPDATE_TIME = toString(currentTimestamp())) ~> DerivedColumns\nDerivedColumns alterRow(upsertIf(true())) ~> AlterRow\nAlterRow sink(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tinput(\n\t\tDIMENSION2_KEY as integer,\n\t\tSOURCE3_ID as integer,\n\t\tNCHAR_ATTRIBUTE1 as string,\n\t\tNCHAR_ATTRIBUTE2 as string,\n\t\tDATETIME_ATTRIBUTE1 as timestamp,\n\t\tDATETIME_ATTRIBUTE2 as timestamp,\n\t\tDSS_CREATE_TIME as timestamp,\n\t\tDSS_UPDATE_TIME as timestamp\n\t),\n\tdeletable:false,\n\tinsertable:false,\n\tupdateable:false,\n\tupsertable:true,\n\tkeys:['SOURCE3_ID'],\n\tformat: 'table',\n\tstaged: true,\n\tallowCopyCommand: true,\n\tpreSQLs:['EXEC\t[dbo].[ZeroRow]\\n\t\t@p_tabname = N\\'TMPL_DIMENSION2\\',\\n\t\t@p_keycolname = N\\'DIMENSION2_KEY\\',\\n\t\t@p_varchar = N\\'Unknown\\',\\n\t\t@p_numeric = NULL,\\n\t\t@p_date = NULL,\\n\t\t@p_time = NULL,\\n\t\t@p_bit = NULL'],\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true,\n\terrorHandlingOption: 'stopOnFirstError') ~> DimensionSink"
+					"script": "source(output(\n\t\tSOURCE3_ID as short,\n\t\tNCHAR_VALUE1 as string,\n\t\tNCHAR_VALUE2 as string,\n\t\tNUMERIC_VALUE1 as double,\n\t\tNUMERIC_VALUE2 as double,\n\t\tDATETIME_VALUE1 as string,\n\t\tDATETIME_VALUE2 as string,\n\t\tCDC_TIMESTAMP as string\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tignoreNoFilesFound: false) ~> DataSource\nsource(output(\n\t\tDIMENSION2_KEY as integer,\n\t\tSOURCE3_ID as integer,\n\t\tNCHAR_ATTRIBUTE1 as string,\n\t\tNCHAR_ATTRIBUTE2 as string,\n\t\tDATETIME_ATTRIBUTE1 as timestamp,\n\t\tDATETIME_ATTRIBUTE2 as timestamp,\n\t\tDSS_CREATE_TIME as timestamp,\n\t\tDSS_UPDATE_TIME as timestamp\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tisolationLevel: 'READ_UNCOMMITTED',\n\tformat: 'table',\n\tstaged: false) ~> Dimension\nDimension select(mapColumn(\n\t\teach(match(true()),\n\t\t\t'DIMPREFIX_'+$$ = $$)\n\t),\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> SelectDimension\nDataSource, SelectDimension lookup(SOURCE3_ID == DIMPREFIX_SOURCE3_ID,\n\tmultiple: false,\n\tpickup: 'any',\n\tbroadcast: 'auto')~> LookupDimension\nLookupDimension select(mapColumn(\n\t\tSOURCE3_ID,\n\t\tDSS_CREATE_TIME = DIMPREFIX_DSS_CREATE_TIME,\n\t\teach(match(left(name,length('DIMPREFIX_'))!='DIMPREFIX_'),\n\t\t\treplace($$,'VALUE','ATTRIBUTE') = $$)\n\t),\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> SelectColumns\nSelectColumns derive(DSS_CREATE_TIME = iif(isNull(DSS_CREATE_TIME), currentTimestamp(), DSS_CREATE_TIME),\n\t\tDSS_UPDATE_TIME = toString(currentTimestamp())) ~> DerivedColumns\nDerivedColumns alterRow(upsertIf(true())) ~> AlterRow\nAlterRow sink(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tinput(\n\t\tDIMENSION2_KEY as integer,\n\t\tSOURCE3_ID as integer,\n\t\tNCHAR_ATTRIBUTE1 as string,\n\t\tNCHAR_ATTRIBUTE2 as string,\n\t\tDATETIME_ATTRIBUTE1 as timestamp,\n\t\tDATETIME_ATTRIBUTE2 as timestamp,\n\t\tDSS_CREATE_TIME as timestamp,\n\t\tDSS_UPDATE_TIME as timestamp\n\t),\n\tdeletable:false,\n\tinsertable:false,\n\tupdateable:false,\n\tupsertable:true,\n\tkeys:['SOURCE3_ID'],\n\tformat: 'table',\n\tstaged: true,\n\tpreSQLs:['EXEC\t[dbo].[ZeroRow]\\n\t\t@p_tabname = N\\'TMPL_DIMENSION2\\',\\n\t\t@p_keycolname = N\\'DIMENSION2_KEY\\',\\n\t\t@p_varchar = N\\'Unknown\\',\\n\t\t@p_numeric = NULL,\\n\t\t@p_date = NULL,\\n\t\t@p_time = NULL,\\n\t\t@p_bit = NULL'],\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true,\n\terrorHandlingOption: 'stopOnFirstError') ~> DimensionSink"
 				}
 			},
 			"dependsOn": [
@@ -1609,7 +1650,7 @@
 							"name": "DerivedColumns"
 						}
 					],
-					"script": "parameters{\n\tp_latest_datetime as string ('1900-01-01 00:00:000'),\n\tp_main_source as string ('ADLS_TMPL_DATASOURCE1'),\n\tp_cdc_column as string ('CDC_TIMESTAMP')\n}\nsource(output(\n\t\tSOURCE1_ID as integer,\n\t\tSOURCE2_REF_ID as integer,\n\t\tSOURCE3_REF_ID as integer,\n\t\tNCHAR_VALUE1 as string,\n\t\tNCHAR_VALUE2 as string,\n\t\tNUMERIC_VALUE1 as decimal(12,6),\n\t\tNUMERIC_VALUE2 as decimal(12,6),\n\t\tDATETIME_VALUE1 as timestamp,\n\t\tDATETIME_VALUE2 as timestamp,\n\t\tCDC_TIMESTAMP as timestamp\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tisolationLevel: 'READ_UNCOMMITTED',\n\tformat: 'table',\n\tstaged: false) ~> MainSource\nsource(output(\n\t\tSOURCE2_ID as integer,\n\t\tNCHAR_VALUE1 as string,\n\t\tNCHAR_VALUE2 as string,\n\t\tNUMERIC_VALUE1 as decimal(18,4),\n\t\tNUMERIC_VALUE2 as decimal(18,4),\n\t\tDATETIME_VALUE1 as timestamp,\n\t\tDATETIME_VALUE2 as timestamp\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tignoreNoFilesFound: false) ~> SlaveSource2\nsource(output(\n\t\tSOURCE3_ID as integer,\n\t\tNCHAR_VALUE1 as string,\n\t\tNCHAR_VALUE2 as string,\n\t\tNUMERIC_VALUE1 as decimal(12,6),\n\t\tNUMERIC_VALUE2 as decimal(12,6),\n\t\tDATETIME_VALUE1 as timestamp,\n\t\tDATETIME_VALUE2 as timestamp,\n\t\tCDC_TIMESTAMP as timestamp\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tisolationLevel: 'READ_UNCOMMITTED',\n\tformat: 'table',\n\tstaged: false) ~> SlaveSource3\nMainSource select(mapColumn(\n\t\teach(match(true()),\n\t\t\t'SRC1_'+$$ = $$)\n\t),\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> SelectMain\nSlaveSource2 select(mapColumn(\n\t\teach(match(true()),\n\t\t\t'SRC2_'+$$ = $$)\n\t),\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> SelectSource2\nSlaveSource3 select(mapColumn(\n\t\teach(match(true()),\n\t\t\t'SRC3_'+$$ = $$)\n\t),\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> SelectSource3\nSelectMain, SelectSource2 join(SRC1_SOURCE2_REF_ID == SRC2_SOURCE2_ID,\n\tjoinType:'left',\n\tbroadcast: 'auto')~> JoinSource2\nJoinSource2, SelectSource3 join(SRC1_SOURCE3_REF_ID == SRC3_SOURCE3_ID,\n\tjoinType:'left',\n\tbroadcast: 'auto')~> JoinSource3\nJoinSource3 derive(DSS_CREATE_TIME = currentTimestamp()) ~> DerivedColumns\nDerivedColumns sink(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tformat: 'parquet',\n\ttruncate: true,\n\tumask: 0022,\n\tpreCommands: [],\n\tpostCommands: [],\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> SinkStaging\nDerivedColumns sink(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tinput(\n\t\tSRC1_SOURCE1_ID as integer,\n\t\tSRC1_SOURCE2_REF_ID as integer,\n\t\tSRC1_SOURCE3_REF_ID as integer\n\t),\n\tformat: 'parquet',\n\ttruncate: true,\n\tumask: 0022,\n\tpreCommands: [],\n\tpostCommands: [],\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true,\n\tmapColumn(\n\t\tSRC1_SOURCE1_ID,\n\t\tSRC1_SOURCE2_REF_ID,\n\t\tSRC1_SOURCE3_REF_ID\n\t)) ~> SinkStagingKey"
+					"script": "parameters{\n\tp_latest_datetime as string ('1900-01-01 00:00:000'),\n\tp_main_source as string ('ADLS_TMPL_DATASOURCE1'),\n\tp_cdc_column as string ('CDC_TIMESTAMP')\n}\nsource(output(\n\t\tSOURCE1_ID as integer,\n\t\tSOURCE2_REF_ID as integer,\n\t\tSOURCE3_REF_ID as integer,\n\t\tNCHAR_VALUE1 as string,\n\t\tNCHAR_VALUE2 as string,\n\t\tNUMERIC_VALUE1 as decimal(12,6),\n\t\tNUMERIC_VALUE2 as decimal(12,6),\n\t\tDATETIME_VALUE1 as timestamp,\n\t\tDATETIME_VALUE2 as timestamp,\n\t\tCDC_TIMESTAMP as timestamp\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tisolationLevel: 'READ_UNCOMMITTED',\n\tformat: 'table',\n\tstaged: false) ~> MainSource\nsource(output(\n\t\tSOURCE2_ID as integer,\n\t\tNCHAR_VALUE1 as string,\n\t\tNCHAR_VALUE2 as string,\n\t\tNUMERIC_VALUE1 as decimal(18,4),\n\t\tNUMERIC_VALUE2 as decimal(18,4),\n\t\tDATETIME_VALUE1 as timestamp,\n\t\tDATETIME_VALUE2 as timestamp\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tignoreNoFilesFound: false) ~> SlaveSource2\nsource(output(\n\t\tSOURCE3_ID as integer,\n\t\tNCHAR_VALUE1 as string,\n\t\tNCHAR_VALUE2 as string,\n\t\tNUMERIC_VALUE1 as decimal(12,6),\n\t\tNUMERIC_VALUE2 as decimal(12,6),\n\t\tDATETIME_VALUE1 as timestamp,\n\t\tDATETIME_VALUE2 as timestamp,\n\t\tCDC_TIMESTAMP as timestamp\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tisolationLevel: 'READ_UNCOMMITTED',\n\tformat: 'table',\n\tstaged: false) ~> SlaveSource3\nMainSource select(mapColumn(\n\t\teach(match(true()),\n\t\t\t'SRC1_'+$$ = $$)\n\t),\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> SelectMain\nSlaveSource2 select(mapColumn(\n\t\teach(match(true()),\n\t\t\t'SRC2_'+$$ = $$)\n\t),\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> SelectSource2\nSlaveSource3 select(mapColumn(\n\t\teach(match(true()),\n\t\t\t'SRC3_'+$$ = $$)\n\t),\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> SelectSource3\nSelectMain, SelectSource2 join(SRC1_SOURCE2_REF_ID == SRC2_SOURCE2_ID,\n\tjoinType:'left',\n\tmatchType:'exact',\n\tignoreSpaces: false,\n\tbroadcast: 'auto')~> JoinSource2\nJoinSource2, SelectSource3 join(SRC1_SOURCE3_REF_ID == SRC3_SOURCE3_ID,\n\tjoinType:'left',\n\tmatchType:'exact',\n\tignoreSpaces: false,\n\tbroadcast: 'auto')~> JoinSource3\nJoinSource3 derive(DSS_CREATE_TIME = currentTimestamp()) ~> DerivedColumns\nDerivedColumns sink(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tformat: 'parquet',\n\ttruncate: true,\n\tumask: 0022,\n\tpreCommands: [],\n\tpostCommands: [],\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> SinkStaging\nDerivedColumns sink(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tinput(\n\t\tSRC1_SOURCE1_ID as integer,\n\t\tSRC1_SOURCE2_REF_ID as integer,\n\t\tSRC1_SOURCE3_REF_ID as integer\n\t),\n\tformat: 'parquet',\n\ttruncate: true,\n\tumask: 0022,\n\tpreCommands: [],\n\tpostCommands: [],\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true,\n\tmapColumn(\n\t\tSRC1_SOURCE1_ID,\n\t\tSRC1_SOURCE2_REF_ID,\n\t\tSRC1_SOURCE3_REF_ID\n\t)) ~> SinkStagingKey"
 				}
 			},
 			"dependsOn": [
@@ -1682,6 +1723,26 @@
 						"databaseName": "ivs_sqlpool",
 						"poolName": "ivs_sqlpool"
 					}
+				},
+				"type": "SqlQuery"
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/CosmosSQL')]",
+			"type": "Microsoft.Synapse/workspaces/sqlscripts",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"content": {
+					"query": "CREATE CREDENTIAL [cosmos_ivsaccount]\n WITH IDENTITY = 'SHARED ACCESS SIGNATURE',\n SECRET = 'exU9Lv....................................=='\n GO\n\nSELECT TOP 100 *\nFROM OPENROWSET(​PROVIDER = 'CosmosDB',\n                CONNECTION = 'Account=ivsaccount;Database=AdventureWorks',\n                OBJECT = 'Sales',\n                SERVER_CREDENTIAL = 'cosmos_ivsaccount'\n) AS [Sales]\n\n\n SELECT orderdate,\n        COUNT(id) AS ordercount\n FROM OPENROWSET(​PROVIDER = 'CosmosDB',\n                 CONNECTION = 'Account=ivsaccount;Database=AdventureWorks',\n                 OBJECT = 'Sales',\n                 SERVER_CREDENTIAL = 'cosmos_ivsaccount'\n ) AS [Sales]\n GROUP BY orderdate\n ORDER BY orderdate;",
+					"metadata": {
+						"language": "sql"
+					},
+					"currentConnection": {
+						"databaseName": "ivs-synapse-dldb",
+						"poolName": "Built-in"
+					},
+					"resultLimit": 5000
 				},
 				"type": "SqlQuery"
 			},
@@ -1905,7 +1966,8 @@
 						"nodeCount": 3,
 						"cores": 4,
 						"memory": 28
-					}
+					},
+					"sessionKeepAliveTimeout": 30
 				},
 				"cells": [
 					{
@@ -2091,7 +2153,7 @@
 			"dependsOn": []
 		},
 		{
-			"name": "[concat(parameters('workspaceName'), '/DimAllTime')]",
+			"name": "[concat(parameters('workspaceName'), '/BloombergToken')]",
 			"type": "Microsoft.Synapse/workspaces/notebooks",
 			"apiVersion": "2019-06-01-preview",
 			"properties": {
@@ -2111,7 +2173,7 @@
 						"spark.dynamicAllocation.enabled": "false",
 						"spark.dynamicAllocation.minExecutors": "2",
 						"spark.dynamicAllocation.maxExecutors": "2",
-						"spark.autotune.trackingId": "86d4c250-7225-4092-9eec-533df588d792"
+						"spark.autotune.trackingId": "f870b825-e443-4655-a8d3-29f08746c0c8"
 					}
 				},
 				"metadata": {
@@ -2143,6 +2205,351 @@
 				},
 				"cells": [
 					{
+						"cell_type": "code",
+						"metadata": {},
+						"source": [
+							"import uuid\r\n",
+							"import binascii\r\n",
+							"import time\r\n",
+							"import jwt\r\n",
+							"from urllib.parse import urlparse"
+						],
+						"outputs": [],
+						"execution_count": 1
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"CLIENT_ID = TokenLibrary.getSecret('ivs-dwh-kv', 'BloombergClientId')\r\n",
+							"CLIENT_SECRET = TokenLibrary.getSecret('ivs-dwh-kv', 'BloombergSecret')\r\n",
+							"\r\n",
+							"IAT = int(time.time())\r\n",
+							"JWT_EXPIRATION = 60\r\n",
+							"REGION = \"default\"\r\n",
+							"URL = \"https://api.bloomberg.com/eap/catalogs/\"\r\n",
+							"METHOD = \"GET\"\r\n",
+							"\r\n",
+							"parsed_uri = urlparse(URL)\r\n",
+							"PATH = parsed_uri.path\r\n",
+							"HOST = parsed_uri.hostname"
+						],
+						"outputs": [],
+						"execution_count": 2
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"jwt_string = jwt.encode({\r\n",
+							"'iss': CLIENT_ID,\r\n",
+							"'iat': IAT,\r\n",
+							"'nbf': IAT,\r\n",
+							"'exp': IAT + JWT_EXPIRATION,\r\n",
+							"'region': REGION,\r\n",
+							"'path': PATH,\r\n",
+							"'method': METHOD,\r\n",
+							"'host': HOST,\r\n",
+							"'jti': str(uuid.uuid4()),\r\n",
+							"}, binascii.unhexlify(CLIENT_SECRET), algorithm=\"HS256\")\r\n",
+							"\r\n",
+							"TokenLibrary.putSecret('ivs-dwh-kv', 'BloombergToken', jwt_string)\r\n",
+							"\r\n",
+							"print(jwt_string)"
+						],
+						"outputs": [],
+						"execution_count": 3
+					}
+				]
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/CosmosNotebook')]",
+			"type": "Microsoft.Synapse/workspaces/notebooks",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"nbformat": 4,
+				"nbformat_minor": 2,
+				"bigDataPool": {
+					"referenceName": "ivsspark",
+					"type": "BigDataPoolReference"
+				},
+				"sessionProperties": {
+					"driverMemory": "28g",
+					"driverCores": 4,
+					"executorMemory": "28g",
+					"executorCores": 4,
+					"numExecutors": 2,
+					"conf": {
+						"spark.dynamicAllocation.enabled": "false",
+						"spark.dynamicAllocation.minExecutors": "2",
+						"spark.dynamicAllocation.maxExecutors": "2",
+						"spark.autotune.trackingId": "52687ac9-815a-4bf5-b2ac-0723f52bed46"
+					}
+				},
+				"metadata": {
+					"saveOutput": true,
+					"enableDebugMode": false,
+					"kernelspec": {
+						"name": "synapse_pyspark",
+						"display_name": "Synapse PySpark"
+					},
+					"language_info": {
+						"name": "python"
+					},
+					"a365ComputeOptions": {
+						"id": "/subscriptions/f939f8f3-2652-4a45-88ae-78a7782ec9df/resourceGroups/ivs-dwh-rg/providers/Microsoft.Synapse/workspaces/ivs-synapse/bigDataPools/ivsspark",
+						"name": "ivsspark",
+						"type": "Spark",
+						"endpoint": "https://ivs-synapse.dev.azuresynapse.net/livyApi/versions/2019-11-01-preview/sparkPools/ivsspark",
+						"auth": {
+							"type": "AAD",
+							"authResource": "https://dev.azuresynapse.net"
+						},
+						"sparkVersion": "3.1",
+						"nodeCount": 3,
+						"cores": 4,
+						"memory": 28
+					},
+					"sessionKeepAliveTimeout": 30
+				},
+				"cells": [
+					{
+						"cell_type": "code",
+						"metadata": {
+							"collapsed": false
+						},
+						"source": [
+							"# Read from Cosmos DB analytical store into a Spark DataFrame and display 10 rows from the DataFrame\n",
+							"# To select a preferred list of regions in a multi-region Cosmos DB account, add .option(\"spark.cosmos.preferredRegions\", \"<Region1>,<Region2>\")\n",
+							"\n",
+							"df = spark.read\\\n",
+							"    .format(\"cosmos.olap\")\\\n",
+							"    .option(\"spark.synapse.linkedService\", \"AdventureWorksSQL\")\\\n",
+							"    .option(\"spark.cosmos.container\", \"Sales\")\\\n",
+							"    .load()\n",
+							"\n",
+							"display(df.limit(10))"
+						],
+						"outputs": [],
+						"execution_count": 1
+					}
+				]
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/DP203Certification')]",
+			"type": "Microsoft.Synapse/workspaces/notebooks",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"nbformat": 4,
+				"nbformat_minor": 2,
+				"bigDataPool": {
+					"referenceName": "ivsspark",
+					"type": "BigDataPoolReference"
+				},
+				"sessionProperties": {
+					"driverMemory": "28g",
+					"driverCores": 4,
+					"executorMemory": "28g",
+					"executorCores": 4,
+					"numExecutors": 2,
+					"conf": {
+						"spark.dynamicAllocation.enabled": "false",
+						"spark.dynamicAllocation.minExecutors": "2",
+						"spark.dynamicAllocation.maxExecutors": "2",
+						"spark.autotune.trackingId": "7884fb01-59e9-4b88-99bd-1ea2b5386fc1"
+					}
+				},
+				"metadata": {
+					"saveOutput": true,
+					"enableDebugMode": false,
+					"kernelspec": {
+						"name": "synapse_pyspark",
+						"display_name": "Synapse PySpark"
+					},
+					"language_info": {
+						"name": "python"
+					},
+					"a365ComputeOptions": {
+						"id": "/subscriptions/f939f8f3-2652-4a45-88ae-78a7782ec9df/resourceGroups/ivs-dwh-rg/providers/Microsoft.Synapse/workspaces/ivs-synapse/bigDataPools/ivsspark",
+						"name": "ivsspark",
+						"type": "Spark",
+						"endpoint": "https://ivs-synapse.dev.azuresynapse.net/livyApi/versions/2019-11-01-preview/sparkPools/ivsspark",
+						"auth": {
+							"type": "AAD",
+							"authResource": "https://dev.azuresynapse.net"
+						},
+						"sparkVersion": "3.1",
+						"nodeCount": 3,
+						"cores": 4,
+						"memory": 28
+					},
+					"sessionKeepAliveTimeout": 30
+				},
+				"cells": [
+					{
+						"cell_type": "code",
+						"metadata": {
+							"microsoft": {
+								"language": "python"
+							},
+							"collapsed": false
+						},
+						"source": [
+							"%%pyspark\r\n",
+							"df = spark.read.load('abfss://spark@ivsdatastorage.dfs.core.windows.net/products.csv',\r\n",
+							"    format='csv',\r\n",
+							"    header=True\r\n",
+							")\r\n",
+							"display(df.limit(10))"
+						],
+						"outputs": [],
+						"execution_count": 2
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							},
+							"collapsed": false
+						},
+						"source": [
+							"from pyspark.sql.types import *\r\n",
+							"from pyspark.sql.functions import *\r\n",
+							"\r\n",
+							"productSchema = StructType([\r\n",
+							"    StructField(\"ProductID\", IntegerType()),\r\n",
+							"    StructField(\"ProductName\", StringType()),\r\n",
+							"    StructField(\"Category\", StringType()),\r\n",
+							"    StructField(\"ListPrice\", FloatType())\r\n",
+							"    ])\r\n",
+							"\r\n",
+							"df = spark.read.load('abfss://spark@ivsdatastorage.dfs.core.windows.net/products.csv',\r\n",
+							"    format='csv',\r\n",
+							"    schema=productSchema,\r\n",
+							"    header=False)\r\n",
+							"\r\n",
+							"df.createOrReplaceTempView(\"products\")\r\n",
+							"\r\n",
+							""
+						],
+						"outputs": [],
+						"execution_count": 10
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							},
+							"microsoft": {
+								"language": "sparksql"
+							},
+							"collapsed": false
+						},
+						"source": [
+							"%%sql\r\n",
+							"\r\n",
+							"SELECT Category, COUNT(ProductID) AS ProductCount\r\n",
+							"FROM products\r\n",
+							"GROUP BY Category\r\n",
+							"ORDER BY Category"
+						],
+						"outputs": [],
+						"execution_count": 12
+					}
+				]
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/DimAllTime')]",
+			"type": "Microsoft.Synapse/workspaces/notebooks",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"nbformat": 4,
+				"nbformat_minor": 2,
+				"bigDataPool": {
+					"referenceName": "ivsspark",
+					"type": "BigDataPoolReference"
+				},
+				"sessionProperties": {
+					"driverMemory": "28g",
+					"driverCores": 4,
+					"executorMemory": "28g",
+					"executorCores": 4,
+					"numExecutors": 2,
+					"conf": {
+						"spark.dynamicAllocation.enabled": "false",
+						"spark.dynamicAllocation.minExecutors": "2",
+						"spark.dynamicAllocation.maxExecutors": "2",
+						"spark.autotune.trackingId": "f03486a3-4e98-4a92-bbaa-56b5d40e9192"
+					}
+				},
+				"metadata": {
+					"saveOutput": true,
+					"enableDebugMode": false,
+					"kernelspec": {
+						"name": "synapse_pyspark",
+						"display_name": "Synapse PySpark"
+					},
+					"language_info": {
+						"name": "python"
+					},
+					"a365ComputeOptions": {
+						"id": "/subscriptions/f939f8f3-2652-4a45-88ae-78a7782ec9df/resourceGroups/ivs-dwh-rg/providers/Microsoft.Synapse/workspaces/ivs-synapse/bigDataPools/ivsspark",
+						"name": "ivsspark",
+						"type": "Spark",
+						"endpoint": "https://ivs-synapse.dev.azuresynapse.net/livyApi/versions/2019-11-01-preview/sparkPools/ivsspark",
+						"auth": {
+							"type": "AAD",
+							"authResource": "https://dev.azuresynapse.net"
+						},
+						"sparkVersion": "3.1",
+						"nodeCount": 3,
+						"cores": 4,
+						"memory": 28
+					},
+					"sessionKeepAliveTimeout": 30
+				},
+				"cells": [
+					{
 						"cell_type": "markdown",
 						"metadata": {
 							"nteract": {
@@ -2157,7 +2564,6 @@
 					},
 					{
 						"cell_type": "code",
-						"metadata": {},
 						"source": [
 							"fiscal_year = spark.read.csv('abfss://spark@ivsdatastorage.dfs.core.windows.net/source/FiscalYear.csv', \r\n",
 							"    header = True)\r\n",
@@ -2171,7 +2577,7 @@
 							""
 						],
 						"outputs": [],
-						"execution_count": 15
+						"execution_count": 1
 					},
 					{
 						"cell_type": "markdown",
@@ -2198,7 +2604,6 @@
 									"deleting": false
 								}
 							},
-							"microsoft": {},
 							"collapsed": false
 						},
 						"source": [
@@ -2214,7 +2619,8 @@
 							"    \"NULL PERIODNAME, \" +\r\n",
 							"    \"NULL SHORTNAME, \" +\r\n",
 							"    \"NULL TYPE, \" +\r\n",
-							"    \"NULL DAYS \" +\r\n",
+							"    \"NULL DAYS, \" +\r\n",
+							"    \"NULL PERIODNUMBER \" +\r\n",
 							"    \"FROM fy_view \" +\r\n",
 							"    \"UNION \" +\r\n",
 							"    \"SELECT concat(CALENDAR, ',PERIOD,', FISCALYEAR, ',', replace(PERIODNAME, 'Period ', '')) DIM_ALL_TIME_ID, \" +\r\n",
@@ -2229,13 +2635,15 @@
 							"    \"PERIODNAME, \" +\r\n",
 							"    \"SHORTNAME, \" +\r\n",
 							"    \"TYPE, \" +\r\n",
-							"    \"DAYS \" +\r\n",
-							"    \"FROM fp_view \")\r\n",
+							"    \"DAYS, \" +\r\n",
+							"    \"cast(replace(PERIODNAME, 'Period ', '') as int) PERIODNUMBER \" +\r\n",
+							"    \"FROM fp_view \" +\r\n",
+							"    \"WHERE TYPE = 1\")\r\n",
 							"\r\n",
 							"df_stg.show()"
 						],
 						"outputs": [],
-						"execution_count": 16
+						"execution_count": 2
 					},
 					{
 						"cell_type": "markdown",
@@ -2262,13 +2670,13 @@
 									"deleting": false
 								}
 							},
-							"microsoft": {},
 							"collapsed": false
 						},
 						"source": [
 							"from pyspark.sql.functions import lit\r\n",
 							"\r\n",
-							"df_stg = df_stg.select(['DIM_ALL_TIME_ID','GRAIN_LEVEL','CALENDAR','FISCALYEAR','STARTDATE','ENDDATE','CALENDARTYPE','QUARTER','MONTH','PERIODNAME','SHORTNAME','TYPE','DAYS', \r\n",
+							"df_stg = df_stg.select(['DIM_ALL_TIME_ID','GRAIN_LEVEL','CALENDAR','FISCALYEAR','STARTDATE','ENDDATE',\r\n",
+							"    'CALENDARTYPE','QUARTER','MONTH','PERIODNAME','SHORTNAME','TYPE','DAYS','PERIODNUMBER', \r\n",
 							"    lit(None).cast('integer').alias('CALYEAR'), \r\n",
 							"    lit(None).cast('string').alias('CALMONTH'), \r\n",
 							"    lit(None).cast('integer').alias('CALMONTH_NUM'), \r\n",
@@ -2294,7 +2702,67 @@
 							"df_stg.where(\"CALENDAR = 'Gregorian' and CALYEAR = 2021\").show()"
 						],
 						"outputs": [],
-						"execution_count": 17
+						"execution_count": 3
+					},
+					{
+						"cell_type": "markdown",
+						"metadata": {
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"Weeks"
+						]
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"from datetime import datetime, timedelta\r\n",
+							"\r\n",
+							"df_stg = df_stg.select(['DIM_ALL_TIME_ID','GRAIN_LEVEL','CALENDAR','FISCALYEAR','STARTDATE','ENDDATE',\r\n",
+							"    'CALENDARTYPE','QUARTER','MONTH','PERIODNAME','SHORTNAME','TYPE','DAYS','PERIODNUMBER',\r\n",
+							"    'CALYEAR','CALMONTH','CALMONTH_NUM','CLOSEDMONTH',\r\n",
+							"    lit(None).cast('integer').alias('YEAR_WEEK_IN'),\r\n",
+							"    lit(None).cast('integer').alias('WEEK_STARTDATE'),\r\n",
+							"    lit(None).cast('integer').alias('WEEK_ENDTDATE'),\r\n",
+							"    lit(None).cast('integer').alias('PERIOD_STARTDATE'),\r\n",
+							"    lit(None).cast('integer').alias('PERIOD_ENDDATE'),\r\n",
+							"    lit(None).cast('integer').alias('YEAR_STARTDATE'),\r\n",
+							"    lit(None).cast('integer').alias('YEAR_ENDDATE')])\r\n",
+							"\r\n",
+							"for row in df_stg.where(\"CALENDAR = 'Fiscal' and GRAIN_LEVEL = 'PERIOD'\").orderBy([\"FISCALYEAR\", \"PERIODNUMBER\"]).collect():\r\n",
+							"    yearRow = []\r\n",
+							"    weekNum = (row['PERIODNUMBER'] - 1) * 4\r\n",
+							"    for i in range(0, int((datetime.strptime(row['ENDDATE'], '%Y-%m-%d %H:%M:%S') - datetime.strptime(row['STARTDATE'], '%Y-%m-%d %H:%M:%S')).days/7)):\r\n",
+							"        weekStart = datetime.strptime(row['STARTDATE'], '%Y-%m-%d %H:%M:%S') + timedelta(days = 7*i)\r\n",
+							"        weekNum = weekNum + 1\r\n",
+							"        weekRow = ['Fiscal,WEEK,' + str(row['FISCALYEAR']) + ',' + str(weekNum), \r\n",
+							"            'WEEK', row['CALENDAR'], row['FISCALYEAR'], row['PERIODNAME'],\r\n",
+							"            weekStart, weekStart + timedelta(days = 6), row['PERIODNUMBER'],\r\n",
+							"            row['QUARTER'], row['MONTH'], weekNum, weekStart, weekStart + timedelta(days = 6)]\r\n",
+							"        yearRow.append(weekRow)\r\n",
+							"    newYear = spark.createDataFrame(yearRow, ['DIM_ALL_TIME_ID', 'GRAIN_LEVEL', 'CALENDAR', 'FISCALYEAR', 'PERIODNAME', \r\n",
+							"        'STARTDATE', 'ENDDATE', 'PERIODNUMBER', 'QUARTER', 'MONTH', 'YEAR_WEEK_IN'])\r\n",
+							"    df_stg = df_stg.unionByName(newYear, allowMissingColumns=True)\r\n",
+							"\r\n",
+							"df_stg.createOrReplaceTempView('AllTimeStg')"
+						],
+						"outputs": [],
+						"execution_count": 4
 					},
 					{
 						"cell_type": "markdown",
@@ -2323,32 +2791,32 @@
 							}
 						},
 						"source": [
-							"from datetime import datetime, timedelta\r\n",
+							"df_stg = df_stg.select(['DIM_ALL_TIME_ID','GRAIN_LEVEL','CALENDAR','FISCALYEAR','STARTDATE','ENDDATE',\r\n",
+							"    'CALENDARTYPE','QUARTER','MONTH','PERIODNAME','SHORTNAME','TYPE','DAYS','PERIODNUMBER',\r\n",
+							"    'CALYEAR','CALMONTH','CALMONTH_NUM','CLOSEDMONTH','YEAR_WEEK_IN',\r\n",
+							"    lit(None).cast('date').alias('CALENDARDATE')])\r\n",
 							"\r\n",
-							"df_stg = df_stg.select(['DIM_ALL_TIME_ID','GRAIN_LEVEL','CALENDAR','FISCALYEAR','STARTDATE','ENDDATE','CALENDARTYPE','QUARTER','MONTH','PERIODNAME','SHORTNAME','TYPE','DAYS', \r\n",
-							"    'CALYEAR','CALMONTH','CALMONTH_NUM','CLOSEDMONTH', \r\n",
-							"    lit(None).cast('date').alias('CALENDARDATE'), \r\n",
-							"    lit(None).cast('integer').alias('PERIODNUMBER')])\r\n",
-							"\r\n",
-							"for row in df_stg.where(\"CALENDAR = 'Fiscal' and GRAIN_LEVEL = 'PERIOD' and TYPE = 1\").collect():\r\n",
-							"    monthRow = []\r\n",
+							"weekRow = []\r\n",
+							"for row in df_stg.where(\"CALENDAR = 'Fiscal' and GRAIN_LEVEL = 'WEEK'\").collect():\r\n",
 							"    for i in range(0, (datetime.strptime(row['ENDDATE'], '%Y-%m-%d %H:%M:%S') - datetime.strptime(row['STARTDATE'], '%Y-%m-%d %H:%M:%S')).days + 1):\r\n",
 							"        calDay = datetime.strptime(row['STARTDATE'], '%Y-%m-%d %H:%M:%S') + timedelta(days = i)\r\n",
 							"        dayRow = ['Fiscal,DAY,' + str(calDay.year) + f'{calDay.month:02}' + f'{calDay.day:02}', 'DAY', row['CALENDAR'], row['FISCALYEAR'], row['PERIODNAME'],\r\n",
-							"            calDay, calDay, calDay, row['QUARTER'], row['MONTH'], calDay.year, f'{calDay.month:02}', calDay.month,\r\n",
-							"            1 if date(calDay.year, calDay.month, monthrange(calDay.year, calDay.month)[1]) < date.today() else 0,\r\n",
-							"            int(row['PERIODNAME'].replace('Period ', ''))]\r\n",
-							"        monthRow.append(dayRow)\r\n",
-							"    newPeriod = spark.createDataFrame(monthRow, ['DIM_ALL_TIME_ID', 'GRAIN_LEVEL', 'CALENDAR', 'FISCALYEAR', 'PERIODNAME', 'CALENDARDATE', \r\n",
-							"        'STARTDATE', 'ENDDATE', 'QUARTER', 'MONTH', 'CALYEAR', 'CALMONTH', 'CALMONTH_NUM', 'CLOSEDMONTH', 'PERIODNUMBER'])\r\n",
-							"    df_stg = df_stg.unionByName(newPeriod, allowMissingColumns=True)\r\n",
+							"            calDay, calDay, calDay, row['PERIODNUMBER'], row['QUARTER'], row['MONTH'], calDay.year, str(calDay.year) + f'{calDay.month:02}', calDay.month,\r\n",
+							"            1 if date(calDay.year, calDay.month, monthrange(calDay.year, calDay.month)[1]) < date.today() else 0, row['YEAR_WEEK_IN']]\r\n",
+							"        weekRow.append(dayRow)\r\n",
+							"\r\n",
+							"newWeek = spark.createDataFrame(weekRow, ['DIM_ALL_TIME_ID', 'GRAIN_LEVEL', 'CALENDAR', 'FISCALYEAR', 'PERIODNAME', 'CALENDARDATE', \r\n",
+							"    'STARTDATE', 'ENDDATE', 'PERIODNUMBER', 'QUARTER', 'MONTH', 'CALYEAR', 'CALMONTH', 'CALMONTH_NUM', 'CLOSEDMONTH', 'YEAR_WEEK_IN'])\r\n",
+							"\r\n",
+							"df_stg = df_stg.unionByName(newWeek, allowMissingColumns=True)\r\n",
 							"\r\n",
 							"df_stg.createOrReplaceTempView('AllTimeStg')\r\n",
 							"\r\n",
-							"df_stg.where(\"CALENDAR = 'Fiscal' and GRAIN_LEVEL = 'DAY' and FISCALYEAR = 2021 and PERIODNAME = 'Period 1'\").show()"
+							"df_stg.where(\"CALENDAR = 'Fiscal' and GRAIN_LEVEL = 'DAY' and FISCALYEAR = 2021 and PERIODNAME = 'Period 1'\").show()\r\n",
+							""
 						],
 						"outputs": [],
-						"execution_count": 18
+						"execution_count": null
 					},
 					{
 						"cell_type": "code",
@@ -2372,10 +2840,12 @@
 							"select * from AllTimeStg\r\n",
 							"where fiscalyear = 2019\r\n",
 							"order by startdate\r\n",
-							"limit 20"
+							"limit 20\r\n",
+							"\r\n",
+							""
 						],
 						"outputs": [],
-						"execution_count": 20
+						"execution_count": 6
 					}
 				]
 			},
@@ -2428,7 +2898,8 @@
 						"nodeCount": 3,
 						"cores": 4,
 						"memory": 28
-					}
+					},
+					"sessionKeepAliveTimeout": 30
 				},
 				"cells": [
 					{
@@ -2728,409 +3199,29 @@
 			"dependsOn": []
 		},
 		{
-			"name": "[concat(parameters('workspaceName'), '/ivs-synapse-dldb')]",
-			"type": "Microsoft.Synapse/workspaces/databases",
-			"apiVersion": "2019-06-01-preview",
-			"properties": {
-				"Ddls": [
-					{
-						"ActionType": "CREATE",
-						"OldEntity": null,
-						"NewEntity": {
-							"Origin": {
-								"Type": "SPARK"
-							},
-							"Properties": {
-								"IsSyMSCDMDatabase": true,
-								"DerivedModelDBInfo": "{\"ModelDirectives\":{\"BaseModel\":{\"Name\":\"Retail\",\"Version\":\"0.1.0\"}}}"
-							},
-							"Name": "ivs-synapse-dldb",
-							"EntityType": "DATABASE",
-							"Source": {
-								"Provider": "ADLS",
-								"Location": "abfss://synapse@ivsdatastorage.dfs.core.windows.net/ivs-synapse-dldb",
-								"Properties": {
-									"FormatType": "parquet",
-									"LinkedServiceName": "ivs-synapse-WorkspaceDefaultStorage"
-								}
-							}
-						},
-						"Source": {
-							"Type": "SPARK"
-						}
-					},
-					{
-						"ActionType": "CREATE",
-						"OldEntity": null,
-						"NewEntity": {
-							"Namespace": {
-								"DatabaseName": "ivs-synapse-dldb"
-							},
-							"Name": "Customer",
-							"Description": "A customer is an individual or legal entity that has or has purchased a product or service.\n\nA potential customer is an individual or legal entity that has the desire to acquire a product or service, the financial ability to pay for that product or service and is located in a location in which the product or service can be delivered to them.\n\nThe definition of 'customer' is of critical importance for every organization.    \n\nIt is the customer that is the focus of product planning, marketing, sales, service, reporting and analytics.    Without 'customer' there would be no need for the organization to exist since its purpose is to serve the customer and profit from that interaction.\n\nThe definition of 'customer' must be consistent with how customers exist and interact with the organization in the real world.  An artificial or conceptual definition of 'customer' that is not consistent with these two objectives is doomed to fail because the data will not be consistent with the definition and employees will not accept concepts or terms that are not consistent with what they see, know and how they interact with customers on a working basis.\n\nMicrosoft defines 'customer' to meet these objectives.    When we look out into the real world we see two dominant types of customers:  human beings and legal entities.     \n\nHuman beings are obviously male and female individuals of various ages, sex, demographics and a variety of similar dimensions that describe and define them who purchase products, good and services.    \n\nLegal entities are those legally-defined entities such as corporations, partnerships, non-profit organizations, government organizations etc. that purchase products, goods and services.\n\nThis view of 'customer' is consistent with the real world and consistent with how employees view and interact with customers.\n\nOf course, that is just the start of identifying, defining and understanding each type of 'customer'.     There is a great deal of detail, complexity and related data that can be used to define each type of customer to various levels of detail and different dimensions of information.\n\nMicrosoft implements these detailed concepts and related data via two distinct business area models that expand the coverage and complexity of each type of customer:\n\n-  INDIVIDUAL CUSTOMER Business Area Model\n-  LEGAL ENTITY CUSTOMER Business Area Model\n\nNote:\nEach of the Microsoft models - enterprise, business area or data warehouse - have a representative level of detail for the appropriate type of customer, which is a 'subset' of the total data available in the associated INDIVIDUAL CUSTOMER or LEGAL ENTITY CUSTOMER business area models..   Reference either of those models to expand the coverage or level of detail in each respective data model.\n\nThe actual customer implemented in each model depends upon the dominant use of customer for that industry.     \n\nFor example, in the pharmaceutical industry the customer is a legal entity, which represents another corporation, company, government organization etc. that purchases the pharmaceutical product and then distributes that product to the end-customer, which is an individual in a retail environment or a government-distribution scheme.    \n\nFor this example, the pharmaceutical models will have the legal entity customer represented but not the individual 'end customer' since that is represented in the appropriate retail industry models, which are a different offering.     \n\nOf course, the entire set of data available for a legal entity customer is contained in the associated LEGAL ENTITY CUSTOMER Business Area Model.   Reference the LEGAL ENTITY CUSTOMER Business Area Model to incorporate additional data that may be of relevance.\n\nIn many industries both types of customers are represented since a legal entity or individual can purchase products, goods or services and enter into contracts.    For these industries, both types of customers are represented by some of the more significant or relevant data derived from the associated LEGAL ENTITY or INDIVIDUAL CUSTOMER business area models.   These models can be used to expand the scope or level of detail in any of the enterprise, business area or data warehouse models.",
-							"EntityType": "TABLE",
-							"TableType": "EXTERNAL",
-							"Origin": {
-								"Type": "SPARK"
-							},
-							"StorageDescriptor": {
-								"Columns": [
-									{
-										"Name": "CustomerId",
-										"Description": "The unique identifier of a Customer.",
-										"OriginDataTypeName": {
-											"TypeName": "long",
-											"IsComplexType": false,
-											"IsNullable": false,
-											"Properties": {
-												"HIVE_TYPE_STRING": "long"
-											}
-										},
-										"BaseAttributeReference": {
-											"Entity": "Customer.cdm.json/Customer",
-											"Name": "CustomerId"
-										}
-									},
-									{
-										"Name": "CustomerEstablishedDate",
-										"Description": "The date that the Customer relationship was established.",
-										"OriginDataTypeName": {
-											"TypeName": "date",
-											"IsComplexType": false,
-											"IsNullable": true,
-											"Properties": {
-												"DateFormat": "YYYY-MM-DD",
-												"HIVE_TYPE_STRING": "date"
-											}
-										},
-										"BaseAttributeReference": {
-											"Entity": "Customer.cdm.json/Customer",
-											"Name": "CustomerEstablishedDate"
-										}
-									},
-									{
-										"Name": "CustomerTypeId",
-										"Description": "The unique identifier of a Customer Type.",
-										"OriginDataTypeName": {
-											"TypeName": "integer",
-											"IsComplexType": false,
-											"IsNullable": true,
-											"Properties": {
-												"HIVE_TYPE_STRING": "integer"
-											}
-										},
-										"BaseAttributeReference": {
-											"Entity": "Customer.cdm.json/Customer",
-											"Name": "CustomerTypeId"
-										}
-									},
-									{
-										"Name": "ResponsibilityCenterId",
-										"Description": "The unique identifier of a Responsibility Center.",
-										"OriginDataTypeName": {
-											"TypeName": "integer",
-											"IsComplexType": false,
-											"IsNullable": true,
-											"Properties": {
-												"HIVE_TYPE_STRING": "integer"
-											}
-										},
-										"BaseAttributeReference": {
-											"Entity": "Customer.cdm.json/Customer",
-											"Name": "ResponsibilityCenterId"
-										}
-									},
-									{
-										"Name": "LedgerId",
-										"Description": "The unique identifier of a Ledger.",
-										"OriginDataTypeName": {
-											"TypeName": "integer",
-											"IsComplexType": false,
-											"IsNullable": true,
-											"Properties": {
-												"HIVE_TYPE_STRING": "integer"
-											}
-										},
-										"BaseAttributeReference": {
-											"Entity": "Customer.cdm.json/Customer",
-											"Name": "LedgerId"
-										}
-									},
-									{
-										"Name": "LedgerAccountNumber",
-										"Description": "The unique identifier of a Ledger Account.",
-										"OriginDataTypeName": {
-											"TypeName": "string",
-											"IsComplexType": false,
-											"IsNullable": true,
-											"Length": 16,
-											"Properties": {
-												"HIVE_TYPE_STRING": "string"
-											}
-										},
-										"BaseAttributeReference": {
-											"Entity": "Customer.cdm.json/Customer",
-											"Name": "LedgerAccountNumber"
-										}
-									},
-									{
-										"Name": "CustomerNote",
-										"Description": "A note, comment or additional information regarding the Customer.",
-										"OriginDataTypeName": {
-											"TypeName": "string",
-											"IsComplexType": false,
-											"IsNullable": true,
-											"Length": 1024,
-											"Properties": {
-												"HIVE_TYPE_STRING": "string"
-											}
-										},
-										"BaseAttributeReference": {
-											"Entity": "Customer.cdm.json/Customer",
-											"Name": "CustomerNote"
-										}
-									},
-									{
-										"Name": "PartyId",
-										"Description": "The unique identifier of a Party.",
-										"OriginDataTypeName": {
-											"TypeName": "long",
-											"IsComplexType": false,
-											"IsNullable": true,
-											"Properties": {
-												"HIVE_TYPE_STRING": "long"
-											}
-										},
-										"BaseAttributeReference": {
-											"Entity": "Customer.cdm.json/Customer",
-											"Name": "PartyId"
-										}
-									},
-									{
-										"Name": "GlobalLocationNumber",
-										"Description": "The Global Location Number (GLN) is a simple tool used to uniquely identify locations. It can be used to identify physical locations such as a warehouse, legal entities, or a function / department within a legal entity. The GLN is part of the GS1 system of standards.",
-										"OriginDataTypeName": {
-											"TypeName": "decimal",
-											"IsComplexType": false,
-											"IsNullable": true,
-											"Precision": 13,
-											"Scale": 0,
-											"Properties": {
-												"HIVE_TYPE_STRING": "decimal"
-											}
-										},
-										"BaseAttributeReference": {
-											"Entity": "Customer.cdm.json/Customer",
-											"Name": "GlobalLocationNumber"
-										}
-									}
-								],
-								"Format": {
-									"InputFormat": "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat",
-									"OutputFormat": "org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat",
-									"FormatType": "parquet",
-									"SerializeLib": "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe",
-									"Properties": {
-										"path": "abfss://synapse@ivsdatastorage.dfs.core.windows.net/ivs-synapse-dldb/Customer",
-										"FormatTypeSetToDatabaseDefault": true
-									}
-								},
-								"Source": {
-									"Provider": "ADLS",
-									"Location": "abfss://synapse@ivsdatastorage.dfs.core.windows.net/ivs-synapse-dldb/Customer",
-									"Properties": {
-										"LinkedServiceName": "ivs-synapse-WorkspaceDefaultStorage",
-										"LocationSetToDatabaseDefault": true
-									}
-								},
-								"Properties": {
-									"textinputformat.record.delimiter": ",",
-									"compression": "{\"type\":\"None\",\"level\":\"optimal\"}",
-									"derivedModelAttributeInfo": "{\"attributeReferences\":{\"CustomerId\":{\"entity\":\"Customer.cdm.json/Customer\",\"name\":\"CustomerId\"},\"CustomerEstablishedDate\":{\"entity\":\"Customer.cdm.json/Customer\",\"name\":\"CustomerEstablishedDate\"},\"CustomerTypeId\":{\"entity\":\"Customer.cdm.json/Customer\",\"name\":\"CustomerTypeId\"},\"ResponsibilityCenterId\":{\"entity\":\"Customer.cdm.json/Customer\",\"name\":\"ResponsibilityCenterId\"},\"LedgerId\":{\"entity\":\"Customer.cdm.json/Customer\",\"name\":\"LedgerId\"},\"LedgerAccountNumber\":{\"entity\":\"Customer.cdm.json/Customer\",\"name\":\"LedgerAccountNumber\"},\"CustomerNote\":{\"entity\":\"Customer.cdm.json/Customer\",\"name\":\"CustomerNote\"},\"PartyId\":{\"entity\":\"Customer.cdm.json/Customer\",\"name\":\"PartyId\"},\"GlobalLocationNumber\":{\"entity\":\"Customer.cdm.json/Customer\",\"name\":\"GlobalLocationNumber\"}}}"
-								},
-								"Compressed": false,
-								"IsStoredAsSubdirectories": false
-							},
-							"Properties": {
-								"DerivedModelEntityInfo": "{\"entityDirectives\":{\"baseEntityReference\":{\"name\":\"Customer\",\"path\":\"Customer.cdm.json/Customer\"},\"description\":\"A customer is an individual or legal entity that has or has purchased a product or service.\\n\\nA potential customer is an individual or legal entity that has the desire to acquire a product or service, the financial ability to pay for that product or service and is located in a location in which the product or service can be delivered to them.\\n\\nThe definition of 'customer' is of critical importance for every organization.    \\n\\nIt is the customer that is the focus of product planning, marketing, sales, service, reporting and analytics.    Without 'customer' there would be no need for the organization to exist since its purpose is to serve the customer and profit from that interaction.\\n\\nThe definition of 'customer' must be consistent with how customers exist and interact with the organization in the real world.  An artificial or conceptual definition of 'customer' that is not consistent with these two objectives is doomed to fail because the data will not be consistent with the definition and employees will not accept concepts or terms that are not consistent with what they see, know and how they interact with customers on a working basis.\\n\\nMicrosoft defines 'customer' to meet these objectives.    When we look out into the real world we see two dominant types of customers:  human beings and legal entities.     \\n\\nHuman beings are obviously male and female individuals of various ages, sex, demographics and a variety of similar dimensions that describe and define them who purchase products, good and services.    \\n\\nLegal entities are those legally-defined entities such as corporations, partnerships, non-profit organizations, government organizations etc. that purchase products, goods and services.\\n\\nThis view of 'customer' is consistent with the real world and consistent with how employees view and interact with customers.\\n\\nOf course, that is just the start of identifying, defining and understanding each type of 'customer'.     There is a great deal of detail, complexity and related data that can be used to define each type of customer to various levels of detail and different dimensions of information.\\n\\nMicrosoft implements these detailed concepts and related data via two distinct business area models that expand the coverage and complexity of each type of customer:\\n\\n-  INDIVIDUAL CUSTOMER Business Area Model\\n-  LEGAL ENTITY CUSTOMER Business Area Model\\n\\nNote:\\nEach of the Microsoft models - enterprise, business area or data warehouse - have a representative level of detail for the appropriate type of customer, which is a 'subset' of the total data available in the associated INDIVIDUAL CUSTOMER or LEGAL ENTITY CUSTOMER business area models..   Reference either of those models to expand the coverage or level of detail in each respective data model.\\n\\nThe actual customer implemented in each model depends upon the dominant use of customer for that industry.     \\n\\nFor example, in the pharmaceutical industry the customer is a legal entity, which represents another corporation, company, government organization etc. that purchases the pharmaceutical product and then distributes that product to the end-customer, which is an individual in a retail environment or a government-distribution scheme.    \\n\\nFor this example, the pharmaceutical models will have the legal entity customer represented but not the individual 'end customer' since that is represented in the appropriate retail industry models, which are a different offering.     \\n\\nOf course, the entire set of data available for a legal entity customer is contained in the associated LEGAL ENTITY CUSTOMER Business Area Model.   Reference the LEGAL ENTITY CUSTOMER Business Area Model to incorporate additional data that may be of relevance.\\n\\nIn many industries both types of customers are represented since a legal entity or individual can purchase products, goods or services and enter into contracts.    For these industries, both types of customers are represented by some of the more significant or relevant data derived from the associated LEGAL ENTITY or INDIVIDUAL CUSTOMER business area models.   These models can be used to expand the scope or level of detail in any of the enterprise, business area or data warehouse models.\",\"primaryKey\":[\"CustomerId\"],\"projectionInfo\":{\"attributes\":[{\"type\":\"Existing\",\"name\":\"CustomerId\",\"attributeReference\":{\"entity\":\"Customer.cdm.json/Customer\",\"name\":\"CustomerId\"},\"dataType\":\"long\"},{\"type\":\"Existing\",\"name\":\"CustomerEstablishedDate\",\"attributeReference\":{\"entity\":\"Customer.cdm.json/Customer\",\"name\":\"CustomerEstablishedDate\"},\"dataType\":\"date\",\"dateFormat\":\"YYYY-MM-DD\"},{\"type\":\"Existing\",\"name\":\"CustomerTypeId\",\"attributeReference\":{\"entity\":\"Customer.cdm.json/Customer\",\"name\":\"CustomerTypeId\"},\"dataType\":\"integer\"},{\"type\":\"Existing\",\"name\":\"ResponsibilityCenterId\",\"attributeReference\":{\"entity\":\"Customer.cdm.json/Customer\",\"name\":\"ResponsibilityCenterId\"},\"dataType\":\"integer\"},{\"type\":\"Existing\",\"name\":\"LedgerId\",\"attributeReference\":{\"entity\":\"Customer.cdm.json/Customer\",\"name\":\"LedgerId\"},\"dataType\":\"integer\"},{\"type\":\"Existing\",\"name\":\"LedgerAccountNumber\",\"attributeReference\":{\"entity\":\"Customer.cdm.json/Customer\",\"name\":\"LedgerAccountNumber\"},\"dataType\":\"string\",\"dataTypeLength\":16},{\"type\":\"Existing\",\"name\":\"CustomerNote\",\"attributeReference\":{\"entity\":\"Customer.cdm.json/Customer\",\"name\":\"CustomerNote\"},\"dataType\":\"string\",\"dataTypeLength\":1024},{\"type\":\"Existing\",\"name\":\"PartyId\",\"attributeReference\":{\"entity\":\"Customer.cdm.json/Customer\",\"name\":\"PartyId\"},\"dataType\":\"long\"},{\"type\":\"Existing\",\"name\":\"GlobalLocationNumber\",\"attributeReference\":{\"entity\":\"Customer.cdm.json/Customer\",\"name\":\"GlobalLocationNumber\"},\"dataType\":\"decimal\",\"dataTypeLength\":13,\"scale\":0}]}}}",
-								"Description": "A customer is an individual or legal entity that has or has purchased a product or service.\n\nA potential customer is an individual or legal entity that has the desire to acquire a product or service, the financial ability to pay for that product or service and is located in a location in which the product or service can be delivered to them.\n\nThe definition of 'customer' is of critical importance for every organization.    \n\nIt is the customer that is the focus of product planning, marketing, sales, service, reporting and analytics.    Without 'customer' there would be no need for the organization to exist since its purpose is to serve the customer and profit from that interaction.\n\nThe definition of 'customer' must be consistent with how customers exist and interact with the organization in the real world.  An artificial or conceptual definition of 'customer' that is not consistent with these two objectives is doomed to fail because the data will not be consistent with the definition and employees will not accept concepts or terms that are not consistent with what they see, know and how they interact with customers on a working basis.\n\nMicrosoft defines 'customer' to meet these objectives.    When we look out into the real world we see two dominant types of customers:  human beings and legal entities.     \n\nHuman beings are obviously male and female individuals of various ages, sex, demographics and a variety of similar dimensions that describe and define them who purchase products, good and services.    \n\nLegal entities are those legally-defined entities such as corporations, partnerships, non-profit organizations, government organizations etc. that purchase products, goods and services.\n\nThis view of 'customer' is consistent with the real world and consistent with how employees view and interact with customers.\n\nOf course, that is just the start of identifying, defining and understanding each type of 'customer'.     There is a great deal of detail, complexity and related data that can be used to define each type of customer to various levels of detail and different dimensions of information.\n\nMicrosoft implements these detailed concepts and related data via two distinct business area models that expand the coverage and complexity of each type of customer:\n\n-  INDIVIDUAL CUSTOMER Business Area Model\n-  LEGAL ENTITY CUSTOMER Business Area Model\n\nNote:\nEach of the Microsoft models - enterprise, business area or data warehouse - have a representative level of detail for the appropriate type of customer, which is a 'subset' of the total data available in the associated INDIVIDUAL CUSTOMER or LEGAL ENTITY CUSTOMER business area models..   Reference either of those models to expand the coverage or level of detail in each respective data model.\n\nThe actual customer implemented in each model depends upon the dominant use of customer for that industry.     \n\nFor example, in the pharmaceutical industry the customer is a legal entity, which represents another corporation, company, government organization etc. that purchases the pharmaceutical product and then distributes that product to the end-customer, which is an individual in a retail environment or a government-distribution scheme.    \n\nFor this example, the pharmaceutical models will have the legal entity customer represented but not the individual 'end customer' since that is represented in the appropriate retail industry models, which are a different offering.     \n\nOf course, the entire set of data available for a legal entity customer is contained in the associated LEGAL ENTITY CUSTOMER Business Area Model.   Reference the LEGAL ENTITY CUSTOMER Business Area Model to incorporate additional data that may be of relevance.\n\nIn many industries both types of customers are represented since a legal entity or individual can purchase products, goods or services and enter into contracts.    For these industries, both types of customers are represented by some of the more significant or relevant data derived from the associated LEGAL ENTITY or INDIVIDUAL CUSTOMER business area models.   These models can be used to expand the scope or level of detail in any of the enterprise, business area or data warehouse models.",
-								"DisplayFolderInfo": "{\"name\":\"Customer\",\"colorCode\":\"#E3008C\"}",
-								"PrimaryKeys": "CustomerId",
-								"spark.sql.sources.provider": "parquet"
-							},
-							"Retention": 0,
-							"Temporary": false,
-							"IsRewriteEnabled": false
-						},
-						"Source": {
-							"Type": "SPARK"
-						}
-					},
-					{
-						"ActionType": "CREATE",
-						"OldEntity": null,
-						"NewEntity": {
-							"Namespace": {
-								"DatabaseName": "ivs-synapse-dldb"
-							},
-							"Name": "Party",
-							"Description": "A party is an individual, organization, legal entity, social organization or business unit of interest to the business.\n\nParty is a concept that enables individuals, organizations, legal entities, social organization and business units to be related or defined with the context of roles, events and relationships.\n\nThis enables us to 'anchor' disparate instances or implementations of each of the above to a common or singular instance of that individual, organization, legal entity, social organization or business unit.\n\nFor example, a large business has 20 customer masters that are used internally.    PARTY enables the organization to identify and define each customer as a single party and relate (cleanse and synchronize) the multiple instances of customer to a single set of customer information.\n\nIt also allows the business to look at the multiple relationships that exist among parties playing different roles over various periods of time.    \n\nFor example, a business might have a vendor who is also a customer that has employees who are also customers of the business.     A business might have employees who are also customers and whose spouse or family members are also customers.\n\nIn short, party enables the business to examine and record the real-world interactions of individuals, organizations, legal entities, social organizations and business units as they perform those many roles that characterize their activities and relationships to other parties.      Party also provides an 'anchor' upon which to resolve multiple instances or definitions of that party so the business can develop a 'single-view' of the party.",
-							"EntityType": "TABLE",
-							"TableType": "EXTERNAL",
-							"Origin": {
-								"Type": "SPARK"
-							},
-							"StorageDescriptor": {
-								"Columns": [
-									{
-										"Name": "PartyId",
-										"Description": "The unique identifier of a Party.",
-										"OriginDataTypeName": {
-											"TypeName": "long",
-											"IsComplexType": false,
-											"IsNullable": false,
-											"Properties": {
-												"HIVE_TYPE_STRING": "long"
-											}
-										},
-										"BaseAttributeReference": {
-											"Entity": "Party.cdm.json/Party",
-											"Name": "PartyId"
-										}
-									},
-									{
-										"Name": "PartyName",
-										"Description": "The name of the Party.",
-										"OriginDataTypeName": {
-											"TypeName": "string",
-											"IsComplexType": false,
-											"IsNullable": true,
-											"Length": 128,
-											"Properties": {
-												"HIVE_TYPE_STRING": "string"
-											}
-										},
-										"BaseAttributeReference": {
-											"Entity": "Party.cdm.json/Party",
-											"Name": "PartyName"
-										}
-									},
-									{
-										"Name": "PartyTypeId",
-										"Description": "The unique identifier of a Party Type.",
-										"OriginDataTypeName": {
-											"TypeName": "integer",
-											"IsComplexType": false,
-											"IsNullable": true,
-											"Properties": {
-												"HIVE_TYPE_STRING": "integer"
-											}
-										},
-										"BaseAttributeReference": {
-											"Entity": "Party.cdm.json/Party",
-											"Name": "PartyTypeId"
-										}
-									},
-									{
-										"Name": "GlobalLocationNumber",
-										"Description": "The Global Location Number (GLN) is a simple tool used to uniquely identify locations. It can be used to identify physical locations such as a warehouse, legal entities, or a function / department within a legal entity. The GLN is part of the GS1 system of standards.",
-										"OriginDataTypeName": {
-											"TypeName": "decimal",
-											"IsComplexType": false,
-											"IsNullable": true,
-											"Precision": 13,
-											"Scale": 0,
-											"Properties": {
-												"HIVE_TYPE_STRING": "decimal"
-											}
-										},
-										"BaseAttributeReference": {
-											"Entity": "Party.cdm.json/Party",
-											"Name": "GlobalLocationNumber"
-										}
-									}
-								],
-								"Format": {
-									"InputFormat": "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat",
-									"OutputFormat": "org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat",
-									"FormatType": "parquet",
-									"SerializeLib": "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe",
-									"Properties": {
-										"path": "abfss://synapse@ivsdatastorage.dfs.core.windows.net/ivs-synapse-dldb/Party",
-										"FormatTypeSetToDatabaseDefault": true
-									}
-								},
-								"Source": {
-									"Provider": "ADLS",
-									"Location": "abfss://synapse@ivsdatastorage.dfs.core.windows.net/ivs-synapse-dldb/Party",
-									"Properties": {
-										"LinkedServiceName": "ivs-synapse-WorkspaceDefaultStorage",
-										"LocationSetToDatabaseDefault": true
-									}
-								},
-								"Properties": {
-									"textinputformat.record.delimiter": ",",
-									"compression": "{\"type\":\"None\",\"level\":\"optimal\"}",
-									"derivedModelAttributeInfo": "{\"attributeReferences\":{\"PartyId\":{\"entity\":\"Party.cdm.json/Party\",\"name\":\"PartyId\"},\"PartyName\":{\"entity\":\"Party.cdm.json/Party\",\"name\":\"PartyName\"},\"PartyTypeId\":{\"entity\":\"Party.cdm.json/Party\",\"name\":\"PartyTypeId\"},\"GlobalLocationNumber\":{\"entity\":\"Party.cdm.json/Party\",\"name\":\"GlobalLocationNumber\"}}}"
-								},
-								"Compressed": false,
-								"IsStoredAsSubdirectories": false
-							},
-							"Properties": {
-								"DerivedModelEntityInfo": "{\"entityDirectives\":{\"name\":\"Party\",\"description\":\"A party is an individual, organization, legal entity, social organization or business unit of interest to the business.\\n\\nParty is a concept that enables individuals, organizations, legal entities, social organization and business units to be related or defined with the context of roles, events and relationships.\\n\\nThis enables us to 'anchor' disparate instances or implementations of each of the above to a common or singular instance of that individual, organization, legal entity, social organization or business unit.\\n\\nFor example, a large business has 20 customer masters that are used internally.    PARTY enables the organization to identify and define each customer as a single party and relate (cleanse and synchronize) the multiple instances of customer to a single set of customer information.\\n\\nIt also allows the business to look at the multiple relationships that exist among parties playing different roles over various periods of time.    \\n\\nFor example, a business might have a vendor who is also a customer that has employees who are also customers of the business.     A business might have employees who are also customers and whose spouse or family members are also customers.\\n\\nIn short, party enables the business to examine and record the real-world interactions of individuals, organizations, legal entities, social organizations and business units as they perform those many roles that characterize their activities and relationships to other parties.      Party also provides an 'anchor' upon which to resolve multiple instances or definitions of that party so the business can develop a 'single-view' of the party.\",\"baseEntityReference\":{\"name\":\"Party\",\"path\":\"Party.cdm.json/Party\"},\"projectionInfo\":{\"attributes\":[{\"type\":\"Existing\",\"name\":\"PartyId\",\"attributeReference\":{\"entity\":\"Party.cdm.json/Party\",\"name\":\"PartyId\"},\"dataType\":\"long\"},{\"type\":\"Existing\",\"name\":\"PartyName\",\"attributeReference\":{\"entity\":\"Party.cdm.json/Party\",\"name\":\"PartyName\"},\"dataType\":\"string\",\"dataTypeLength\":128},{\"type\":\"Existing\",\"name\":\"PartyTypeId\",\"attributeReference\":{\"entity\":\"Party.cdm.json/Party\",\"name\":\"PartyTypeId\"},\"dataType\":\"integer\"},{\"type\":\"Existing\",\"name\":\"GlobalLocationNumber\",\"attributeReference\":{\"entity\":\"Party.cdm.json/Party\",\"name\":\"GlobalLocationNumber\"},\"dataType\":\"decimal\",\"dataTypeLength\":13,\"scale\":0}]},\"primaryKey\":[\"PartyId\"]}}",
-								"Description": "A party is an individual, organization, legal entity, social organization or business unit of interest to the business.\n\nParty is a concept that enables individuals, organizations, legal entities, social organization and business units to be related or defined with the context of roles, events and relationships.\n\nThis enables us to 'anchor' disparate instances or implementations of each of the above to a common or singular instance of that individual, organization, legal entity, social organization or business unit.\n\nFor example, a large business has 20 customer masters that are used internally.    PARTY enables the organization to identify and define each customer as a single party and relate (cleanse and synchronize) the multiple instances of customer to a single set of customer information.\n\nIt also allows the business to look at the multiple relationships that exist among parties playing different roles over various periods of time.    \n\nFor example, a business might have a vendor who is also a customer that has employees who are also customers of the business.     A business might have employees who are also customers and whose spouse or family members are also customers.\n\nIn short, party enables the business to examine and record the real-world interactions of individuals, organizations, legal entities, social organizations and business units as they perform those many roles that characterize their activities and relationships to other parties.      Party also provides an 'anchor' upon which to resolve multiple instances or definitions of that party so the business can develop a 'single-view' of the party.",
-								"DisplayFolderInfo": "{\"name\":\"Party\",\"colorCode\":\"#7D0F6C\"}",
-								"PrimaryKeys": "PartyId",
-								"spark.sql.sources.provider": "parquet"
-							},
-							"Retention": 0,
-							"Temporary": false,
-							"IsRewriteEnabled": false
-						},
-						"Source": {
-							"Type": "SPARK"
-						}
-					},
-					{
-						"ActionType": "CREATE",
-						"OldEntity": null,
-						"NewEntity": {
-							"Namespace": {
-								"DatabaseName": "ivs-synapse-dldb"
-							},
-							"Name": "relationship-dzoinvuioc",
-							"EntityType": "RELATIONSHIP",
-							"Origin": {
-								"Type": "SPARK"
-							},
-							"FromTableName": "Party",
-							"ToTableName": "Customer",
-							"ColumnRelationshipInformations": [
-								{
-									"FromColumnName": "PartyId",
-									"ToColumnName": "PartyId"
-								}
-							],
-							"Properties": {
-								"DerivedModelRelationshipInfo": "{\"baseRelationship\":{\"fromEntity\":\"Party.cdm.json/Party\",\"toEntity\":\"Customer.cdm.json/Customer\",\"joinPairs\":[{\"fromAttribute\":\"PartyId\",\"toAttribute\":\"PartyId\"}]}}"
-							}
-						},
-						"Source": {
-							"Type": "SPARK"
-						}
-					}
-				]
-			},
-			"dependsOn": []
-		},
-		{
 			"name": "[concat(parameters('workspaceName'), '/ivsspark')]",
 			"type": "Microsoft.Synapse/workspaces/bigDataPools",
 			"apiVersion": "2019-06-01-preview",
 			"properties": {
+				"autoPause": {
+					"enabled": true,
+					"delayInMinutes": 5
+				},
+				"autoScale": {
+					"enabled": false,
+					"maxNodeCount": 10,
+					"minNodeCount": 3
+				},
+				"nodeCount": 3,
+				"nodeSize": "Small",
+				"nodeSizeFamily": "MemoryOptimized",
+				"sparkVersion": "3.1",
+				"isComputeIsolationEnabled": false,
+				"sessionLevelPackagesEnabled": false,
 				"annotations": []
 			},
-			"dependsOn": []
+			"dependsOn": [],
+			"location": "westus"
 		}
 	]
 }

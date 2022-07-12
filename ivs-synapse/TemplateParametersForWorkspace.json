@@ -5,6 +5,9 @@
 		"workspaceName": {
 			"value": "ivs-synapse"
 		},
+		"AdventureWorksSQL_connectionString": {
+			"value": ""
+		},
 		"ivs-synapse-WorkspaceDefaultSqlServer_connectionString": {
 			"value": ""
 		},
@@ -13,6 +16,9 @@
 		},
 		"ivs-synapse-WorkspaceDefaultStorage_properties_typeProperties_url": {
 			"value": "https://ivsdatastorage.dfs.core.windows.net"
+		},
+		"ivs_dwh_kv_properties_typeProperties_baseUrl": {
+			"value": "https://ivs-dwh-kv.vault.azure.net/"
 		},
 		"SchedSQLPoolPaused_properties_SQLPoolPause_parameters_p_subscription": {
 			"value": "f939f8f3-2652-4a45-88ae-78a7782ec9df"
