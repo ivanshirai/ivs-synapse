@@ -20,7 +20,7 @@
 				"spark.dynamicAllocation.enabled": "false",
 				"spark.dynamicAllocation.minExecutors": "2",
 				"spark.dynamicAllocation.maxExecutors": "2",
-				"spark.autotune.trackingId": "59213d5b-b219-4ffe-90a3-00c3ff9c8dc2"
+				"spark.autotune.trackingId": "69760187-3c13-42a5-8bc5-c87d4ade64d5"
 			}
 		},
 		"metadata": {
@@ -52,15 +52,221 @@
 		},
 		"cells": [
 			{
+				"cell_type": "markdown",
+				"metadata": {
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"Activate eager evaluation (instead of lazy)"
+				]
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"#from pyspark.sql import SparkSession\r\n",
+					" \r\n",
+					"#spark = (SparkSession.builder\r\n",
+					"#                     .config(\"spark.sql.repl.eagerEval.enabled\", \"True\")\r\n",
+					"#                     .getOrCreate())"
+				],
+				"execution_count": null
+			},
+			{
+				"cell_type": "markdown",
+				"metadata": {
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"Reading data into a data frame with spark.read"
+				]
+			},
+			{
 				"cell_type": "code",
 				"source": [
-					"adls_path = 'abfss://learning@ivsdatastorage.dfs.core.windows.net/DataAnalysisPythonPySpark'\r\n",
+					"#Root path var\r\n",
+					"adls_path = \"abfss://learning@ivsdatastorage.dfs.core.windows.net/DataAnalysisPythonPySpark\"\r\n",
 					"\r\n",
-					"book = spark.read.text(adls_path + '/data/gutenberg_books/1342-0.txt')\r\n",
+					"#Load text file to data frame\r\n",
+					"book = spark.read.text(adls_path + \"/data/gutenberg_books/1342-0.txt\")\r\n",
 					"\r\n",
-					"book.show()"
+					"book\r\n",
+					"\r\n",
+					""
 				],
-				"execution_count": 15
+				"execution_count": 2
+			},
+			{
+				"cell_type": "markdown",
+				"metadata": {
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"Explore schema"
+				]
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"book.printSchema()\r\n",
+					"\r\n",
+					"print(book.dtypes)\r\n",
+					"\r\n",
+					"#print(spark.__doc__)\r\n",
+					"\r\n",
+					"dir(book)"
+				],
+				"execution_count": 38
+			},
+			{
+				"cell_type": "markdown",
+				"metadata": {
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"Code assistance"
+				]
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"#General recommendations\r\n",
+					"print(spark.__doc__)\r\n",
+					"\r\n",
+					"#Methods available for the object\r\n",
+					"dir(book)\r\n",
+					"\r\n",
+					"#Documentation on the object\r\n",
+					"book.__doc__"
+				],
+				"execution_count": null
+			},
+			{
+				"cell_type": "markdown",
+				"metadata": {
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"Explore data"
+				]
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"#book.show()\r\n",
+					"\r\n",
+					"book.show(n=10, truncate=100, vertical=True)"
+				],
+				"execution_count": null
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"Splitting lines of text into arrays or words"
+				],
+				"execution_count": null
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"from pyspark.sql.functions import split\r\n",
+					"\r\n",
+					"lines = book.select(split(\"value\", ' ').alias('line'))\r\n",
+					"\r\n",
+					"lines.show(truncate=100)\r\n",
+					"\r\n",
+					"#Alternative ways to select data:\r\n",
+					"#book.select(book.value)\r\n",
+					"#book.select(book[\"value\"])\r\n",
+					"#book.select(col(\"value\"))\r\n",
+					"#book.select(\"value\")"
+				],
+				"execution_count": 43
 			}
 		]
 	}
