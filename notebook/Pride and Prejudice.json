@@ -20,7 +20,7 @@
 				"spark.dynamicAllocation.enabled": "false",
 				"spark.dynamicAllocation.minExecutors": "2",
 				"spark.dynamicAllocation.maxExecutors": "2",
-				"spark.autotune.trackingId": "69760187-3c13-42a5-8bc5-c87d4ade64d5"
+				"spark.autotune.trackingId": "fd328f03-13d5-4036-93dd-dd7e9edcdcd2"
 			}
 		},
 		"metadata": {
@@ -149,7 +149,7 @@
 					"\r\n",
 					"dir(book)"
 				],
-				"execution_count": 38
+				"execution_count": null
 			},
 			{
 				"cell_type": "markdown",
@@ -220,7 +220,7 @@
 					"\r\n",
 					"book.show(n=10, truncate=100, vertical=True)"
 				],
-				"execution_count": null
+				"execution_count": 47
 			},
 			{
 				"cell_type": "code",
@@ -256,17 +256,107 @@
 				"source": [
 					"from pyspark.sql.functions import split\r\n",
 					"\r\n",
-					"lines = book.select(split(\"value\", ' ').alias('line'))\r\n",
-					"\r\n",
-					"lines.show(truncate=100)\r\n",
+					"lines = book.select(split(book.value, ' ').alias('line'))\r\n",
 					"\r\n",
 					"#Alternative ways to select data:\r\n",
 					"#book.select(book.value)\r\n",
 					"#book.select(book[\"value\"])\r\n",
 					"#book.select(col(\"value\"))\r\n",
-					"#book.select(\"value\")"
+					"#book.select(\"value\")\r\n",
+					"\r\n",
+					"#Alternative ways to alias data:\r\n",
+					"# This looks a lot cleaner\r\n",
+					"#lines = book.select(split(book.value, \" \").alias(\"line\"))\r\n",
+					"# This is messier, and you have to remember the name PySpark assigns automatically\r\n",
+					"#lines = book.select(split(book.value, \" \"))\r\n",
+					"#lines = lines.withColumnRenamed(\"split(value, , -1)\", \"line\")\r\n",
+					"\r\n",
+					"lines.show(5, 100)\r\n",
+					"\r\n",
+					"lines.printSchema()\r\n",
+					"\r\n",
+					""
 				],
-				"execution_count": 43
+				"execution_count": null
+			},
+			{
+				"cell_type": "markdown",
+				"metadata": {
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"Exploding arrays into rows"
+				]
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"from pyspark.sql.functions import explode\r\n",
+					"\r\n",
+					"words = lines.select(explode(lines.line).alias(\"word\"))\r\n",
+					"\r\n",
+					"words.show(30, 30)"
+				],
+				"execution_count": null
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"Cleansing data (lowering case, remove punctuation and empty words)"
+				],
+				"execution_count": null
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"from pyspark.sql.functions import lower, regexp_extract\r\n",
+					"\r\n",
+					"words_lower = words.select(lower(words.word).alias('word_lower'))\r\n",
+					"\r\n",
+					"words_clean = words_lower.select(regexp_extract(words_lower.word_lower, \"[a-z]+\", 0).alias(\"word\"))\r\n",
+					"\r\n",
+					"words_not_null = words_clean.filter(words_clean.word != \"\")\r\n",
+					"\r\n",
+					"words_not_null.show(30,30)"
+				],
+				"execution_count": 61
 			}
 		]
 	}
