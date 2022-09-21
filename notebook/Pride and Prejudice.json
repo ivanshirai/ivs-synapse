@@ -20,7 +20,7 @@
 				"spark.dynamicAllocation.enabled": "false",
 				"spark.dynamicAllocation.minExecutors": "2",
 				"spark.dynamicAllocation.maxExecutors": "2",
-				"spark.autotune.trackingId": "6116c707-7f3e-41bf-a2c9-0847c9166a60"
+				"spark.autotune.trackingId": "d72905f1-4365-46a2-8c41-039abbd84f7a"
 			}
 		},
 		"metadata": {
@@ -549,6 +549,99 @@
 					"#words_longer_than_3.show()"
 				],
 				"execution_count": 28
+			},
+			{
+				"cell_type": "markdown",
+				"metadata": {
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"The where clause takes a Boolean expression over one or many columns to filter the data frame. Beyond the usual Boolean operators (>, <, ==, <=, >=, !=), PySpark provides other functions that return Boolean columns in the pyspark.sql.functions module.\r\n",
+					"\r\n",
+					"A good example is the isin() method (applied on a Column object, like col(...).isin(...)), which takes a list of values as a parameter, and will return only the records where the value in the column equals a member of the list.\r\n",
+					"\r\n",
+					"Let’s say you want to remove the words is, not, the and if from your list of words, using a single where() method on the words_nonull data frame. Write the code to do so."
+				]
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"no_short_words = words_not_null.where(~col(\"word\").isin(\"is\", \"not\", \"the\"))\r\n",
+					"\r\n",
+					"#no_short_words = words_not_null.where(col(\"word\").isin(\"is\", \"not\", \"the\") == False)\r\n",
+					"\r\n",
+					"no_short_words.show()"
+				],
+				"execution_count": 33
+			},
+			{
+				"cell_type": "markdown",
+				"metadata": {
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"Exercise 2.7\r\n",
+					"One of your friends comes to you with the following code. They have no idea why it doesn’t work. Can you diagnose the problem in the try block, explain why it is an error, and provide a fix?"
+				]
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"from pyspark.sql.functions import col, split\r\n",
+					"\r\n",
+					"#Root path var\r\n",
+					"adls_path = \"abfss://learning@ivsdatastorage.dfs.core.windows.net/DataAnalysisPythonPySpark\"\r\n",
+					" \r\n",
+					"try:\r\n",
+					"    book = spark.read.text(adls_path + \"/data/gutenberg_books/1342-0.txt\")\r\n",
+					"    book = book.printSchema()\r\n",
+					"    lines = book.select(split(book.value, \" \").alias(\"line\"))\r\n",
+					"    words = lines.select(explode(col(\"line\")).alias(\"word\"))\r\n",
+					"except AnalysisException as err:\r\n",
+					"    print(err)\r\n",
+					"\r\n",
+					"\r\n",
+					"#fix:\r\n",
+					"try:\r\n",
+					"    book = spark.read.text(adls_path + \"/data/gutenberg_books/1342-0.txt\")\r\n",
+					"#    book = book.printSchema()\r\n",
+					"    lines = book.select(split(book.value, \" \").alias(\"line\"))\r\n",
+					"    words = lines.select(explode(col(\"line\")).alias(\"word\"))\r\n",
+					"except AnalysisException as err:\r\n",
+					"    print(err)\r\n",
+					""
+				],
+				"execution_count": 38
 			}
 		]
 	}
