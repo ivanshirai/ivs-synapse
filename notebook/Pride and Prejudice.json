@@ -20,7 +20,7 @@
 				"spark.dynamicAllocation.enabled": "false",
 				"spark.dynamicAllocation.minExecutors": "2",
 				"spark.dynamicAllocation.maxExecutors": "2",
-				"spark.autotune.trackingId": "7b9b4cae-f256-4b68-8369-3db8f409e52b"
+				"spark.autotune.trackingId": "29a3c269-26ac-4609-93c2-41215be3f8c3"
 			}
 		},
 		"metadata": {
@@ -752,9 +752,14 @@
 				"source": [
 					"result = words_not_null.groupby(col(\"word\")).count().orderBy(col(\"count\"), ascending = False)\r\n",
 					"\r\n",
-					"result.show(50)"
+					"#Root path var\r\n",
+					"adls_path = \"abfss://learning@ivsdatastorage.dfs.core.windows.net/DataAnalysisPythonPySpark\"\r\n",
+					"\r\n",
+					"result.write.csv(adls_path + \"/output/Pride and Prejudice/partitioned\")\r\n",
+					"\r\n",
+					"result.coalesce(1).write.csv(adls_path + \"/output/Pride and Prejudice/single file\")"
 				],
-				"execution_count": 48
+				"execution_count": 53
 			}
 		]
 	}
