@@ -20,7 +20,7 @@
 				"spark.dynamicAllocation.enabled": "false",
 				"spark.dynamicAllocation.minExecutors": "2",
 				"spark.dynamicAllocation.maxExecutors": "2",
-				"spark.autotune.trackingId": "d72905f1-4365-46a2-8c41-039abbd84f7a"
+				"spark.autotune.trackingId": "7b9b4cae-f256-4b68-8369-3db8f409e52b"
 			}
 		},
 		"metadata": {
@@ -642,6 +642,119 @@
 					""
 				],
 				"execution_count": 38
+			},
+			{
+				"cell_type": "markdown",
+				"metadata": {
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"Book wording analysis continuation"
+				]
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"groups = words_not_null.groupby(col(\"word\"))\r\n",
+					"\r\n",
+					"print(groups)\r\n",
+					"\r\n",
+					"result = words_not_null.groupby(col(\"word\")).count()\r\n",
+					"\r\n",
+					"result.show()"
+				],
+				"execution_count": 41
+			},
+			{
+				"cell_type": "markdown",
+				"metadata": {
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"Exercise 3.1\r\n",
+					"\r\n",
+					"Starting with the words_not_null seen in this section, which of the following expressions would return the number of words per letter count (e.g., there are X one-letter words, Y two-letter words, etc.)?\r\n",
+					"\r\n",
+					"Assume that pyspark.sql.functions.col, pyspark.sql.functions.length are imported.\r\n",
+					"\r\n",
+					"a) words_not_null.select(length(col(\"word\"))).groupby(\"length\").count()\r\n",
+					"\r\n",
+					"b) words_not_null.select(length(col(\"word\")).alias(\"length\")).groupby(\"length\").count()\r\n",
+					"\r\n",
+					"c) words_not_null.groupby(\"length\").select(\"length\").count()\r\n",
+					"\r\n",
+					"d) None of those options would work."
+				]
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"words_not_null.select(length(col(\"word\")).alias(\"length\")).groupby(\"length\").count().show()"
+				],
+				"execution_count": 42
+			},
+			{
+				"cell_type": "markdown",
+				"metadata": {
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"Book wording analysis continuation"
+				]
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"result = words_not_null.groupby(col(\"word\")).count().orderBy(col(\"count\"), ascending = False)\r\n",
+					"\r\n",
+					"result.show(50)"
+				],
+				"execution_count": 48
 			}
 		]
 	}
