@@ -20,7 +20,7 @@
 				"spark.dynamicAllocation.enabled": "false",
 				"spark.dynamicAllocation.minExecutors": "2",
 				"spark.dynamicAllocation.maxExecutors": "2",
-				"spark.autotune.trackingId": "abe1b63a-3a1d-4bb2-a91c-df5744903cca"
+				"spark.autotune.trackingId": "6116c707-7f3e-41bf-a2c9-0847c9166a60"
 			}
 		},
 		"metadata": {
@@ -112,7 +112,7 @@
 					"\r\n",
 					""
 				],
-				"execution_count": 139
+				"execution_count": 14
 			},
 			{
 				"cell_type": "markdown",
@@ -272,7 +272,7 @@
 					"\r\n",
 					""
 				],
-				"execution_count": 143
+				"execution_count": 15
 			},
 			{
 				"cell_type": "markdown",
@@ -307,7 +307,7 @@
 					"\r\n",
 					"words.show(30, 30)"
 				],
-				"execution_count": 144
+				"execution_count": 16
 			},
 			{
 				"cell_type": "markdown",
@@ -346,7 +346,7 @@
 					"\r\n",
 					"words_not_null.show(30,30)"
 				],
-				"execution_count": 145
+				"execution_count": 17
 			},
 			{
 				"cell_type": "markdown",
@@ -393,6 +393,162 @@
 					""
 				],
 				"execution_count": 160
+			},
+			{
+				"cell_type": "markdown",
+				"metadata": {
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"Exercise 2.3\r\n",
+					"Rewrite the following code snippet, removing the withColumnRenamed method. Which version is clearer and easier to read?"
+				]
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"#Root path var\r\n",
+					"adls_path = \"abfss://learning@ivsdatastorage.dfs.core.windows.net/DataAnalysisPythonPySpark\"\r\n",
+					"\r\n",
+					"from pyspark.sql.functions import col, length\r\n",
+					" \r\n",
+					"# The `length` function returns the number of characters in a string column.\r\n",
+					" \r\n",
+					"exo2_3_df = (\r\n",
+					"    spark.read.text(adls_path + \"/data/gutenberg_books/1342-0.txt\")\r\n",
+					"    .select(length(col(\"value\")))\r\n",
+					"    .withColumnRenamed(\"length(value)\", \"number_of_char\")\r\n",
+					")\r\n",
+					"\r\n",
+					"exo2_3_df.show() .withColumnRenamed easier to read\r\n",
+					"\r\n",
+					"#Version with "
+				],
+				"execution_count": 8
+			},
+			{
+				"cell_type": "markdown",
+				"metadata": {
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"Exercise 2.4\r\n",
+					"Assume a data frame exo2_4_df. The following code block gives an error. What is the problem, and how can you solve it?"
+				]
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"from pyspark.sql.functions import col, greatest\r\n",
+					" \r\n",
+					"exo2_4_df = spark.createDataFrame(\r\n",
+					"    [[\"key\", 10_000, 20_000]], [\"key\", \"value1\", \"value2\"]\r\n",
+					")\r\n",
+					" \r\n",
+					"exo2_4_df.printSchema()\r\n",
+					"# root\r\n",
+					"#  |-- key: string (containsNull = true)\r\n",
+					"#  |-- value1: long (containsNull = true)\r\n",
+					"#  |-- value2: long (containsNull = true)\r\n",
+					" \r\n",
+					"# `greatest` will return the greatest value of the list of column names,\r\n",
+					"# skipping null value\r\n",
+					" \r\n",
+					"# The following statement will return an error\r\n",
+					"from pyspark.sql.utils import AnalysisException\r\n",
+					" \r\n",
+					"try:\r\n",
+					"    exo2_4_mod = exo2_4_df.select(\r\n",
+					"        greatest(col(\"value1\"), col(\"value2\")).alias(\"maximum_value\")\r\n",
+					"    ).select(\"key\", \"max_value\")\r\n",
+					"except AnalysisException as err:\r\n",
+					"    print(err)\r\n",
+					"\r\n",
+					"#modified code\r\n",
+					"exo2_4_df.select(col(\"key\"),\r\n",
+					"        greatest(col(\"value1\"), col(\"value2\")).alias(\"maximum_value\")\r\n",
+					"    ).select(\"key\", \"maximum_value\").show()"
+				],
+				"execution_count": 13
+			},
+			{
+				"cell_type": "markdown",
+				"metadata": {
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"Exercise 2.5\r\n",
+					"Let’s take our words_nonull data frame, available in the next listing. You can use the code from the repository (code/Ch02/end_of_chapter.py) in your REPL to get the data frame loaded.\r\n",
+					"\r\n",
+					"a) Remove all of the occurrences of the word is.\r\n",
+					"\r\n",
+					"b) (Challenge) Using the length function, keep only the words with more than three characters."
+				]
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"#words_not_null.show()\r\n",
+					"\r\n",
+					"#a\r\n",
+					"words_no_is = words_not_null.filter(col(\"word\") != 'is')\r\n",
+					"\r\n",
+					"#words_no_is.show()\r\n",
+					"\r\n",
+					"#b\r\n",
+					"words_longer_than_3 = (words_not_null.select(col(\"word\"), length(col(\"word\")).alias(\"word_length\"))\r\n",
+					"    .filter(col(\"word_length\") > 3)\r\n",
+					"    .select(\"word\")\r\n",
+					")\r\n",
+					"\r\n",
+					"#words_longer_than_3.show()"
+				],
+				"execution_count": 28
 			}
 		]
 	}
