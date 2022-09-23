@@ -20,7 +20,7 @@
 				"spark.dynamicAllocation.enabled": "false",
 				"spark.dynamicAllocation.minExecutors": "2",
 				"spark.dynamicAllocation.maxExecutors": "2",
-				"spark.autotune.trackingId": "29a3c269-26ac-4609-93c2-41215be3f8c3"
+				"spark.autotune.trackingId": "3506ea3e-0645-40c9-ba87-329fc57b562c"
 			}
 		},
 		"metadata": {
@@ -760,6 +760,102 @@
 					"result.coalesce(1).write.csv(adls_path + \"/output/Pride and Prejudice/single file\")"
 				],
 				"execution_count": 53
+			},
+			{
+				"cell_type": "markdown",
+				"metadata": {
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"Simplifying code"
+				]
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"import pyspark.sql.functions as F\r\n",
+					"\r\n",
+					"#Root path var\r\n",
+					"adls_path = \"abfss://learning@ivsdatastorage.dfs.core.windows.net/DataAnalysisPythonPySpark\"\r\n",
+					" \r\n",
+					"results = (\r\n",
+					"    spark.read.text(adls_path + \"/data/gutenberg_books/1342-0.txt\")\r\n",
+					"    .select(F.split(F.col(\"value\"), \" \").alias(\"line\"))\r\n",
+					"    .select(F.explode(F.col(\"line\")).alias(\"word\"))\r\n",
+					"    .select(F.lower(F.col(\"word\")).alias(\"word\"))\r\n",
+					"    .select(F.regexp_extract(F.col(\"word\"), \"[a-z']*\", 0).alias(\"word\"))\r\n",
+					"    .where(F.col(\"word\") != \"\")\r\n",
+					"    .groupby(\"word\")\r\n",
+					"    .count()\r\n",
+					"    .orderBy(F.col(\"count\"), ascending = False)\r\n",
+					")\r\n",
+					"\r\n",
+					"results.show()"
+				],
+				"execution_count": 3
+			},
+			{
+				"cell_type": "markdown",
+				"metadata": {
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"Processing more books"
+				]
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"import pyspark.sql.functions as F\r\n",
+					"\r\n",
+					"#Root path var\r\n",
+					"adls_path = \"abfss://learning@ivsdatastorage.dfs.core.windows.net/DataAnalysisPythonPySpark\"\r\n",
+					" \r\n",
+					"results = (\r\n",
+					"    spark.read.text(adls_path + \"/data/gutenberg_books/*.txt\")\r\n",
+					"    .select(F.split(F.col(\"value\"), \" \").alias(\"line\"))\r\n",
+					"    .select(F.explode(F.col(\"line\")).alias(\"word\"))\r\n",
+					"    .select(F.lower(F.col(\"word\")).alias(\"word\"))\r\n",
+					"    .select(F.regexp_extract(F.col(\"word\"), \"[a-z']*\", 0).alias(\"word\"))\r\n",
+					"    .where(F.col(\"word\") != \"\")\r\n",
+					"    .groupby(\"word\")\r\n",
+					"    .count()\r\n",
+					"    .orderBy(F.col(\"count\"), ascending = False)\r\n",
+					")\r\n",
+					"\r\n",
+					"results.show()"
+				],
+				"execution_count": 4
 			}
 		]
 	}
