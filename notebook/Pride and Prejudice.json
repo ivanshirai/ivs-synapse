@@ -20,7 +20,7 @@
 				"spark.dynamicAllocation.enabled": "false",
 				"spark.dynamicAllocation.minExecutors": "2",
 				"spark.dynamicAllocation.maxExecutors": "2",
-				"spark.autotune.trackingId": "86adba59-68ea-4230-9de9-5d326a52e2f9"
+				"spark.autotune.trackingId": "4b197407-b31b-43f4-9d20-566850138adb"
 			}
 		},
 		"metadata": {
@@ -1053,6 +1053,55 @@
 					"results_consonants.show(5)"
 				],
 				"execution_count": 37
+			},
+			{
+				"cell_type": "markdown",
+				"metadata": {
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"Exercise 3.6\r\n",
+					"Let’s say you want to get both the count() and sum() of a GroupedData object. Why doesn’t this code work? Map the inputs and outputs of each method.\r\n",
+					"\r\n",
+					"my_data_frame.groupby(\"my_column\").count().sum()"
+				]
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"adls_path = \"abfss://learning@ivsdatastorage.dfs.core.windows.net/DataAnalysisPythonPySpark\"\r\n",
+					" \r\n",
+					"results = (\r\n",
+					"    spark.read.text(adls_path + \"/data/gutenberg_books/1342-0.txt\")\r\n",
+					"    .select(F.split(F.col(\"value\"), \" \").alias(\"line\"))\r\n",
+					"    .select(F.explode(F.col(\"line\")).alias(\"word\"))\r\n",
+					"    .select(F.lower(F.col(\"word\")).alias(\"word\"))\r\n",
+					"    .select(F.regexp_extract(F.col(\"word\"), \"[a-z']*\", 0).alias(\"word\"))\r\n",
+					"    .where(F.col(\"word\") != \"\")\r\n",
+					"    .groupby(F.col(\"word\"))\r\n",
+					"    .count()\r\n",
+					"    .groupby(F.col(\"word\"))\r\n",
+					"    .sum(\"count\")\r\n",
+					")\r\n",
+					"\r\n",
+					"results.show()"
+				],
+				"execution_count": 49
 			}
 		]
 	}
