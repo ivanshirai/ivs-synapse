@@ -20,7 +20,7 @@
 				"spark.dynamicAllocation.enabled": "false",
 				"spark.dynamicAllocation.minExecutors": "2",
 				"spark.dynamicAllocation.maxExecutors": "2",
-				"spark.autotune.trackingId": "9b424e73-4e2d-49bf-9ffc-ada920f15f3d"
+				"spark.autotune.trackingId": "86adba59-68ea-4230-9de9-5d326a52e2f9"
 			}
 		},
 		"metadata": {
@@ -975,6 +975,84 @@
 					"results.show(5)"
 				],
 				"execution_count": 32
+			},
+			{
+				"cell_type": "markdown",
+				"metadata": {
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"Exercise 3.5\r\n",
+					"Using the substring function (refer to PySpark’s API or the pyspark shell if needed), return the top five most popular first letters (keep only the first letter of each word).\r\n",
+					"\r\n",
+					"Compute the number of words starting with a consonant or a vowel. (Hint: The isin() function might be useful.)"
+				]
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"adls_path = \"abfss://learning@ivsdatastorage.dfs.core.windows.net/DataAnalysisPythonPySpark\"\r\n",
+					" \r\n",
+					"results = (\r\n",
+					"    spark.read.text(adls_path + \"/data/gutenberg_books/1342-0.txt\")\r\n",
+					"    .select(F.split(F.col(\"value\"), \" \").alias(\"line\"))\r\n",
+					"    .select(F.explode(F.col(\"line\")).alias(\"word\"))\r\n",
+					"    .select(F.lower(F.col(\"word\")).alias(\"word\"))\r\n",
+					"    .select(F.regexp_extract(F.col(\"word\"), \"[a-z']*\", 0).alias(\"word\"))\r\n",
+					"    .where(F.col(\"word\") != \"\")\r\n",
+					"    .groupby(F.substring(F.col(\"word\"), 1, 1).alias(\"firstLetter\"))\r\n",
+					"    .count()\r\n",
+					"    .orderBy(F.col(\"count\"), ascending = False)\r\n",
+					")\r\n",
+					"\r\n",
+					"results.show(5)\r\n",
+					"\r\n",
+					"results_vowels = (\r\n",
+					"    spark.read.text(adls_path + \"/data/gutenberg_books/1342-0.txt\")\r\n",
+					"    .select(F.split(F.col(\"value\"), \" \").alias(\"line\"))\r\n",
+					"    .select(F.explode(F.col(\"line\")).alias(\"word\"))\r\n",
+					"    .select(F.lower(F.col(\"word\")).alias(\"word\"))\r\n",
+					"    .select(F.regexp_extract(F.col(\"word\"), \"[a-z']*\", 0).alias(\"word\"))\r\n",
+					"    .where(F.col(\"word\") != \"\")\r\n",
+					"    .groupby(F.substring(F.col(\"word\"), 1, 1).alias(\"firstLetter\"))\r\n",
+					"    .count()\r\n",
+					"    .where(F.col(\"firstLetter\").isin(['a','e','i','o','u','y']))\r\n",
+					"    .orderBy(F.col(\"count\"), ascending = False)\r\n",
+					")\r\n",
+					"\r\n",
+					"results_vowels.show(5)\r\n",
+					"\r\n",
+					"results_consonants = (\r\n",
+					"    spark.read.text(adls_path + \"/data/gutenberg_books/1342-0.txt\")\r\n",
+					"    .select(F.split(F.col(\"value\"), \" \").alias(\"line\"))\r\n",
+					"    .select(F.explode(F.col(\"line\")).alias(\"word\"))\r\n",
+					"    .select(F.lower(F.col(\"word\")).alias(\"word\"))\r\n",
+					"    .select(F.regexp_extract(F.col(\"word\"), \"[a-z']*\", 0).alias(\"word\"))\r\n",
+					"    .where(F.col(\"word\") != \"\")\r\n",
+					"    .groupby(F.substring(F.col(\"word\"), 1, 1).alias(\"firstLetter\"))\r\n",
+					"    .count()\r\n",
+					"    .where(~F.col(\"firstLetter\").isin(['a','e','i','o','u','y']))\r\n",
+					"    .orderBy(F.col(\"count\"), ascending = False)\r\n",
+					")\r\n",
+					"\r\n",
+					"results_consonants.show(5)"
+				],
+				"execution_count": 37
 			}
 		]
 	}
