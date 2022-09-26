@@ -20,7 +20,7 @@
 				"spark.dynamicAllocation.enabled": "false",
 				"spark.dynamicAllocation.minExecutors": "2",
 				"spark.dynamicAllocation.maxExecutors": "2",
-				"spark.autotune.trackingId": "3506ea3e-0645-40c9-ba87-329fc57b562c"
+				"spark.autotune.trackingId": "48d2edf5-868b-4433-a587-60563b0532ba"
 			}
 		},
 		"metadata": {
@@ -84,7 +84,7 @@
 					"#                     .config(\"spark.sql.repl.eagerEval.enabled\", \"True\")\r\n",
 					"#                     .getOrCreate())"
 				],
-				"execution_count": 138
+				"execution_count": 14
 			},
 			{
 				"cell_type": "markdown",
@@ -112,7 +112,7 @@
 					"\r\n",
 					""
 				],
-				"execution_count": 14
+				"execution_count": 15
 			},
 			{
 				"cell_type": "markdown",
@@ -149,7 +149,7 @@
 					"\r\n",
 					"dir(book)"
 				],
-				"execution_count": 140
+				"execution_count": 16
 			},
 			{
 				"cell_type": "markdown",
@@ -187,7 +187,7 @@
 					"#Documentation on the object\r\n",
 					"book.__doc__"
 				],
-				"execution_count": 141
+				"execution_count": 17
 			},
 			{
 				"cell_type": "markdown",
@@ -220,7 +220,7 @@
 					"\r\n",
 					"book.show(n=10, truncate=100, vertical=True)"
 				],
-				"execution_count": 142
+				"execution_count": 18
 			},
 			{
 				"cell_type": "markdown",
@@ -272,7 +272,7 @@
 					"\r\n",
 					""
 				],
-				"execution_count": 15
+				"execution_count": 19
 			},
 			{
 				"cell_type": "markdown",
@@ -307,7 +307,7 @@
 					"\r\n",
 					"words.show(30, 30)"
 				],
-				"execution_count": 16
+				"execution_count": 20
 			},
 			{
 				"cell_type": "markdown",
@@ -346,7 +346,7 @@
 					"\r\n",
 					"words_not_null.show(30,30)"
 				],
-				"execution_count": 17
+				"execution_count": 21
 			},
 			{
 				"cell_type": "markdown",
@@ -392,7 +392,7 @@
 					"print(dfcolumns_filtered.count())\r\n",
 					""
 				],
-				"execution_count": 160
+				"execution_count": 22
 			},
 			{
 				"cell_type": "markdown",
@@ -439,7 +439,7 @@
 					"\r\n",
 					"#Version with "
 				],
-				"execution_count": 8
+				"execution_count": 23
 			},
 			{
 				"cell_type": "markdown",
@@ -499,7 +499,7 @@
 					"        greatest(col(\"value1\"), col(\"value2\")).alias(\"maximum_value\")\r\n",
 					"    ).select(\"key\", \"maximum_value\").show()"
 				],
-				"execution_count": 13
+				"execution_count": null
 			},
 			{
 				"cell_type": "markdown",
@@ -548,7 +548,7 @@
 					"\r\n",
 					"#words_longer_than_3.show()"
 				],
-				"execution_count": 28
+				"execution_count": null
 			},
 			{
 				"cell_type": "markdown",
@@ -587,7 +587,7 @@
 					"\r\n",
 					"no_short_words.show()"
 				],
-				"execution_count": 33
+				"execution_count": null
 			},
 			{
 				"cell_type": "markdown",
@@ -641,7 +641,7 @@
 					"    print(err)\r\n",
 					""
 				],
-				"execution_count": 38
+				"execution_count": null
 			},
 			{
 				"cell_type": "markdown",
@@ -678,7 +678,7 @@
 					"\r\n",
 					"result.show()"
 				],
-				"execution_count": 41
+				"execution_count": null
 			},
 			{
 				"cell_type": "markdown",
@@ -721,7 +721,7 @@
 				"source": [
 					"words_not_null.select(length(col(\"word\")).alias(\"length\")).groupby(\"length\").count().show()"
 				],
-				"execution_count": 42
+				"execution_count": null
 			},
 			{
 				"cell_type": "markdown",
@@ -759,7 +759,7 @@
 					"\r\n",
 					"result.coalesce(1).write.csv(adls_path + \"/output/Pride and Prejudice/single file\")"
 				],
-				"execution_count": 53
+				"execution_count": null
 			},
 			{
 				"cell_type": "markdown",
@@ -807,7 +807,7 @@
 					"\r\n",
 					"results.show()"
 				],
-				"execution_count": 3
+				"execution_count": null
 			},
 			{
 				"cell_type": "markdown",
@@ -855,7 +855,79 @@
 					"\r\n",
 					"results.show()"
 				],
-				"execution_count": 4
+				"execution_count": null
+			},
+			{
+				"cell_type": "markdown",
+				"metadata": {
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"Exercise 3.3\r\n",
+					"By modifying the word_count_submit.py program, return the number of distinct words in Jane Austen’s Pride and Prejudice. (Hint: results contains one record for each unique word.)\r\n",
+					"\r\n",
+					"(Challenge) Wrap your program in a function that takes a file name as a parameter. It should return the number of distinct words."
+				]
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"import pyspark.sql.functions as F\r\n",
+					"\r\n",
+					"#Root path var\r\n",
+					"adls_path = \"abfss://learning@ivsdatastorage.dfs.core.windows.net/DataAnalysisPythonPySpark\"\r\n",
+					" \r\n",
+					"result = (\r\n",
+					"    spark.read.text(adls_path + \"/data/gutenberg_books/1342-0.txt\")\r\n",
+					"    .select(F.split(F.col(\"value\"), \" \").alias(\"line\"))\r\n",
+					"    .select(F.explode(F.col(\"line\")).alias(\"word\"))\r\n",
+					"    .select(F.lower(F.col(\"word\")).alias(\"word\"))\r\n",
+					"    .select(F.regexp_extract(F.col(\"word\"), \"[a-z']*\", 0).alias(\"word\"))\r\n",
+					"    .where(F.col(\"word\") != \"\")\r\n",
+					"    .select(F.col(\"word\"))\r\n",
+					"    .distinct()\r\n",
+					"    .count()\r\n",
+					")\r\n",
+					"\r\n",
+					"print(result)\r\n",
+					"\r\n",
+					"def bookDistCount(fName):\r\n",
+					"    #Root path var\r\n",
+					"    adls_path = \"abfss://learning@ivsdatastorage.dfs.core.windows.net/DataAnalysisPythonPySpark\"\r\n",
+					"    \r\n",
+					"    result = (\r\n",
+					"        spark.read.text(adls_path + \"/data/gutenberg_books/\" + fName)\r\n",
+					"        .select(F.split(F.col(\"value\"), \" \").alias(\"line\"))\r\n",
+					"        .select(F.explode(F.col(\"line\")).alias(\"word\"))\r\n",
+					"        .select(F.lower(F.col(\"word\")).alias(\"word\"))\r\n",
+					"        .select(F.regexp_extract(F.col(\"word\"), \"[a-z']*\", 0).alias(\"word\"))\r\n",
+					"        .where(F.col(\"word\") != \"\")\r\n",
+					"        .select(F.col(\"word\"))\r\n",
+					"        .distinct()\r\n",
+					"        .count()\r\n",
+					"    )\r\n",
+					"\r\n",
+					"    return result\r\n",
+					"\r\n",
+					"\r\n",
+					"print(bookDistCount(\"1661-0.txt\"))"
+				],
+				"execution_count": 30
 			}
 		]
 	}
