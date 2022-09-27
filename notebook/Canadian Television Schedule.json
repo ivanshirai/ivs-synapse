@@ -1,0 +1,126 @@
+{
+	"name": "Canadian Television Schedule",
+	"properties": {
+		"folder": {
+			"name": "Data Analysis with Python and PySpark"
+		},
+		"nbformat": 4,
+		"nbformat_minor": 2,
+		"bigDataPool": {
+			"referenceName": "ivsspark",
+			"type": "BigDataPoolReference"
+		},
+		"sessionProperties": {
+			"driverMemory": "28g",
+			"driverCores": 4,
+			"executorMemory": "28g",
+			"executorCores": 4,
+			"numExecutors": 2,
+			"conf": {
+				"spark.dynamicAllocation.enabled": "false",
+				"spark.dynamicAllocation.minExecutors": "2",
+				"spark.dynamicAllocation.maxExecutors": "2",
+				"spark.autotune.trackingId": "31f54868-6162-440a-b604-987add161854"
+			}
+		},
+		"metadata": {
+			"saveOutput": true,
+			"enableDebugMode": false,
+			"kernelspec": {
+				"name": "synapse_pyspark",
+				"display_name": "Synapse PySpark"
+			},
+			"language_info": {
+				"name": "python"
+			},
+			"a365ComputeOptions": {
+				"id": "/subscriptions/f939f8f3-2652-4a45-88ae-78a7782ec9df/resourceGroups/ivs-dwh-rg/providers/Microsoft.Synapse/workspaces/ivs-synapse/bigDataPools/ivsspark",
+				"name": "ivsspark",
+				"type": "Spark",
+				"endpoint": "https://ivs-synapse.dev.azuresynapse.net/livyApi/versions/2019-11-01-preview/sparkPools/ivsspark",
+				"auth": {
+					"type": "AAD",
+					"authResource": "https://dev.azuresynapse.net"
+				},
+				"sparkVersion": "3.1",
+				"nodeCount": 3,
+				"cores": 4,
+				"memory": 28,
+				"automaticScaleJobs": false
+			},
+			"sessionKeepAliveTimeout": 30
+		},
+		"cells": [
+			{
+				"cell_type": "markdown",
+				"metadata": {
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"Simple Data Frame"
+				]
+			},
+			{
+				"cell_type": "code",
+				"source": [
+					"import pyspark.sql.functions as F\r\n",
+					"\r\n",
+					"my_grocery_list = (\r\n",
+					"    ['Banana', 2, 1.74],\r\n",
+					"    ['Apple', 4, 2.04],\r\n",
+					"    ['Carrot', 1, 1.09],\r\n",
+					"    ['Cake', 1, 10.99]\r\n",
+					")\r\n",
+					"\r\n",
+					"df_grocery_list = spark.createDataFrame(\r\n",
+					"    my_grocery_list, ['Item', 'Quantity', 'Price']\r\n",
+					")\r\n",
+					"\r\n",
+					"df_grocery_list.printSchema()"
+				],
+				"execution_count": 2
+			},
+			{
+				"cell_type": "markdown",
+				"metadata": {
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"Read the source"
+				]
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"#Root path var\r\n",
+					"adls_path = \"abfss://learning@ivsdatastorage.dfs.core.windows.net/DataAnalysisPythonPySpark\"\r\n",
+					"\r\n",
+					"#Load text file to data frame\r\n",
+					"df_tv_sched = spark.read.text(adls_path + \"/data/broadcast_logs/BroadcastLogs_2018_Q3_M8_sample.CSV\")\r\n",
+					"\r\n",
+					"df_tv_sched.show(5, 500)"
+				],
+				"execution_count": 6
+			}
+		]
+	}
+}
