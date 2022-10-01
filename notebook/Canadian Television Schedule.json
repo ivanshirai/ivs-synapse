@@ -20,7 +20,7 @@
 				"spark.dynamicAllocation.enabled": "false",
 				"spark.dynamicAllocation.minExecutors": "2",
 				"spark.dynamicAllocation.maxExecutors": "2",
-				"spark.autotune.trackingId": "20bbaa01-4739-49f3-96eb-79fd305a8059"
+				"spark.autotune.trackingId": "4d9192e1-da64-4930-839e-bc3145e66850"
 			}
 		},
 		"metadata": {
@@ -198,10 +198,6 @@
 				"source": [
 					"import numpy as np\r\n",
 					"\r\n",
-					"#print(len(logs.columns))\r\n",
-					"\r\n",
-					"#print(explode(logs.columns))\r\n",
-					"\r\n",
 					"column_split = np.array_split(\r\n",
 					"    np.array(logs.columns), len(logs.columns) // 3 #// means integer division\r\n",
 					")  \r\n",
@@ -215,7 +211,39 @@
 					"\r\n",
 					""
 				],
-				"execution_count": 42
+				"execution_count": null
+			},
+			{
+				"cell_type": "markdown",
+				"metadata": {
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"Show data frame in table format"
+				]
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					},
+					"collapsed": false
+				},
+				"source": [
+					"display(logs)"
+				],
+				"execution_count": 43
 			},
 			{
 				"cell_type": "markdown",
