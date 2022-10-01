@@ -20,7 +20,7 @@
 				"spark.dynamicAllocation.enabled": "false",
 				"spark.dynamicAllocation.minExecutors": "2",
 				"spark.dynamicAllocation.maxExecutors": "2",
-				"spark.autotune.trackingId": "aeeabbfc-04c5-411a-b6ce-2551e612496c"
+				"spark.autotune.trackingId": "961fd648-6328-4226-b4b7-3e9b85e2244f"
 			}
 		},
 		"metadata": {
@@ -243,7 +243,42 @@
 				"source": [
 					"display(logs.take(10))"
 				],
-				"execution_count": 44
+				"execution_count": null
+			},
+			{
+				"cell_type": "markdown",
+				"metadata": {
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"Remove columns from dataframe"
+				]
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					},
+					"collapsed": false
+				},
+				"source": [
+					"display(logs.drop(\"BroadCastLogID\", \"LogServiceID\").take(10))\r\n",
+					"\r\n",
+					"#Check if column is a part of data frame\r\n",
+					"print(\"BroadCastLogID\" in logs.columns)"
+				],
+				"execution_count": 47
 			},
 			{
 				"cell_type": "markdown",
