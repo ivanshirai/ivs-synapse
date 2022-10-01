@@ -20,7 +20,7 @@
 				"spark.dynamicAllocation.enabled": "false",
 				"spark.dynamicAllocation.minExecutors": "2",
 				"spark.dynamicAllocation.maxExecutors": "2",
-				"spark.autotune.trackingId": "961fd648-6328-4226-b4b7-3e9b85e2244f"
+				"spark.autotune.trackingId": "7b331743-c537-4879-b76a-7cf22146773d"
 			}
 		},
 		"metadata": {
@@ -205,13 +205,13 @@
 					"print(column_split)\r\n",
 					"\r\n",
 					"for x in column_split:\r\n",
-					"    logs.select(*x).show(5)\r\n",
+					"    logs.select(*x).show(5) #asterix explodes array into list of values\r\n",
 					"    #print(*x)\r\n",
 					"    #print(x)\r\n",
 					"\r\n",
 					""
 				],
-				"execution_count": null
+				"execution_count": 49
 			},
 			{
 				"cell_type": "markdown",
@@ -276,9 +276,12 @@
 					"display(logs.drop(\"BroadCastLogID\", \"LogServiceID\").take(10))\r\n",
 					"\r\n",
 					"#Check if column is a part of data frame\r\n",
-					"print(\"BroadCastLogID\" in logs.columns)"
+					"print(\"BroadCastLogID\" in logs.columns)\r\n",
+					"\r\n",
+					"#same with select (loop on columns array)\r\n",
+					"display(logs.select([x for x in logs.columns if x not in [\"BroadcastLogID\", \"LogServiceID\"]]).take(5))"
 				],
-				"execution_count": 47
+				"execution_count": 60
 			},
 			{
 				"cell_type": "markdown",
