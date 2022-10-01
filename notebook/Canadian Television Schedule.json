@@ -20,7 +20,7 @@
 				"spark.dynamicAllocation.enabled": "false",
 				"spark.dynamicAllocation.minExecutors": "2",
 				"spark.dynamicAllocation.maxExecutors": "2",
-				"spark.autotune.trackingId": "fa5decb0-6ad6-4695-93b2-03e6ba016898"
+				"spark.autotune.trackingId": "20bbaa01-4739-49f3-96eb-79fd305a8059"
 			}
 		},
 		"metadata": {
@@ -82,7 +82,7 @@
 					"\r\n",
 					"df_grocery_list.printSchema()"
 				],
-				"execution_count": 2
+				"execution_count": 32
 			},
 			{
 				"cell_type": "markdown",
@@ -131,7 +131,91 @@
 					"\r\n",
 					"#logs.show()"
 				],
-				"execution_count": 6
+				"execution_count": 33
+			},
+			{
+				"cell_type": "markdown",
+				"metadata": {
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"Basic operations"
+				]
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"#select\r\n",
+					"logs.select(\"BroadcastLogID\", \"LogServiceID\", \"LogDate\").show(5)\r\n",
+					"\r\n",
+					"logs.select([\"BroadCastLogID\", \"LogServiceID\", \"LogDate\"]).show(5)\r\n",
+					"\r\n",
+					"logs.select(F.col(\"BroadCastLogID\"), F.col(\"LogServiceID\"), F.col(\"LogDate\")).show(5)"
+				],
+				"execution_count": 38
+			},
+			{
+				"cell_type": "markdown",
+				"metadata": {
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"Peeking at the data frame in chunks of three columns"
+				]
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"import numpy as np\r\n",
+					"\r\n",
+					"#print(len(logs.columns))\r\n",
+					"\r\n",
+					"#print(explode(logs.columns))\r\n",
+					"\r\n",
+					"column_split = np.array_split(\r\n",
+					"    np.array(logs.columns), len(logs.columns) // 3 #// means integer division\r\n",
+					")  \r\n",
+					" \r\n",
+					"print(column_split)\r\n",
+					"\r\n",
+					"for x in column_split:\r\n",
+					"    logs.select(*x).show(5)\r\n",
+					"    #print(*x)\r\n",
+					"    #print(x)\r\n",
+					"\r\n",
+					""
+				],
+				"execution_count": 42
 			},
 			{
 				"cell_type": "markdown",
@@ -187,7 +271,7 @@
 					"\r\n",
 					"df_grocery_list.printSchema()"
 				],
-				"execution_count": 10
+				"execution_count": null
 			}
 		]
 	}
