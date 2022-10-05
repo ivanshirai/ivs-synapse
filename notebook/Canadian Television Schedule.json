@@ -20,7 +20,7 @@
 				"spark.dynamicAllocation.enabled": "false",
 				"spark.dynamicAllocation.minExecutors": "2",
 				"spark.dynamicAllocation.maxExecutors": "2",
-				"spark.autotune.trackingId": "dc0b2d09-32e7-41f4-be1f-3c59c8e097db"
+				"spark.autotune.trackingId": "cd93a09e-0f2d-44a9-b219-cf8ad3ea1c60"
 			}
 		},
 		"metadata": {
@@ -82,7 +82,7 @@
 					"\r\n",
 					"df_grocery_list.printSchema()"
 				],
-				"execution_count": 2
+				"execution_count": 24
 			},
 			{
 				"cell_type": "markdown",
@@ -131,7 +131,7 @@
 					"\r\n",
 					"#logs.show()"
 				],
-				"execution_count": 1
+				"execution_count": 31
 			},
 			{
 				"cell_type": "markdown",
@@ -167,7 +167,7 @@
 					"\r\n",
 					"logs.select(F.col(\"BroadCastLogID\"), F.col(\"LogServiceID\"), F.col(\"LogDate\")).show(5)"
 				],
-				"execution_count": 38
+				"execution_count": 26
 			},
 			{
 				"cell_type": "markdown",
@@ -211,7 +211,7 @@
 					"\r\n",
 					""
 				],
-				"execution_count": 49
+				"execution_count": 27
 			},
 			{
 				"cell_type": "markdown",
@@ -243,7 +243,7 @@
 				"source": [
 					"display(logs.take(10))"
 				],
-				"execution_count": null
+				"execution_count": 28
 			},
 			{
 				"cell_type": "markdown",
@@ -281,7 +281,7 @@
 					"#same with select (loop on columns array)\r\n",
 					"display(logs.select([x for x in logs.columns if x not in [\"BroadcastLogID\", \"LogServiceID\"]]).take(5))"
 				],
-				"execution_count": 60
+				"execution_count": null
 			},
 			{
 				"cell_type": "markdown",
@@ -400,9 +400,25 @@
 					"#Lowercasing all columns (toDF creates new dataframe from another)\r\n",
 					"logs = logs.toDF(*[x.lower() for x in logs.columns]) #asterisk converts array into list of values (doesn't work without that)\r\n",
 					"\r\n",
+					"#Sorting columns\r\n",
+					"logs = logs.select(sorted(logs.columns, reverse = True))\r\n",
+					"\r\n",
 					"logs.printSchema()"
 				],
 				"execution_count": null
+			},
+			{
+				"cell_type": "markdown",
+				"metadata": {
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"Data profiling"
+				]
 			},
 			{
 				"cell_type": "code",
@@ -418,9 +434,14 @@
 					}
 				},
 				"source": [
-					"print(*[x.lower() for x in logs.columns])"
+					"#for i in logs.columns:\r\n",
+					"    #logs.describe(i).show(truncate = False)\r\n",
+					"\r\n",
+					"\r\n",
+					"for i in logs.columns:\r\n",
+					"    logs.select(i).summary().show() #stats can be defined as list of columns within summary() statement"
 				],
-				"execution_count": 22
+				"execution_count": 43
 			}
 		]
 	}
