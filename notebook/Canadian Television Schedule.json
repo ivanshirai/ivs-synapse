@@ -20,7 +20,7 @@
 				"spark.dynamicAllocation.enabled": "false",
 				"spark.dynamicAllocation.minExecutors": "2",
 				"spark.dynamicAllocation.maxExecutors": "2",
-				"spark.autotune.trackingId": "cd93a09e-0f2d-44a9-b219-cf8ad3ea1c60"
+				"spark.autotune.trackingId": "241fb60f-01c8-4e9d-b2d9-9c69f064dcdc"
 			}
 		},
 		"metadata": {
@@ -131,7 +131,7 @@
 					"\r\n",
 					"#logs.show()"
 				],
-				"execution_count": 31
+				"execution_count": 1
 			},
 			{
 				"cell_type": "markdown",
@@ -442,6 +442,82 @@
 					"    logs.select(i).summary().show() #stats can be defined as list of columns within summary() statement"
 				],
 				"execution_count": 43
+			},
+			{
+				"cell_type": "markdown",
+				"metadata": {
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"Exercise 4.3\r\n",
+					"Reread the data in a logs_raw data frame (the data file is ./data/broadcast_logsBroadcastLogs_2018_Q3_M8.CSV), this time without passing any optional parameters. Print the first five rows of data, as well as the schema. What are the differences in terms of data and schema between logs and logs_raw?"
+				]
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"#Root path var\r\n",
+					"adls_path = \"abfss://learning@ivsdatastorage.dfs.core.windows.net/DataAnalysisPythonPySpark\"\r\n",
+					"\r\n",
+					"#Parse csv to data frame\r\n",
+					"logs_raw = spark.read.csv(\r\n",
+					"    path = adls_path + \"/data/broadcast_logs/BroadcastLogs_2018_Q3_M8_sample.CSV\")\r\n",
+					"\r\n",
+					"logs_raw.printSchema()\r\n",
+					"\r\n",
+					"logs_raw.show(5, 500)"
+				],
+				"execution_count": 3
+			},
+			{
+				"cell_type": "markdown",
+				"metadata": {
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"Exercise 4.4\r\n",
+					"Create a new data frame, logs_clean, that contains only the columns that do not end with ID."
+				]
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					},
+					"collapsed": false
+				},
+				"source": [
+					"logs_clean = logs.select(*[x for x in logs.columns if x[-2:] != \"ID\"])\r\n",
+					"\r\n",
+					"display(logs_clean.take(10))"
+				],
+				"execution_count": 18
 			}
 		]
 	}
