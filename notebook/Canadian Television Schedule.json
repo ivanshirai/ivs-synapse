@@ -20,7 +20,7 @@
 				"spark.dynamicAllocation.enabled": "false",
 				"spark.dynamicAllocation.minExecutors": "2",
 				"spark.dynamicAllocation.maxExecutors": "2",
-				"spark.autotune.trackingId": "241fb60f-01c8-4e9d-b2d9-9c69f064dcdc"
+				"spark.autotune.trackingId": "65978747-c807-41d9-8a7d-2bffd24c97e1"
 			}
 		},
 		"metadata": {
@@ -82,7 +82,7 @@
 					"\r\n",
 					"df_grocery_list.printSchema()"
 				],
-				"execution_count": 24
+				"execution_count": 23
 			},
 			{
 				"cell_type": "markdown",
@@ -131,7 +131,7 @@
 					"\r\n",
 					"#logs.show()"
 				],
-				"execution_count": 1
+				"execution_count": 36
 			},
 			{
 				"cell_type": "markdown",
@@ -167,7 +167,7 @@
 					"\r\n",
 					"logs.select(F.col(\"BroadCastLogID\"), F.col(\"LogServiceID\"), F.col(\"LogDate\")).show(5)"
 				],
-				"execution_count": 26
+				"execution_count": 25
 			},
 			{
 				"cell_type": "markdown",
@@ -211,7 +211,7 @@
 					"\r\n",
 					""
 				],
-				"execution_count": 27
+				"execution_count": 26
 			},
 			{
 				"cell_type": "markdown",
@@ -243,7 +243,7 @@
 				"source": [
 					"display(logs.take(10))"
 				],
-				"execution_count": 28
+				"execution_count": 27
 			},
 			{
 				"cell_type": "markdown",
@@ -281,7 +281,7 @@
 					"#same with select (loop on columns array)\r\n",
 					"display(logs.select([x for x in logs.columns if x not in [\"BroadcastLogID\", \"LogServiceID\"]]).take(5))"
 				],
-				"execution_count": null
+				"execution_count": 28
 			},
 			{
 				"cell_type": "markdown",
@@ -337,7 +337,7 @@
 					"\r\n",
 					"df_grocery_list.printSchema()"
 				],
-				"execution_count": null
+				"execution_count": 29
 			},
 			{
 				"cell_type": "markdown",
@@ -405,7 +405,7 @@
 					"\r\n",
 					"logs.printSchema()"
 				],
-				"execution_count": null
+				"execution_count": 30
 			},
 			{
 				"cell_type": "markdown",
@@ -441,7 +441,7 @@
 					"for i in logs.columns:\r\n",
 					"    logs.select(i).summary().show() #stats can be defined as list of columns within summary() statement"
 				],
-				"execution_count": 43
+				"execution_count": 31
 			},
 			{
 				"cell_type": "markdown",
@@ -482,7 +482,7 @@
 					"\r\n",
 					"logs_raw.show(5, 500)"
 				],
-				"execution_count": 3
+				"execution_count": 32
 			},
 			{
 				"cell_type": "markdown",
@@ -517,7 +517,60 @@
 					"\r\n",
 					"display(logs_clean.take(10))"
 				],
-				"execution_count": 18
+				"execution_count": 33
+			},
+			{
+				"cell_type": "markdown",
+				"metadata": {
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"Join operation"
+				]
+			},
+			{
+				"cell_type": "code",
+				"metadata": {
+					"jupyter": {
+						"source_hidden": false,
+						"outputs_hidden": false
+					},
+					"nteract": {
+						"transient": {
+							"deleting": false
+						}
+					}
+				},
+				"source": [
+					"log_identifier=spark.read.csv(\r\n",
+					"    path=adls_path + \"/data/broadcast_logs/ReferenceTables/LogIdentifier.csv\",\r\n",
+					"    sep=\"|\",\r\n",
+					"    inferSchema=True,\r\n",
+					"    header=True\r\n",
+					")\r\n",
+					"\r\n",
+					"log_identifier.printSchema()\r\n",
+					"\r\n",
+					"log_identifier.show(5)\r\n",
+					"\r\n",
+					"#logs.join(\r\n",
+					"#    log_identifier,\r\n",
+					"#    on=(logs[\"LogServiceID\"] == log_identifier[\"LogServiceID\"]) & (log_identifier[\"PrimaryFG\"] == 1)\r\n",
+					"#    how=\"inner\"\r\n",
+					"#).show(5)\r\n",
+					"\r\n",
+					"#compact version if column match and inner join (default)\r\n",
+					"logs.join(\r\n",
+					"    log_identifier,\r\n",
+					"    on=\"LogServiceID\"\r\n",
+					").show(5)\r\n",
+					""
+				],
+				"execution_count": 43
 			}
 		]
 	}
