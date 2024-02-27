@@ -1,46 +1,14 @@
 {
-	"name": "SQLPoolPause",
+	"name": "SQLPoolStartStop",
 	"properties": {
+		"description": "Use p_action = 'resume' to start or 'pause to stop dedicated SQL pool",
 		"activities": [
 			{
-				"name": "SQLPoolGetStatus",
-				"type": "WebActivity",
-				"dependsOn": [],
-				"policy": {
-					"timeout": "7.00:00:00",
-					"retry": 2,
-					"retryIntervalInSeconds": 200,
-					"secureOutput": false,
-					"secureInput": false
-				},
-				"userProperties": [],
-				"typeProperties": {
-					"url": {
-						"value": "@concat('https://management.azure.com/subscriptions/', pipeline().parameters.p_subscription, '/resourceGroups/', pipeline().parameters.p_resourceGroup, '/providers/Microsoft.Synapse/workspaces/', pipeline().parameters.p_workspace, '/sqlPools/', pipeline().parameters.p_sqlPool, '/?api-version=2019-06-01-preview')",
-						"type": "Expression"
-					},
-					"connectVia": {
-						"referenceName": "AutoResolveIntegrationRuntime",
-						"type": "IntegrationRuntimeReference"
-					},
-					"method": "GET",
-					"body": {
-						"sku": {
-							"name": "DW100c"
-						}
-					},
-					"authentication": {
-						"type": "MSI",
-						"resource": "https://management.azure.com/"
-					}
-				}
-			},
-			{
-				"name": "StatusCheck",
+				"name": "If not PROD",
 				"type": "IfCondition",
 				"dependsOn": [
 					{
-						"activity": "SQLPoolGetStatus",
+						"activity": "FilterSystem",
 						"dependencyConditions": [
 							"Succeeded"
 						]
@@ -49,32 +17,33 @@
 				"userProperties": [],
 				"typeProperties": {
 					"expression": {
-						"value": "@equals(activity('SQLPoolGetStatus').output.properties.status, 'Paused')",
+						"value": "@equals(activity('FilterSystem').output.FilteredItemsCount, 0)",
 						"type": "Expression"
 					},
 					"ifFalseActivities": [
 						{
-							"name": "SQLPoolPause",
+							"name": "Start SQL Pool",
 							"type": "WebActivity",
 							"dependsOn": [],
 							"policy": {
-								"timeout": "7.00:00:00",
+								"timeout": "0.12:00:00",
 								"retry": 2,
-								"retryIntervalInSeconds": 200,
+								"retryIntervalInSeconds": 30,
 								"secureOutput": false,
 								"secureInput": false
 							},
 							"userProperties": [],
 							"typeProperties": {
-								"url": {
-									"value": "@concat('https://management.azure.com/subscriptions/', pipeline().parameters.p_subscription, '/resourceGroups/', pipeline().parameters.p_resourceGroup, '/providers/Microsoft.Synapse/workspaces/', pipeline().parameters.p_workspace, '/sqlPools/', pipeline().parameters.p_sqlPool, '/pause?api-version=2019-06-01-preview')",
-									"type": "Expression"
-								},
 								"method": "POST",
-								"body": {
-									"value": "'{ ]'",
+								"url": {
+									"value": "@concat('https://management.azure.com/subscriptions/', \nactivity('FilterSystem').output.Value[0].subscriptionId, \n'/resourceGroups/', \nactivity('FilterSystem').output.Value[0].resourceGroup, \n'/providers/Microsoft.Synapse/workspaces/', \npipeline().DataFactory, \n'/sqlPools/', activity('FilterSystem').output.Value[0].sqlPool,\n'/', pipeline().parameters.p_action, '?api-version=2019-06-01-preview')",
 									"type": "Expression"
 								},
+								"connectVia": {
+									"referenceName": "SHIR",
+									"type": "IntegrationRuntimeReference"
+								},
+								"body": "'{ }'",
 								"authentication": {
 									"type": "MSI",
 									"resource": "https://management.azure.com/"
@@ -83,29 +52,47 @@
 						}
 					]
 				}
+			},
+			{
+				"name": "FilterSystem",
+				"type": "Filter",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@pipeline().parameters.c_system_landscape",
+						"type": "Expression"
+					},
+					"condition": {
+						"value": "@equals(item().SynapseWorkspace, pipeline().DataFactory)",
+						"type": "Expression"
+					}
+				}
 			}
 		],
 		"parameters": {
-			"p_subscription": {
+			"p_action": {
 				"type": "string",
-				"defaultValue": "f939f8f3-2652-4a45-88ae-78a7782ec9df"
+				"defaultValue": "pause"
 			},
-			"p_resourceGroup": {
-				"type": "string",
-				"defaultValue": "ivs-dwh-rg"
-			},
-			"p_workspace": {
-				"type": "string",
-				"defaultValue": "ivs-synapse"
-			},
-			"p_sqlPool": {
-				"type": "string",
-				"defaultValue": "ivs_sqlpool"
+			"c_system_landscape": {
+				"type": "array",
+				"defaultValue": [
+					{
+						"environment": "DV",
+						"SynapseWorkspace": "ivs-synapse",
+						"resourceGroup": "ivs-dwh-rg",
+						"subscriptionId": "f939f8f3-2652-4a45-88ae-78a7782ec9df",
+						"sqlPool": "ivssql"
+					}
+				]
 			}
 		},
 		"folder": {
-			"name": "Scheduled"
+			"name": "Templates"
 		},
-		"annotations": []
-	}
+		"annotations": [],
+		"lastPublishTime": "2023-10-16T14:39:39Z"
+	},
+	"type": "Microsoft.Synapse/workspaces/pipelines"
 }
