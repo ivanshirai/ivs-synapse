@@ -1,0 +1,10 @@
+{
+	"name": "template_kv",
+	"properties": {
+		"annotations": [],
+		"type": "AzureKeyVault",
+		"typeProperties": {
+			"baseUrl": "https://ivs-dwh-kv.vault.azure.net/"
+		}
+	}
+}
