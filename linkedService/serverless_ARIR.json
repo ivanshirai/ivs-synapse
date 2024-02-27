@@ -1,0 +1,19 @@
+{
+	"name": "serverless_ARIR",
+	"properties": {
+		"parameters": {
+			"p_database": {
+				"type": "string"
+			}
+		},
+		"annotations": [],
+		"type": "AzureSqlDW",
+		"typeProperties": {
+			"connectionString": "Integrated Security=False;Encrypt=True;Connection Timeout=30;Data Source=ivs-synapse-ondemand.sql.azuresynapse.net;Initial Catalog=@{linkedService().p_database}"
+		},
+		"connectVia": {
+			"referenceName": "AutoResolveIntegrationRuntime",
+			"type": "IntegrationRuntimeReference"
+		}
+	}
+}
