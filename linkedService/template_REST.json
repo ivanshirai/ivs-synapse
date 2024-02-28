@@ -11,6 +11,7 @@
 		"connectVia": {
 			"referenceName": "SHIR",
 			"type": "IntegrationRuntimeReference"
-		}
+		},
+		"description": "https://random-data-api.com/documentation"
 	}
 }
