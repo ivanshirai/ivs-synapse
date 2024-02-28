@@ -9,28 +9,34 @@
 			"value": ""
 		},
 		"ivs-synapse-WorkspaceDefaultSqlServer_connectionString": {
-			"value": ""
+			"value": "Integrated Security=False;Encrypt=True;Connection Timeout=30;Data Source=tcp:ivs-synapse.sql.azuresynapse.net,1433;Initial Catalog=@{linkedService().DBName}"
 		},
 		"ivs_od_sqlpool_connectionString": {
-			"value": ""
+			"value": "Integrated Security=False;Encrypt=True;Connection Timeout=30;Data Source=ivs-synapse-ondemand.sql.azuresynapse.net;Initial Catalog=ivs_od_sqlpool"
+		},
+		"serverless_ARIR_connectionString": {
+			"value": "Integrated Security=False;Encrypt=True;Connection Timeout=30;Data Source=ivs-synapse-ondemand.sql.azuresynapse.net;Initial Catalog=@{linkedService().p_database}"
+		},
+		"template_dedicated_ARIR_connectionString": {
+			"value": "Integrated Security=False;Encrypt=True;Connection Timeout=30;Data Source=ivs-synapse.sql.azuresynapse.net;Initial Catalog=ivssql"
 		},
 		"ivs-synapse-WorkspaceDefaultStorage_properties_typeProperties_url": {
 			"value": "https://ivsdatastorage.dfs.core.windows.net"
 		},
-		"ivs_dwh_kv_properties_typeProperties_baseUrl": {
+		"template_REST_properties_typeProperties_url": {
+			"value": "https://random-data-api.com/api/v2/"
+		},
+		"template_kv_properties_typeProperties_baseUrl": {
 			"value": "https://ivs-dwh-kv.vault.azure.net/"
 		},
-		"SchedSQLPoolPaused_properties_SQLPoolPause_parameters_p_subscription": {
-			"value": "f939f8f3-2652-4a45-88ae-78a7782ec9df"
+		"templatecurst_ARIR_properties_typeProperties_url": {
+			"value": "https://ivscur.dfs.core.windows.net/"
 		},
-		"SchedSQLPoolPaused_properties_SQLPoolPause_parameters_p_resourceGroup": {
-			"value": "ivs-dwh-rg"
+		"templateenrst_ARIR_properties_typeProperties_url": {
+			"value": "https://ivsenr.dfs.core.windows.net/"
 		},
-		"SchedSQLPoolPaused_properties_SQLPoolPause_parameters_p_workspace": {
-			"value": "ivs-synapse"
-		},
-		"SchedSQLPoolPaused_properties_SQLPoolPause_parameters_p_sqlPool": {
-			"value": "ivs_sqlpool"
+		"templaterawst_ARIR_properties_typeProperties_url": {
+			"value": "https://ivsraw.dfs.core.windows.net/"
 		}
 	}
 }

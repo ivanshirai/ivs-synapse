@@ -13,35 +13,47 @@
 		},
 		"ivs-synapse-WorkspaceDefaultSqlServer_connectionString": {
 			"type": "secureString",
-			"metadata": "Secure string for 'connectionString' of 'ivs-synapse-WorkspaceDefaultSqlServer'"
+			"metadata": "Secure string for 'connectionString' of 'ivs-synapse-WorkspaceDefaultSqlServer'",
+			"defaultValue": "Integrated Security=False;Encrypt=True;Connection Timeout=30;Data Source=tcp:ivs-synapse.sql.azuresynapse.net,1433;Initial Catalog=@{linkedService().DBName}"
 		},
 		"ivs_od_sqlpool_connectionString": {
 			"type": "secureString",
-			"metadata": "Secure string for 'connectionString' of 'ivs_od_sqlpool'"
+			"metadata": "Secure string for 'connectionString' of 'ivs_od_sqlpool'",
+			"defaultValue": "Integrated Security=False;Encrypt=True;Connection Timeout=30;Data Source=ivs-synapse-ondemand.sql.azuresynapse.net;Initial Catalog=ivs_od_sqlpool"
+		},
+		"serverless_ARIR_connectionString": {
+			"type": "secureString",
+			"metadata": "Secure string for 'connectionString' of 'serverless_ARIR'",
+			"defaultValue": "Integrated Security=False;Encrypt=True;Connection Timeout=30;Data Source=ivs-synapse-ondemand.sql.azuresynapse.net;Initial Catalog=@{linkedService().p_database}"
+		},
+		"template_dedicated_ARIR_connectionString": {
+			"type": "secureString",
+			"metadata": "Secure string for 'connectionString' of 'template_dedicated_ARIR'",
+			"defaultValue": "Integrated Security=False;Encrypt=True;Connection Timeout=30;Data Source=ivs-synapse.sql.azuresynapse.net;Initial Catalog=ivssql"
 		},
 		"ivs-synapse-WorkspaceDefaultStorage_properties_typeProperties_url": {
 			"type": "string",
 			"defaultValue": "https://ivsdatastorage.dfs.core.windows.net"
 		},
-		"ivs_dwh_kv_properties_typeProperties_baseUrl": {
+		"template_REST_properties_typeProperties_url": {
+			"type": "string",
+			"defaultValue": "https://random-data-api.com/api/v2/"
+		},
+		"template_kv_properties_typeProperties_baseUrl": {
 			"type": "string",
 			"defaultValue": "https://ivs-dwh-kv.vault.azure.net/"
 		},
-		"SchedSQLPoolPaused_properties_SQLPoolPause_parameters_p_subscription": {
+		"templatecurst_ARIR_properties_typeProperties_url": {
 			"type": "string",
-			"defaultValue": "f939f8f3-2652-4a45-88ae-78a7782ec9df"
+			"defaultValue": "https://ivscur.dfs.core.windows.net/"
 		},
-		"SchedSQLPoolPaused_properties_SQLPoolPause_parameters_p_resourceGroup": {
+		"templateenrst_ARIR_properties_typeProperties_url": {
 			"type": "string",
-			"defaultValue": "ivs-dwh-rg"
+			"defaultValue": "https://ivsenr.dfs.core.windows.net/"
 		},
-		"SchedSQLPoolPaused_properties_SQLPoolPause_parameters_p_workspace": {
+		"templaterawst_ARIR_properties_typeProperties_url": {
 			"type": "string",
-			"defaultValue": "ivs-synapse"
-		},
-		"SchedSQLPoolPaused_properties_SQLPoolPause_parameters_p_sqlPool": {
-			"type": "string",
-			"defaultValue": "ivs_sqlpool"
+			"defaultValue": "https://ivsraw.dfs.core.windows.net/"
 		}
 	},
 	"variables": {
@@ -49,17 +61,685 @@
 	},
 	"resources": [
 		{
-			"name": "[concat(parameters('workspaceName'), '/DeltaLake')]",
+			"name": "[concat(parameters('workspaceName'), '/FromRESTAPIToJson')]",
 			"type": "Microsoft.Synapse/workspaces/pipelines",
 			"apiVersion": "2019-06-01-preview",
 			"properties": {
 				"activities": [
 					{
-						"name": "Data flow1",
-						"type": "ExecuteDataFlow",
+						"name": "ForEachDataset",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "Set v_datetime_to",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "GenericRawJson linked service",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@pipeline().parameters.p_datasets",
+								"type": "Expression"
+							},
+							"isSequential": false,
+							"activities": [
+								{
+									"name": "CopyDataset",
+									"type": "Copy",
+									"dependsOn": [
+										{
+											"activity": "ReadMonitoringBlob",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "7.00:00:00",
+										"retry": 3,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "RestSource",
+											"httpRequestTimeout": "00:01:40",
+											"requestInterval": "00.00:00:00.010",
+											"requestMethod": "GET",
+											"paginationRules": {
+												"AbsoluteUrl": "$.nextLink",
+												"supportRFC5988": "true"
+											}
+										},
+										"sink": {
+											"type": "JsonSink",
+											"storeSettings": {
+												"type": "AzureBlobFSWriteSettings"
+											},
+											"formatSettings": {
+												"type": "JsonWriteSettings"
+											}
+										},
+										"enableStaging": false
+									},
+									"inputs": [
+										{
+											"referenceName": "TemplateREST",
+											"type": "DatasetReference",
+											"parameters": {
+												"p_relative_url": {
+													"value": "@if(\n    and(\n        item().delta, \n        equals(length(activity('ReadMonitoringBlob').output.firstRow.DeltaLink), 0)\n    ),\n    concat(item().path, \n        item().source, \n        '/delta',\n        if(\n            and(\n                empty(item().select), \n                empty(item().filter)), '',\n            concat('?', item().select, item().filter)\n        )\n    ), \n    if(\n        item().delta,\n        activity('ReadMonitoringBlob').output.firstRow.DeltaLink,\n        concat(\n            item().path, \n            item().source, \n            if(\n                and(\n                    empty(item().select), \n                    and(empty(item().filter), empty(item().cdcCol))), '',\n                concat('?', \n                    if(empty(item().select), '', concat(item().select, '&')),\n                    if(empty(item().filter),\n                        if(not(empty(item().cdcCol)), '$filter=', ''),\n                        if(not(empty(item().cdcCol)), concat(item().filter, '&'), item().filter)\n                    ),\n                    if(and(not(item().delta), not(empty(item().cdcCol))),\n                        concat('(DateModified gt ',\n                            formatDateTime(\n                                if(empty(pipeline().parameters.p_datetime_from),\n                                    addHours(\n                                        activity('ReadMonitoringBlob').output.firstRow.CDCTimestamp,\n                                        pipeline().parameters.c_cdc_offset_hr\n                                    ),                                        \n                                    pipeline().parameters.p_datetime_from\n                                ),\n                            'yyyy-MM-ddTHH:mm:ss.fffffffZ'),\n                            ' and DateModified le ',\n                            formatDateTime(\n                                variables('v_datetime_to'), \n                                'yyyy-MM-ddTHH:mm:ss.fffffffZ'\n                            ), ')'\n                        ), ''\n                    )\n                )\n            )\n        )\n    )\n)",
+													"type": "Expression"
+												}
+											}
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "GenericRawJson",
+											"type": "DatasetReference",
+											"parameters": {
+												"p_container": {
+													"value": "@pipeline().parameters.c_raw_container",
+													"type": "Expression"
+												},
+												"p_folder": {
+													"value": "@concat(pipeline().parameters.c_raw_root_folder, '/',\nif(equals(length(item().target), 0), item().source, item().target))",
+													"type": "Expression"
+												},
+												"p_file": {
+													"value": "@concat(if(\n    equals(length(item().target), 0), item().source, item().target),\n    '_', variables('v_cdc_timestamp'))",
+													"type": "Expression"
+												}
+											}
+										}
+									]
+								},
+								{
+									"name": "CheckPipelineMonitoringBlob",
+									"type": "GetMetadata",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "7.00:00:00",
+										"retry": 2,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"dataset": {
+											"referenceName": "GenericRawJson",
+											"type": "DatasetReference",
+											"parameters": {
+												"p_container": {
+													"value": "@pipeline().parameters.c_raw_monitoring_container",
+													"type": "Expression"
+												},
+												"p_folder": {
+													"value": "@concat(pipeline().parameters.c_raw_monitoring_folder, '/',\n    pipeline().parameters.c_raw_root_folder, '/', \n    item().target)",
+													"type": "Expression"
+												},
+												"p_file": {
+													"value": "@item().target",
+													"type": "Expression"
+												}
+											}
+										},
+										"fieldList": [
+											"exists",
+											"lastModified"
+										],
+										"storeSettings": {
+											"type": "AzureBlobFSReadSettings",
+											"recursive": true,
+											"enablePartitionDiscovery": false
+										},
+										"formatSettings": {
+											"type": "JsonReadSettings"
+										}
+									}
+								},
+								{
+									"name": "If Monitoring Blob Exists",
+									"type": "IfCondition",
+									"dependsOn": [
+										{
+											"activity": "CheckPipelineMonitoringBlob",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"expression": {
+											"value": "@activity('CheckPipelineMonitoringBlob').output.exists",
+											"type": "Expression"
+										},
+										"ifFalseActivities": [
+											{
+												"name": "CopyDefaultMonitoringData",
+												"type": "Copy",
+												"dependsOn": [],
+												"policy": {
+													"timeout": "7.00:00:00",
+													"retry": 2,
+													"retryIntervalInSeconds": 30,
+													"secureOutput": false,
+													"secureInput": false
+												},
+												"userProperties": [],
+												"typeProperties": {
+													"source": {
+														"type": "JsonSource",
+														"additionalColumns": [
+															{
+																"name": "PipelineName",
+																"value": {
+																	"value": "@pipeline().Pipeline",
+																	"type": "Expression"
+																}
+															},
+															{
+																"name": "BlobRootDirectory",
+																"value": {
+																	"value": "@concat(pipeline().parameters.c_raw_root_folder)",
+																	"type": "Expression"
+																}
+															},
+															{
+																"name": "DatetimeFrom",
+																"value": ""
+															},
+															{
+																"name": "DatetimeTo",
+																"value": ""
+															},
+															{
+																"name": "CDCTimestamp",
+																"value": {
+																	"value": "@concat('1900-01-01')",
+																	"type": "Expression"
+																}
+															},
+															{
+																"name": "CurrentUTC",
+																"value": {
+																	"value": "@utcnow()",
+																	"type": "Expression"
+																}
+															},
+															{
+																"name": "DeltaLink",
+																"value": ""
+															},
+															{
+																"name": "RowCount",
+																"value": ""
+															}
+														],
+														"storeSettings": {
+															"type": "AzureBlobFSReadSettings",
+															"recursive": true,
+															"enablePartitionDiscovery": false
+														},
+														"formatSettings": {
+															"type": "JsonReadSettings"
+														}
+													},
+													"sink": {
+														"type": "JsonSink",
+														"storeSettings": {
+															"type": "AzureBlobFSWriteSettings"
+														},
+														"formatSettings": {
+															"type": "JsonWriteSettings"
+														}
+													},
+													"enableStaging": false
+												},
+												"inputs": [
+													{
+														"referenceName": "DummyJson",
+														"type": "DatasetReference",
+														"parameters": {}
+													}
+												],
+												"outputs": [
+													{
+														"referenceName": "GenericRawJson",
+														"type": "DatasetReference",
+														"parameters": {
+															"p_container": {
+																"value": "@pipeline().parameters.c_raw_monitoring_container",
+																"type": "Expression"
+															},
+															"p_folder": {
+																"value": "@concat(pipeline().parameters.c_raw_monitoring_folder, '/',\n    pipeline().parameters.c_raw_root_folder, '/', \n    item().target)",
+																"type": "Expression"
+															},
+															"p_file": {
+																"value": "@item().target",
+																"type": "Expression"
+															}
+														}
+													}
+												]
+											}
+										]
+									}
+								},
+								{
+									"name": "ReadMonitoringBlob",
+									"type": "Lookup",
+									"dependsOn": [
+										{
+											"activity": "If Monitoring Blob Exists",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 2,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "JsonSource",
+											"storeSettings": {
+												"type": "AzureBlobFSReadSettings",
+												"recursive": false,
+												"enablePartitionDiscovery": false
+											},
+											"formatSettings": {
+												"type": "JsonReadSettings"
+											}
+										},
+										"dataset": {
+											"referenceName": "GenericRawJson",
+											"type": "DatasetReference",
+											"parameters": {
+												"p_container": {
+													"value": "@pipeline().parameters.c_raw_monitoring_container",
+													"type": "Expression"
+												},
+												"p_folder": {
+													"value": "@concat(pipeline().parameters.c_raw_monitoring_folder, '/',\n    pipeline().parameters.c_raw_root_folder, '/', \n    item().target)",
+													"type": "Expression"
+												},
+												"p_file": {
+													"value": "@item().target",
+													"type": "Expression"
+												}
+											}
+										}
+									}
+								},
+								{
+									"name": "countRows",
+									"type": "Script",
+									"dependsOn": [
+										{
+											"activity": "CopyDataset",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 2,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"linkedServiceName": {
+										"referenceName": "serverless_ARIR",
+										"type": "LinkedServiceReference",
+										"parameters": {
+											"p_database": "master"
+										}
+									},
+									"typeProperties": {
+										"scripts": [
+											{
+												"type": "Query",
+												"text": {
+													"value": "SELECT count(keyColumn) countRows\n   FROM OPENROWSET(\n          BULK '@{activity('GenericRawJson linked service').output.properties.typeProperties.url}@{pipeline().parameters.c_raw_container}/@{pipeline().parameters.c_raw_root_folder}/@{item().target}/@{concat(if(equals(length(item().target), 0), item().source, item().target), '_', variables('v_cdc_timestamp'))}.json', \n          FORMAT = 'CSV', FIELDQUOTE = '0x0b', FIELDTERMINATOR ='0x0b', ROWTERMINATOR = '\\n') \n   WITH (jsonContent nvarchar(MAX)) AS [result] \n   cross apply openjson(JSON_QUERY(jsonContent, '$.value'))\n   with (keyColumn nvarchar(MAX) '$.@{item().keyCol}')",
+													"type": "Expression"
+												}
+											}
+										],
+										"scriptBlockExecutionTimeout": "02:00:00"
+									}
+								},
+								{
+									"name": "If RowCount not zero",
+									"type": "IfCondition",
+									"dependsOn": [
+										{
+											"activity": "countRows",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"expression": {
+											"value": "@greater(\n    activity('countRows').output.resultSets[0].rows[0].countRows,\n    0)",
+											"type": "Expression"
+										},
+										"ifFalseActivities": [
+											{
+												"name": "Delete Blob with no Data",
+												"type": "Delete",
+												"dependsOn": [],
+												"policy": {
+													"timeout": "0.12:00:00",
+													"retry": 2,
+													"retryIntervalInSeconds": 30,
+													"secureOutput": false,
+													"secureInput": false
+												},
+												"userProperties": [],
+												"typeProperties": {
+													"dataset": {
+														"referenceName": "GenericRawJson",
+														"type": "DatasetReference",
+														"parameters": {
+															"p_container": {
+																"value": "@pipeline().parameters.c_raw_container",
+																"type": "Expression"
+															},
+															"p_folder": {
+																"value": "@concat(pipeline().parameters.c_raw_root_folder, '/',\nif(equals(length(item().target), 0), item().source, item().target))",
+																"type": "Expression"
+															},
+															"p_file": {
+																"value": "@concat(if(\n    equals(length(item().target), 0), item().source, item().target),\n    '_', variables('v_cdc_timestamp'))",
+																"type": "Expression"
+															}
+														}
+													},
+													"enableLogging": false,
+													"storeSettings": {
+														"type": "AzureBlobFSReadSettings",
+														"recursive": false,
+														"enablePartitionDiscovery": false
+													}
+												}
+											}
+										],
+										"ifTrueActivities": [
+											{
+												"name": "GetIncrementalReference",
+												"type": "Script",
+												"dependsOn": [],
+												"policy": {
+													"timeout": "0.12:00:00",
+													"retry": 2,
+													"retryIntervalInSeconds": 30,
+													"secureOutput": false,
+													"secureInput": false
+												},
+												"userProperties": [],
+												"linkedServiceName": {
+													"referenceName": "serverless_ARIR",
+													"type": "LinkedServiceReference",
+													"parameters": {
+														"p_database": "master"
+													}
+												},
+												"typeProperties": {
+													"scripts": [
+														{
+															"type": "Query",
+															"text": {
+																"value": "@if(item().delta,\n   concat('SELECT deltaLink FROM OPENROWSET(BULK ''',\n      activity('GenericRawJson linked service').output.properties.typeProperties.url,\n      pipeline().parameters.c_raw_container, '/',\n      pipeline().parameters.c_raw_root_folder, '/',\n      item().target, '/',\n      if(equals(length(item().target), 0), item().source, item().target),\n      '_', variables('v_cdc_timestamp'), '.json', \n      ''', FORMAT = ''CSV'', FIELDQUOTE = ''0x0b'', ',\n      'FIELDTERMINATOR =''0x0b'', ROWTERMINATOR = ''\\n'') ',\n      'WITH (jsonContent nvarchar(MAX)) AS [result] ',\n      'cross apply openjson(jsonContent) with (deltaLink varchar(max) ',\n      '''$.\"', pipeline().parameters.c_delta_link_field, '\"'') ',\n      'where deltaLink is not null'\n   ),\n   'SELECT '''' as deltaLink'\n)",
+																"type": "Expression"
+															}
+														}
+													],
+													"scriptBlockExecutionTimeout": "02:00:00"
+												}
+											},
+											{
+												"name": "CopyMonitoringData",
+												"type": "Copy",
+												"dependsOn": [
+													{
+														"activity": "GetIncrementalReference",
+														"dependencyConditions": [
+															"Succeeded"
+														]
+													},
+													{
+														"activity": "GetCDCTimeStamp",
+														"dependencyConditions": [
+															"Succeeded"
+														]
+													}
+												],
+												"policy": {
+													"timeout": "7.00:00:00",
+													"retry": 2,
+													"retryIntervalInSeconds": 30,
+													"secureOutput": false,
+													"secureInput": false
+												},
+												"userProperties": [],
+												"typeProperties": {
+													"source": {
+														"type": "JsonSource",
+														"additionalColumns": [
+															{
+																"name": "PipelineName",
+																"value": {
+																	"value": "@pipeline().Pipeline",
+																	"type": "Expression"
+																}
+															},
+															{
+																"name": "BlobRootDirectory",
+																"value": {
+																	"value": "@concat(pipeline().parameters.c_raw_root_folder)",
+																	"type": "Expression"
+																}
+															},
+															{
+																"name": "DatetimeFrom",
+																"value": {
+																	"value": "@pipeline().parameters.p_datetime_from",
+																	"type": "Expression"
+																}
+															},
+															{
+																"name": "DatetimeTo",
+																"value": {
+																	"value": "@pipeline().parameters.p_datetime_to",
+																	"type": "Expression"
+																}
+															},
+															{
+																"name": "CDCTimestamp",
+																"value": {
+																	"value": "@if(\n    greaterOrEquals(\n        formatDateTime(\n            variables('v_datetime_to'), \n            'yyyy-MM-ddTHH:mm:ss.fffffffZ'\n        ), \n        activity('GetCDCTimeStamp').output.resultSets[0].rows[0].CDCTimestamp\n    ),\n    activity('GetCDCTimeStamp').output.resultSets[0].rows[0].CDCTimestamp,\n    activity('ReadMonitoringBlob').output.firstRow.CDCTimestamp\n)\n",
+																	"type": "Expression"
+																}
+															},
+															{
+																"name": "CurrentUTC",
+																"value": {
+																	"value": "@utcnow()",
+																	"type": "Expression"
+																}
+															},
+															{
+																"name": "DeltaLink",
+																"value": {
+																	"value": "@activity('GetIncrementalReference').output.resultSets[0].rows[0].deltaLink",
+																	"type": "Expression"
+																}
+															},
+															{
+																"name": "RowCount",
+																"value": {
+																	"value": "@activity('countRows').output.resultSets[0].rows[0].countRows",
+																	"type": "Expression"
+																}
+															}
+														],
+														"storeSettings": {
+															"type": "AzureBlobFSReadSettings",
+															"recursive": true,
+															"enablePartitionDiscovery": false
+														},
+														"formatSettings": {
+															"type": "JsonReadSettings"
+														}
+													},
+													"sink": {
+														"type": "JsonSink",
+														"storeSettings": {
+															"type": "AzureBlobFSWriteSettings"
+														},
+														"formatSettings": {
+															"type": "JsonWriteSettings"
+														}
+													},
+													"enableStaging": false
+												},
+												"inputs": [
+													{
+														"referenceName": "DummyJson",
+														"type": "DatasetReference",
+														"parameters": {}
+													}
+												],
+												"outputs": [
+													{
+														"referenceName": "GenericRawJson",
+														"type": "DatasetReference",
+														"parameters": {
+															"p_container": {
+																"value": "@pipeline().parameters.c_raw_monitoring_container",
+																"type": "Expression"
+															},
+															"p_folder": {
+																"value": "@concat(pipeline().parameters.c_raw_monitoring_folder, '/',\n    pipeline().parameters.c_raw_root_folder, '/', \n    item().target)",
+																"type": "Expression"
+															},
+															"p_file": {
+																"value": "@item().target",
+																"type": "Expression"
+															}
+														}
+													}
+												]
+											},
+											{
+												"name": "GetCDCTimeStamp",
+												"type": "Script",
+												"dependsOn": [],
+												"policy": {
+													"timeout": "0.12:00:00",
+													"retry": 2,
+													"retryIntervalInSeconds": 30,
+													"secureOutput": false,
+													"secureInput": false
+												},
+												"userProperties": [],
+												"linkedServiceName": {
+													"referenceName": "serverless_ARIR",
+													"type": "LinkedServiceReference",
+													"parameters": {
+														"p_database": "master"
+													}
+												},
+												"typeProperties": {
+													"scripts": [
+														{
+															"type": "Query",
+															"text": {
+																"value": "@if(or(item().delta, empty(item().cdcCol)),\n   concat('SELECT ''', variables('v_cdc_timestamp'), ''' as CDCTimestamp'),\n   concat('SELECT max(CDCTimestamp) CDCTimestamp ',\n      'FROM OPENROWSET(BULK ''',\n      activity('GenericRawJson linked service').output.properties.typeProperties.url,\n      pipeline().parameters.c_raw_container, '/',\n      pipeline().parameters.c_raw_root_folder, '/',\n      item().target, '/',\n      if(equals(length(item().target), 0), item().source, item().target),\n      '_', variables('v_cdc_timestamp'), '.json', \n      ''', FORMAT = ''CSV'', FIELDQUOTE = ''0x0b'', ',\n      'FIELDTERMINATOR =''0x0b'', ROWTERMINATOR = ''\\n'') ',\n      'WITH (jsonContent nvarchar(MAX)) AS [result] ',\n      'cross apply openjson(JSON_QUERY(jsonContent, ''$.value'')) ',\n      ' WITH (CDCTimestamp nvarchar(max) ''$.\"', item().cdcCol, '\"'')'\n   )\n)",
+																"type": "Expression"
+															}
+														}
+													],
+													"scriptBlockExecutionTimeout": "02:00:00"
+												}
+											}
+										]
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "Set v_cdc_timestamp",
+						"type": "SetVariable",
 						"dependsOn": [],
 						"policy": {
-							"timeout": "1.00:00:00",
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "v_cdc_timestamp",
+							"value": {
+								"value": "@if(empty(pipeline().parameters.c_cdc_timestamp), utcNow(),\npipeline().parameters.c_cdc_timestamp)",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Set v_datetime_to",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Set v_cdc_timestamp",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "v_datetime_to",
+							"value": {
+								"value": "@if(empty(pipeline().parameters.p_datetime_to),\nvariables('v_cdc_timestamp'),\npipeline().parameters.p_datetime_to)",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "GenericRawJson attributes",
+						"type": "WebActivity",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
 							"retry": 0,
 							"retryIntervalInSeconds": 30,
 							"secureOutput": false,
@@ -67,80 +747,150 @@
 						},
 						"userProperties": [],
 						"typeProperties": {
-							"dataflow": {
-								"referenceName": "DeltaLake",
-								"type": "DataFlowReference",
-								"parameters": {},
-								"datasetParameters": {
-									"source1": {},
-									"sink1": {}
-								}
+							"method": "GET",
+							"headers": {},
+							"url": {
+								"value": "@concat('https://', pipeline().DataFactory, '.dev.azuresynapse.net/datasets/GenericRawJson?api-version=2020-12-01')",
+								"type": "Expression"
 							},
-							"staging": {},
-							"compute": {
-								"coreCount": 8,
-								"computeType": "General"
+							"connectVia": {
+								"referenceName": "SHIR",
+								"type": "IntegrationRuntimeReference"
 							},
-							"traceLevel": "Fine"
+							"authentication": {
+								"type": "MSI",
+								"resource": "https://dev.azuresynapse.net/"
+							}
 						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {},
-					"cancelAfter": {}
-				},
-				"annotations": []
-			},
-			"dependsOn": [
-				"[concat(variables('workspaceId'), '/dataflows/DeltaLake')]"
-			]
-		},
-		{
-			"name": "[concat(parameters('workspaceName'), '/SQLPoolPause')]",
-			"type": "Microsoft.Synapse/workspaces/pipelines",
-			"apiVersion": "2019-06-01-preview",
-			"properties": {
-				"activities": [
+					},
 					{
-						"name": "SQLPoolGetStatus",
+						"name": "GenericRawJson linked service",
 						"type": "WebActivity",
-						"dependsOn": [],
+						"dependsOn": [
+							{
+								"activity": "GenericRawJson attributes",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
 						"policy": {
-							"timeout": "7.00:00:00",
-							"retry": 2,
-							"retryIntervalInSeconds": 200,
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
 							"secureOutput": false,
 							"secureInput": false
 						},
 						"userProperties": [],
 						"typeProperties": {
+							"method": "GET",
+							"headers": {},
 							"url": {
-								"value": "@concat('https://management.azure.com/subscriptions/', pipeline().parameters.p_subscription, '/resourceGroups/', pipeline().parameters.p_resourceGroup, '/providers/Microsoft.Synapse/workspaces/', pipeline().parameters.p_workspace, '/sqlPools/', pipeline().parameters.p_sqlPool, '/?api-version=2019-06-01-preview')",
+								"value": "@concat('https://', pipeline().DataFactory, '.dev.azuresynapse.net/linkedservices/', activity('GenericRawJson attributes').output.properties.linkedServiceName.referenceName, '?api-version=2020-12-01')",
 								"type": "Expression"
 							},
 							"connectVia": {
-								"referenceName": "AutoResolveIntegrationRuntime",
+								"referenceName": "SHIR",
 								"type": "IntegrationRuntimeReference"
-							},
-							"method": "GET",
-							"headers": {},
-							"body": {
-								"sku": {
-									"name": "DW100c"
-								}
 							},
 							"authentication": {
 								"type": "MSI",
-								"resource": "https://management.azure.com/"
+								"resource": "https://dev.azuresynapse.net/"
 							}
 						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"parameters": {
+					"p_datasets": {
+						"type": "array",
+						"defaultValue": [
+							{
+								"source": "users",
+								"target": "users",
+								"path": "/",
+								"delta": false,
+								"select": "size=10",
+								"filter": null,
+								"cdcCol": null,
+								"keyCol": "id",
+								"relCol": null
+							}
+						]
 					},
+					"c_raw_root_folder": {
+						"type": "string",
+						"defaultValue": "FromRESTAPIToJson"
+					},
+					"c_raw_monitoring_container": {
+						"type": "string",
+						"defaultValue": "template"
+					},
+					"c_raw_container": {
+						"type": "string",
+						"defaultValue": "template"
+					},
+					"p_datetime_from": {
+						"type": "string"
+					},
+					"p_datetime_to": {
+						"type": "string"
+					},
+					"c_raw_monitoring_folder": {
+						"type": "string",
+						"defaultValue": "PipelineMonitoring"
+					},
+					"c_delta_link_field": {
+						"type": "string"
+					},
+					"c_cdc_timestamp": {
+						"type": "string"
+					},
+					"c_cdc_offset_hr": {
+						"type": "int",
+						"defaultValue": 0
+					}
+				},
+				"variables": {
+					"v_cdc_timestamp": {
+						"type": "String"
+					},
+					"v_datetime_to": {
+						"type": "String"
+					},
+					"v_monitor": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "Templates"
+				},
+				"annotations": [],
+				"lastPublishTime": "2023-10-16T14:40:59Z"
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/integrationRuntimes/SHIR')]",
+				"[concat(variables('workspaceId'), '/datasets/TemplateREST')]",
+				"[concat(variables('workspaceId'), '/datasets/GenericRawJson')]",
+				"[concat(variables('workspaceId'), '/linkedServices/serverless_ARIR')]",
+				"[concat(variables('workspaceId'), '/datasets/DummyJson')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/SQLPoolStartStop')]",
+			"type": "Microsoft.Synapse/workspaces/pipelines",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"description": "Use p_action = 'resume' to start or 'pause to stop dedicated SQL pool",
+				"activities": [
 					{
-						"name": "StatusCheck",
+						"name": "If not PROD",
 						"type": "IfCondition",
 						"dependsOn": [
 							{
-								"activity": "SQLPoolGetStatus",
+								"activity": "FilterSystem",
 								"dependencyConditions": [
 									"Succeeded"
 								]
@@ -149,33 +899,34 @@
 						"userProperties": [],
 						"typeProperties": {
 							"expression": {
-								"value": "@equals(activity('SQLPoolGetStatus').output.properties.status, 'Paused')",
+								"value": "@equals(activity('FilterSystem').output.FilteredItemsCount, 0)",
 								"type": "Expression"
 							},
 							"ifFalseActivities": [
 								{
-									"name": "SQLPoolPause",
+									"name": "Start SQL Pool",
 									"type": "WebActivity",
 									"dependsOn": [],
 									"policy": {
-										"timeout": "7.00:00:00",
+										"timeout": "0.12:00:00",
 										"retry": 2,
-										"retryIntervalInSeconds": 200,
+										"retryIntervalInSeconds": 30,
 										"secureOutput": false,
 										"secureInput": false
 									},
 									"userProperties": [],
 									"typeProperties": {
-										"url": {
-											"value": "@concat('https://management.azure.com/subscriptions/', pipeline().parameters.p_subscription, '/resourceGroups/', pipeline().parameters.p_resourceGroup, '/providers/Microsoft.Synapse/workspaces/', pipeline().parameters.p_workspace, '/sqlPools/', pipeline().parameters.p_sqlPool, '/pause?api-version=2019-06-01-preview')",
-											"type": "Expression"
-										},
 										"method": "POST",
 										"headers": {},
-										"body": {
-											"value": "'{ ]'",
+										"url": {
+											"value": "@concat('https://management.azure.com/subscriptions/', \nactivity('FilterSystem').output.Value[0].subscriptionId, \n'/resourceGroups/', \nactivity('FilterSystem').output.Value[0].resourceGroup, \n'/providers/Microsoft.Synapse/workspaces/', \npipeline().DataFactory, \n'/sqlPools/', activity('FilterSystem').output.Value[0].sqlPool,\n'/', pipeline().parameters.p_action, '?api-version=2019-06-01-preview')",
 											"type": "Expression"
 										},
+										"connectVia": {
+											"referenceName": "SHIR",
+											"type": "IntegrationRuntimeReference"
+										},
+										"body": "'{ }'",
 										"authentication": {
 											"type": "MSI",
 											"resource": "https://management.azure.com/"
@@ -184,317 +935,230 @@
 								}
 							]
 						}
+					},
+					{
+						"name": "FilterSystem",
+						"type": "Filter",
+						"dependsOn": [],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@pipeline().parameters.c_system_landscape",
+								"type": "Expression"
+							},
+							"condition": {
+								"value": "@equals(item().SynapseWorkspace, pipeline().DataFactory)",
+								"type": "Expression"
+							}
+						}
 					}
 				],
 				"policy": {
-					"elapsedTimeMetric": {},
-					"cancelAfter": {}
+					"elapsedTimeMetric": {}
 				},
 				"parameters": {
-					"p_subscription": {
+					"p_action": {
 						"type": "string",
-						"defaultValue": "f939f8f3-2652-4a45-88ae-78a7782ec9df"
+						"defaultValue": "pause"
 					},
-					"p_resourceGroup": {
-						"type": "string",
-						"defaultValue": "ivs-dwh-rg"
-					},
-					"p_workspace": {
-						"type": "string",
-						"defaultValue": "ivs-synapse"
-					},
-					"p_sqlPool": {
-						"type": "string",
-						"defaultValue": "ivs_sqlpool"
-					}
-				},
-				"folder": {
-					"name": "Scheduled"
-				},
-				"annotations": []
-			},
-			"dependsOn": [
-				"[concat(variables('workspaceId'), '/integrationRuntimes/AutoResolveIntegrationRuntime')]"
-			]
-		},
-		{
-			"name": "[concat(parameters('workspaceName'), '/TemplateDimensions')]",
-			"type": "Microsoft.Synapse/workspaces/pipelines",
-			"apiVersion": "2019-06-01-preview",
-			"properties": {
-				"activities": [
-					{
-						"name": "TemplateDimension1",
-						"type": "ExecuteDataFlow",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "7.00:00:00",
-							"retry": 2,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"dataflow": {
-								"referenceName": "TemplateDimension1",
-								"type": "DataFlowReference",
-								"parameters": {},
-								"datasetParameters": {
-									"DataSource": {},
-									"Dimension": {},
-									"DimensionSink": {}
-								}
-							},
-							"staging": {
-								"linkedService": {
-									"referenceName": "ivs-synapse-WorkspaceDefaultStorage",
-									"type": "LinkedServiceReference"
-								},
-								"folderPath": "adftemplate/staging/dimension1"
-							},
-							"compute": {
-								"coreCount": 8,
-								"computeType": "General"
-							},
-							"traceLevel": "Fine"
-						}
-					},
-					{
-						"name": "TemplateDimension2",
-						"type": "ExecuteDataFlow",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "7.00:00:00",
-							"retry": 2,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"dataflow": {
-								"referenceName": "TemplateDimension2",
-								"type": "DataFlowReference",
-								"parameters": {},
-								"datasetParameters": {
-									"DataSource": {},
-									"Dimension": {},
-									"DimensionSink": {}
-								}
-							},
-							"staging": {
-								"linkedService": {
-									"referenceName": "ivs-synapse-WorkspaceDefaultStorage",
-									"type": "LinkedServiceReference"
-								},
-								"folderPath": "adftemplate/staging/dimension2"
-							},
-							"compute": {
-								"coreCount": 8,
-								"computeType": "General"
-							},
-							"traceLevel": "Fine"
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {},
-					"cancelAfter": {}
-				},
-				"folder": {
-					"name": "Templates"
-				},
-				"annotations": []
-			},
-			"dependsOn": [
-				"[concat(variables('workspaceId'), '/dataflows/TemplateDimension1')]",
-				"[concat(variables('workspaceId'), '/linkedServices/ivs-synapse-WorkspaceDefaultStorage')]",
-				"[concat(variables('workspaceId'), '/dataflows/TemplateDimension2')]"
-			]
-		},
-		{
-			"name": "[concat(parameters('workspaceName'), '/TemplateFact')]",
-			"type": "Microsoft.Synapse/workspaces/pipelines",
-			"apiVersion": "2019-06-01-preview",
-			"properties": {
-				"activities": [
-					{
-						"name": "TemplateIncrementalStaging",
-						"type": "ExecuteDataFlow",
-						"dependsOn": [
+					"c_system_landscape": {
+						"type": "array",
+						"defaultValue": [
 							{
-								"activity": "LookupLatestCDC",
-								"dependencyConditions": [
-									"Succeeded"
-								]
+								"environment": "DV",
+								"SynapseWorkspace": "ivs-synapse",
+								"resourceGroup": "ivs-dwh-rg",
+								"subscriptionId": "f939f8f3-2652-4a45-88ae-78a7782ec9df",
+								"sqlPool": "ivssql"
 							}
-						],
-						"policy": {
-							"timeout": "7.00:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"dataflow": {
-								"referenceName": "TemplateIncrementalStaging",
-								"type": "DataFlowReference",
-								"parameters": {
-									"p_latest_datetime": "'1900-01-01 00:00:000'",
-									"p_main_source": "'ADLS_TMPL_DATASOURCE1'",
-									"p_cdc_column": "'CDC_TIMESTAMP'"
-								},
-								"datasetParameters": {
-									"MainSource": {},
-									"SlaveSource2": {},
-									"SlaveSource3": {},
-									"SinkStaging": {},
-									"SinkStagingKey": {}
-								}
-							},
-							"staging": {},
-							"compute": {
-								"coreCount": 8,
-								"computeType": "General"
-							},
-							"traceLevel": "Fine"
-						}
-					},
-					{
-						"name": "TemplateFact",
-						"type": "ExecuteDataFlow",
-						"dependsOn": [
-							{
-								"activity": "TemplateIncrementalStaging",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "7.00:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"dataflow": {
-								"referenceName": "TemplateFact",
-								"type": "DataFlowReference",
-								"parameters": {},
-								"datasetParameters": {
-									"Source": {},
-									"Dimension1": {},
-									"Dimension2": {},
-									"Fact": {},
-									"FactSink": {}
-								}
-							},
-							"staging": {
-								"linkedService": {
-									"referenceName": "ivs-synapse-WorkspaceDefaultStorage",
-									"type": "LinkedServiceReference"
-								},
-								"folderPath": "adftemplate/staging/fact"
-							},
-							"compute": {
-								"coreCount": 8,
-								"computeType": "General"
-							},
-							"traceLevel": "Fine"
-						}
-					},
-					{
-						"name": "LookupLatestCDC",
-						"type": "Lookup",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "7.00:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"source": {
-								"type": "SqlDWSource",
-								"sqlReaderQuery": {
-									"value": "@concat('select case count(*) when 0 then ''', ''' else (select convert(varchar, max(', pipeline().parameters.p_cdc_column, '), 21) from ', pipeline().parameters.p_target_table, ') end LATEST_DATETIME from ', pipeline().parameters.p_target_table)",
-									"type": "Expression"
-								},
-								"queryTimeout": "02:00:00",
-								"partitionOption": "None"
-							},
-							"dataset": {
-								"referenceName": "TMPL_FACT",
-								"type": "DatasetReference",
-								"parameters": {}
-							}
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {},
-					"cancelAfter": {}
-				},
-				"parameters": {
-					"p_latest_datetime": {
-						"type": "string"
-					},
-					"p_target_table": {
-						"type": "string",
-						"defaultValue": "TMPL_FACT"
-					},
-					"p_cdc_column": {
-						"type": "string",
-						"defaultValue": "SRC1_CDC_TIMESTAMP"
+						]
 					}
 				},
 				"folder": {
 					"name": "Templates"
 				},
-				"annotations": []
+				"annotations": [],
+				"lastPublishTime": "2023-10-16T14:39:39Z"
 			},
 			"dependsOn": [
-				"[concat(variables('workspaceId'), '/dataflows/TemplateIncrementalStaging')]",
-				"[concat(variables('workspaceId'), '/dataflows/TemplateFact')]",
-				"[concat(variables('workspaceId'), '/linkedServices/ivs-synapse-WorkspaceDefaultStorage')]",
-				"[concat(variables('workspaceId'), '/datasets/TMPL_FACT')]"
+				"[concat(variables('workspaceId'), '/integrationRuntimes/SHIR')]"
 			]
 		},
 		{
-			"name": "[concat(parameters('workspaceName'), '/TemplateSchedPipeline')]",
+			"name": "[concat(parameters('workspaceName'), '/ServerlessDBDeploy')]",
 			"type": "Microsoft.Synapse/workspaces/pipelines",
 			"apiVersion": "2019-06-01-preview",
 			"properties": {
+				"description": "Pipeline runs automatically after release deploy to create serverless DB, master key and default credentials",
 				"activities": [
 					{
-						"name": "TemplateDimensions",
+						"name": "ForEachServerlessDB",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "FilterKeyVault",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@pipeline().parameters.p_serverless_db",
+								"type": "Expression"
+							},
+							"isSequential": true,
+							"activities": [
+								{
+									"name": "MasterKeySecret",
+									"type": "WebActivity",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 2,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": true,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"method": "GET",
+										"headers": {},
+										"url": {
+											"value": "@concat(activity('FilterKeyVault').output.Value[0].properties.typeProperties.baseUrl,\n'secrets/', item().MasterKeySecret, '?api-version=7.3')",
+											"type": "Expression"
+										},
+										"connectVia": {
+											"referenceName": "SHIR",
+											"type": "IntegrationRuntimeReference"
+										},
+										"authentication": {
+											"type": "MSI",
+											"resource": "https://vault.azure.net"
+										}
+									}
+								},
+								{
+									"name": "ServerlessDBCreate",
+									"type": "Script",
+									"dependsOn": [
+										{
+											"activity": "MasterKeySecret",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 2,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"linkedServiceName": {
+										"referenceName": "serverless_ARIR",
+										"type": "LinkedServiceReference",
+										"parameters": {
+											"p_database": "master"
+										}
+									},
+									"typeProperties": {
+										"scripts": [
+											{
+												"type": "NonQuery",
+												"text": {
+													"value": "if not exists (select name from sys.databases WHERE name = '@{item().serverlessDB}')\nbegin create database @{item().serverlessDB} end\n",
+													"type": "Expression"
+												}
+											}
+										],
+										"scriptBlockExecutionTimeout": "02:00:00"
+									}
+								},
+								{
+									"name": "ServerlessDBCredentials",
+									"type": "Script",
+									"dependsOn": [
+										{
+											"activity": "ServerlessDBCreate",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 2,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": true
+									},
+									"userProperties": [],
+									"linkedServiceName": {
+										"referenceName": "serverless_ARIR",
+										"type": "LinkedServiceReference",
+										"parameters": {
+											"p_database": {
+												"value": "@item().serverlessDB",
+												"type": "Expression"
+											}
+										}
+									},
+									"typeProperties": {
+										"scripts": [
+											{
+												"type": "NonQuery",
+												"text": {
+													"value": "IF NOT EXISTS (SELECT [name] from sys.symmetric_keys WHERE [name] = '##MS_DatabaseMasterKey##')\nBEGIN CREATE MASTER KEY ENCRYPTION BY PASSWORD = '@{activity('MasterKeySecret').output.value}' END\n\nIF NOT EXISTS (SELECT [name] from sys.database_scoped_credentials WHERE [name] = '@{item().scopedCredential}')\nBEGIN CREATE DATABASE SCOPED CREDENTIAL @{item().scopedCredential} WITH IDENTITY = 'Managed Identity'  END \n",
+													"type": "Expression"
+												}
+											}
+										],
+										"scriptBlockExecutionTimeout": "02:00:00"
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "LinkedServiceList",
 						"description": "",
-						"type": "ExecutePipeline",
+						"type": "WebActivity",
 						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 2,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
 						"userProperties": [],
 						"typeProperties": {
-							"pipeline": {
-								"referenceName": "TemplateDimensions",
-								"type": "PipelineReference"
+							"method": "GET",
+							"headers": {},
+							"url": {
+								"value": "@concat('https://', pipeline().DataFactory, \n'.dev.azuresynapse.net/linkedservices?api-version=2020-12-01')",
+								"type": "Expression"
 							},
-							"waitOnCompletion": true,
-							"parameters": {}
+							"connectVia": {
+								"referenceName": "SHIR",
+								"type": "IntegrationRuntimeReference"
+							},
+							"authentication": {
+								"type": "MSI",
+								"resource": "https://dev.azuresynapse.net"
+							}
 						}
 					},
 					{
-						"name": "TemplateFact",
-						"type": "ExecutePipeline",
+						"name": "FilterKeyVault",
+						"type": "Filter",
 						"dependsOn": [
 							{
-								"activity": "TemplateDimensions",
+								"activity": "LinkedServiceList",
 								"dependencyConditions": [
 									"Succeeded"
 								]
@@ -502,121 +1166,50 @@
 						],
 						"userProperties": [],
 						"typeProperties": {
-							"pipeline": {
-								"referenceName": "TemplateFact",
-								"type": "PipelineReference"
-							},
-							"waitOnCompletion": true,
-							"parameters": {}
-						}
-					},
-					{
-						"name": "WarningEmail_Fact",
-						"type": "WebActivity",
-						"dependsOn": [
-							{
-								"activity": "TemplateFact",
-								"dependencyConditions": [
-									"Failed"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "7.00:00:00",
-							"retry": 2,
-							"retryIntervalInSeconds": 200,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"url": {
-								"value": "@pipeline().parameters.LogicAppWarningMsgURL",
+							"items": {
+								"value": "@activity('LinkedServiceList').output.value",
 								"type": "Expression"
 							},
-							"connectVia": {
-								"referenceName": "AutoResolveIntegrationRuntime",
-								"type": "IntegrationRuntimeReference"
-							},
-							"method": "POST",
-							"headers": {
-								"Content-Type": "application/json"
-							},
-							"body": {
-								"dataFactoryName": "@{pipeline().DataFactory}",
-								"message": "@{activity('TemplateFact').error.message}",
-								"receiver": "@pipeline().parameters.receiver",
-								"CCreceiver": "@pipeline().parameters.CCreceiver",
-								"pipelineName": "@{pipeline().Pipeline}"
-							}
-						}
-					},
-					{
-						"name": "WarningEmail_Dimensions",
-						"type": "WebActivity",
-						"dependsOn": [
-							{
-								"activity": "TemplateDimensions",
-								"dependencyConditions": [
-									"Failed"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "7.00:00:00",
-							"retry": 2,
-							"retryIntervalInSeconds": 200,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"url": {
-								"value": "@pipeline().parameters.LogicAppWarningMsgURL",
+							"condition": {
+								"value": "@and(equals(item().properties.type, 'AzureKeyVault'), equals(item().name, pipeline().parameters.p_key_vault_linked_service))",
 								"type": "Expression"
-							},
-							"connectVia": {
-								"referenceName": "AutoResolveIntegrationRuntime",
-								"type": "IntegrationRuntimeReference"
-							},
-							"method": "POST",
-							"headers": {
-								"Content-Type": "application/json"
-							},
-							"body": {
-								"dataFactoryName": "@{pipeline().DataFactory}",
-								"message": "@{activity('TemplateDimensions').error.message}",
-								"receiver": "@pipeline().parameters.receiver",
-								"CCreceiver": "@pipeline().parameters.CCreceiver",
-								"pipelineName": "@{pipeline().Pipeline}"
 							}
 						}
 					}
 				],
 				"policy": {
-					"elapsedTimeMetric": {},
-					"cancelAfter": {}
+					"elapsedTimeMetric": {}
 				},
 				"parameters": {
-					"LogicAppWarningMsgURL": {
-						"type": "string"
+					"p_serverless_db": {
+						"type": "array",
+						"defaultValue": [
+							{
+								"serverlessDB": "templateDB",
+								"masterkeySecret": "template-sqlpool-master-key",
+								"scopedCredential": "SynapseIdentity"
+							}
+						]
 					},
-					"receiver": {
-						"type": "string"
-					},
-					"CCreceiver": {
-						"type": "string"
+					"p_key_vault_linked_service": {
+						"type": "string",
+						"defaultValue": "ivs_dwh_kv"
+					}
+				},
+				"variables": {
+					"v_test": {
+						"type": "String"
 					}
 				},
 				"folder": {
 					"name": "Templates"
 				},
-				"annotations": []
+				"annotations": [],
+				"lastPublishTime": "2023-10-16T14:40:16Z"
 			},
 			"dependsOn": [
-				"[concat(variables('workspaceId'), '/pipelines/TemplateDimensions')]",
-				"[concat(variables('workspaceId'), '/pipelines/TemplateFact')]",
-				"[concat(variables('workspaceId'), '/integrationRuntimes/AutoResolveIntegrationRuntime')]"
+				"[concat(variables('workspaceId'), '/integrationRuntimes/SHIR')]",
+				"[concat(variables('workspaceId'), '/linkedServices/serverless_ARIR')]"
 			]
 		},
 		{
@@ -761,6 +1354,75 @@
 			},
 			"dependsOn": [
 				"[concat(variables('workspaceId'), '/linkedServices/ivs-synapse-WorkspaceDefaultSqlServer')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/DummyJson')]",
+			"type": "Microsoft.Synapse/workspaces/datasets",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "templaterawst_ARIR",
+					"type": "LinkedServiceReference"
+				},
+				"annotations": [],
+				"type": "Json",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"fileName": "dummy.json",
+						"fileSystem": "raw"
+					}
+				},
+				"schema": {}
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/linkedServices/templaterawst_ARIR')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/GenericRawJson')]",
+			"type": "Microsoft.Synapse/workspaces/datasets",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "templaterawst_ARIR",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"p_container": {
+						"type": "string"
+					},
+					"p_folder": {
+						"type": "string"
+					},
+					"p_file": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"type": "Json",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"fileName": {
+							"value": "@concat(dataset().p_file, '.json')",
+							"type": "Expression"
+						},
+						"folderPath": {
+							"value": "@dataset().p_folder",
+							"type": "Expression"
+						},
+						"fileSystem": {
+							"value": "@dataset().p_container",
+							"type": "Expression"
+						}
+					}
+				},
+				"schema": {}
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/linkedServices/templaterawst_ARIR')]"
 			]
 		},
 		{
@@ -1135,6 +1797,29 @@
 			]
 		},
 		{
+			"name": "[concat(parameters('workspaceName'), '/TemplateREST')]",
+			"type": "Microsoft.Synapse/workspaces/datasets",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "template_REST",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"p_relative_url": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"type": "RestResource",
+				"typeProperties": {},
+				"schema": []
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/linkedServices/template_REST')]"
+			]
+		},
+		{
 			"name": "[concat(parameters('workspaceName'), '/serverlessview')]",
 			"type": "Microsoft.Synapse/workspaces/datasets",
 			"apiVersion": "2019-06-01-preview",
@@ -1244,19 +1929,6 @@
 			]
 		},
 		{
-			"name": "[concat(parameters('workspaceName'), '/ivs_dwh_kv')]",
-			"type": "Microsoft.Synapse/workspaces/linkedServices",
-			"apiVersion": "2019-06-01-preview",
-			"properties": {
-				"annotations": [],
-				"type": "AzureKeyVault",
-				"typeProperties": {
-					"baseUrl": "[parameters('ivs_dwh_kv_properties_typeProperties_baseUrl')]"
-				}
-			},
-			"dependsOn": []
-		},
-		{
 			"name": "[concat(parameters('workspaceName'), '/ivs_od_sqlpool')]",
 			"type": "Microsoft.Synapse/workspaces/linkedServices",
 			"apiVersion": "2019-06-01-preview",
@@ -1276,26 +1948,148 @@
 			]
 		},
 		{
+			"name": "[concat(parameters('workspaceName'), '/serverless_ARIR')]",
+			"type": "Microsoft.Synapse/workspaces/linkedServices",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"parameters": {
+					"p_database": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"type": "AzureSqlDW",
+				"typeProperties": {
+					"connectionString": "[parameters('serverless_ARIR_connectionString')]"
+				},
+				"connectVia": {
+					"referenceName": "AutoResolveIntegrationRuntime",
+					"type": "IntegrationRuntimeReference"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/integrationRuntimes/AutoResolveIntegrationRuntime')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/template_REST')]",
+			"type": "Microsoft.Synapse/workspaces/linkedServices",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"description": "https://random-data-api.com/documentation",
+				"annotations": [],
+				"type": "RestService",
+				"typeProperties": {
+					"url": "[parameters('template_REST_properties_typeProperties_url')]",
+					"enableServerCertificateValidation": false,
+					"authenticationType": "Anonymous"
+				},
+				"connectVia": {
+					"referenceName": "SHIR",
+					"type": "IntegrationRuntimeReference"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/integrationRuntimes/SHIR')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/template_dedicated_ARIR')]",
+			"type": "Microsoft.Synapse/workspaces/linkedServices",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"annotations": [],
+				"type": "AzureSqlDW",
+				"typeProperties": {
+					"connectionString": "[parameters('template_dedicated_ARIR_connectionString')]"
+				},
+				"connectVia": {
+					"referenceName": "AutoResolveIntegrationRuntime",
+					"type": "IntegrationRuntimeReference"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/integrationRuntimes/AutoResolveIntegrationRuntime')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/template_kv')]",
+			"type": "Microsoft.Synapse/workspaces/linkedServices",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"annotations": [],
+				"type": "AzureKeyVault",
+				"typeProperties": {
+					"baseUrl": "[parameters('template_kv_properties_typeProperties_baseUrl')]"
+				}
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/templatecurst_ARIR')]",
+			"type": "Microsoft.Synapse/workspaces/linkedServices",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"annotations": [],
+				"type": "AzureBlobFS",
+				"typeProperties": {
+					"url": "[parameters('templatecurst_ARIR_properties_typeProperties_url')]"
+				},
+				"connectVia": {
+					"referenceName": "AutoResolveIntegrationRuntime",
+					"type": "IntegrationRuntimeReference"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/integrationRuntimes/AutoResolveIntegrationRuntime')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/templateenrst_ARIR')]",
+			"type": "Microsoft.Synapse/workspaces/linkedServices",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"annotations": [],
+				"type": "AzureBlobFS",
+				"typeProperties": {
+					"url": "[parameters('templateenrst_ARIR_properties_typeProperties_url')]"
+				},
+				"connectVia": {
+					"referenceName": "AutoResolveIntegrationRuntime",
+					"type": "IntegrationRuntimeReference"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/integrationRuntimes/AutoResolveIntegrationRuntime')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/templaterawst_ARIR')]",
+			"type": "Microsoft.Synapse/workspaces/linkedServices",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"annotations": [],
+				"type": "AzureBlobFS",
+				"typeProperties": {
+					"url": "[parameters('templaterawst_ARIR_properties_typeProperties_url')]"
+				},
+				"connectVia": {
+					"referenceName": "AutoResolveIntegrationRuntime",
+					"type": "IntegrationRuntimeReference"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/integrationRuntimes/AutoResolveIntegrationRuntime')]"
+			]
+		},
+		{
 			"name": "[concat(parameters('workspaceName'), '/SchedSQLPoolPaused')]",
 			"type": "Microsoft.Synapse/workspaces/triggers",
 			"apiVersion": "2019-06-01-preview",
 			"properties": {
 				"annotations": [],
 				"runtimeState": "Started",
-				"pipelines": [
-					{
-						"pipelineReference": {
-							"referenceName": "SQLPoolPause",
-							"type": "PipelineReference"
-						},
-						"parameters": {
-							"p_subscription": "[parameters('SchedSQLPoolPaused_properties_SQLPoolPause_parameters_p_subscription')]",
-							"p_resourceGroup": "[parameters('SchedSQLPoolPaused_properties_SQLPoolPause_parameters_p_resourceGroup')]",
-							"p_workspace": "[parameters('SchedSQLPoolPaused_properties_SQLPoolPause_parameters_p_workspace')]",
-							"p_sqlPool": "[parameters('SchedSQLPoolPaused_properties_SQLPoolPause_parameters_p_sqlPool')]"
-						}
-					}
-				],
+				"pipelines": [],
 				"type": "ScheduleTrigger",
 				"typeProperties": {
 					"recurrence": {
@@ -1314,9 +2108,7 @@
 					}
 				}
 			},
-			"dependsOn": [
-				"[concat(variables('workspaceId'), '/pipelines/SQLPoolPause')]"
-			]
+			"dependsOn": []
 		},
 		{
 			"name": "[concat(parameters('workspaceName'), '/AutoResolveIntegrationRuntime')]",
@@ -1338,248 +2130,14 @@
 			"dependsOn": []
 		},
 		{
-			"name": "[concat(parameters('workspaceName'), '/DeltaLake')]",
-			"type": "Microsoft.Synapse/workspaces/dataflows",
+			"name": "[concat(parameters('workspaceName'), '/SHIR')]",
+			"type": "Microsoft.Synapse/workspaces/integrationRuntimes",
 			"apiVersion": "2019-06-01-preview",
 			"properties": {
-				"type": "MappingDataFlow",
-				"typeProperties": {
-					"sources": [
-						{
-							"linkedService": {
-								"referenceName": "ivs-synapse-WorkspaceDefaultStorage",
-								"type": "LinkedServiceReference"
-							},
-							"name": "source1"
-						}
-					],
-					"sinks": [
-						{
-							"linkedService": {
-								"referenceName": "ivs-synapse-WorkspaceDefaultStorage",
-								"type": "LinkedServiceReference"
-							},
-							"name": "sink1"
-						}
-					],
-					"transformations": [],
-					"script": "source(output(\n\t\tPartyId as long,\n\t\tPartyName as string,\n\t\tPartyTypeId as integer,\n\t\tGlobalLocationNumber as decimal(13,0)\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tignoreNoFilesFound: false,\n\tformat: 'delta',\n\tfileSystem: 'synapse',\n\tfolderPath: 'ivs-synapse-dldb/Party') ~> source1\nsource1 sink(allowSchemaDrift: false,\n\tvalidateSchema: false,\n\tformat: 'delta',\n\tfileSystem: 'temp',\n\tmergeSchema: false,\n\tautoCompact: false,\n\toptimizedWrite: false,\n\tvacuum: 0,\n\tdeletable:false,\n\tinsertable:true,\n\tupdateable:false,\n\tupsertable:false,\n\tumask: 0022,\n\tpreCommands: [],\n\tpostCommands: [],\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> sink1"
-				}
+				"type": "SelfHosted",
+				"typeProperties": {}
 			},
-			"dependsOn": [
-				"[concat(variables('workspaceId'), '/linkedServices/ivs-synapse-WorkspaceDefaultStorage')]"
-			]
-		},
-		{
-			"name": "[concat(parameters('workspaceName'), '/TemplateDimension1')]",
-			"type": "Microsoft.Synapse/workspaces/dataflows",
-			"apiVersion": "2019-06-01-preview",
-			"properties": {
-				"folder": {
-					"name": "Templates"
-				},
-				"type": "MappingDataFlow",
-				"typeProperties": {
-					"sources": [
-						{
-							"dataset": {
-								"referenceName": "TMPL_DATASOURCE2",
-								"type": "DatasetReference"
-							},
-							"name": "DataSource"
-						},
-						{
-							"dataset": {
-								"referenceName": "TMPL_DIMENSION1",
-								"type": "DatasetReference"
-							},
-							"name": "Dimension"
-						}
-					],
-					"sinks": [
-						{
-							"dataset": {
-								"referenceName": "TMPL_DIMENSION1",
-								"type": "DatasetReference"
-							},
-							"name": "DimensionSink"
-						}
-					],
-					"transformations": [
-						{
-							"name": "SelectDimension"
-						},
-						{
-							"name": "LookupDimension"
-						},
-						{
-							"name": "SelectColumns"
-						},
-						{
-							"name": "DerivedColumns"
-						},
-						{
-							"name": "AlterRow"
-						}
-					],
-					"script": "source(output(\n\t\tSOURCE2_ID as string,\n\t\tNCHAR_VALUE1 as string,\n\t\tNCHAR_VALUE2 as string,\n\t\tNUMERIC_VALUE1 as double,\n\t\tNUMERIC_VALUE2 as double,\n\t\tDATETIME_VALUE1 as string,\n\t\tDATETIME_VALUE2 as string\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tignoreNoFilesFound: false) ~> DataSource\nsource(output(\n\t\tDIMENSION1_KEY as string,\n\t\tSOURCE2_ID as string,\n\t\tNCHAR_ATTRIBUTE1 as string,\n\t\tNCHAR_ATTRIBUTE2 as string,\n\t\tDATETIME_ATTRIBUTE1 as string,\n\t\tDATETIME_ATTRIBUTE2 as string,\n\t\tDSS_CREATE_TIME as string,\n\t\tDSS_UPDATE_TIME as string\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tisolationLevel: 'READ_UNCOMMITTED',\n\tformat: 'table',\n\tstaged: false) ~> Dimension\nDimension select(mapColumn(\n\t\teach(match(true()),\n\t\t\t'DIMPREFIX_'+$$ = $$)\n\t),\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> SelectDimension\nDataSource, SelectDimension lookup(SOURCE2_ID == DIMPREFIX_SOURCE2_ID,\n\tmultiple: false,\n\tpickup: 'any',\n\tbroadcast: 'auto')~> LookupDimension\nLookupDimension select(mapColumn(\n\t\tDSS_CREATE_TIME = DIMPREFIX_DSS_CREATE_TIME,\n\t\teach(match(left(name,length('DIMPREFIX_'))!='DIMPREFIX_'),\n\t\t\treplace($$,'VALUE','ATTRIBUTE') = $$)\n\t),\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> SelectColumns\nSelectColumns derive(DSS_CREATE_TIME = iif(isNull(DSS_CREATE_TIME), toString(currentTimestamp()), DSS_CREATE_TIME),\n\t\tDSS_UPDATE_TIME = toString(currentTimestamp())) ~> DerivedColumns\nDerivedColumns alterRow(upsertIf(true())) ~> AlterRow\nAlterRow sink(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tinput(\n\t\tDIMENSION1_KEY as integer,\n\t\tSOURCE2_ID as integer,\n\t\tNCHAR_ATTRIBUTE1 as string,\n\t\tNCHAR_ATTRIBUTE2 as string,\n\t\tDATETIME_ATTRIBUTE1 as timestamp,\n\t\tDATETIME_ATTRIBUTE2 as timestamp,\n\t\tDSS_CREATE_TIME as timestamp,\n\t\tDSS_UPDATE_TIME as timestamp\n\t),\n\tdeletable:false,\n\tinsertable:false,\n\tupdateable:false,\n\tupsertable:true,\n\tkeys:['SOURCE2_ID'],\n\tformat: 'table',\n\tstaged: true,\n\tpreSQLs:['EXEC\t[dbo].[ZeroRow]\\n\t\t@p_tabname = N\\'TMPL_DIMENSION1\\',\\n\t\t@p_keycolname = N\\'DIMENSION1_KEY\\',\\n\t\t@p_varchar = N\\'Unknown\\',\\n\t\t@p_numeric = NULL,\\n\t\t@p_date = NULL,\\n\t\t@p_time = NULL,\\n\t\t@p_bit = NULL'],\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true,\n\terrorHandlingOption: 'stopOnFirstError') ~> DimensionSink"
-				}
-			},
-			"dependsOn": [
-				"[concat(variables('workspaceId'), '/datasets/TMPL_DATASOURCE2')]",
-				"[concat(variables('workspaceId'), '/datasets/TMPL_DIMENSION1')]"
-			]
-		},
-		{
-			"name": "[concat(parameters('workspaceName'), '/TemplateDimension2')]",
-			"type": "Microsoft.Synapse/workspaces/dataflows",
-			"apiVersion": "2019-06-01-preview",
-			"properties": {
-				"folder": {
-					"name": "Templates"
-				},
-				"type": "MappingDataFlow",
-				"typeProperties": {
-					"sources": [
-						{
-							"dataset": {
-								"referenceName": "TMPL_DATASOURCE3",
-								"type": "DatasetReference"
-							},
-							"name": "DataSource"
-						},
-						{
-							"dataset": {
-								"referenceName": "TMPL_DIMENSION2",
-								"type": "DatasetReference"
-							},
-							"name": "Dimension"
-						}
-					],
-					"sinks": [
-						{
-							"dataset": {
-								"referenceName": "TMPL_DIMENSION2",
-								"type": "DatasetReference"
-							},
-							"name": "DimensionSink"
-						}
-					],
-					"transformations": [
-						{
-							"name": "SelectDimension"
-						},
-						{
-							"name": "LookupDimension"
-						},
-						{
-							"name": "SelectColumns"
-						},
-						{
-							"name": "DerivedColumns"
-						},
-						{
-							"name": "AlterRow"
-						}
-					],
-					"script": "source(output(\n\t\tSOURCE3_ID as short,\n\t\tNCHAR_VALUE1 as string,\n\t\tNCHAR_VALUE2 as string,\n\t\tNUMERIC_VALUE1 as double,\n\t\tNUMERIC_VALUE2 as double,\n\t\tDATETIME_VALUE1 as string,\n\t\tDATETIME_VALUE2 as string,\n\t\tCDC_TIMESTAMP as string\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tignoreNoFilesFound: false) ~> DataSource\nsource(output(\n\t\tDIMENSION2_KEY as integer,\n\t\tSOURCE3_ID as integer,\n\t\tNCHAR_ATTRIBUTE1 as string,\n\t\tNCHAR_ATTRIBUTE2 as string,\n\t\tDATETIME_ATTRIBUTE1 as timestamp,\n\t\tDATETIME_ATTRIBUTE2 as timestamp,\n\t\tDSS_CREATE_TIME as timestamp,\n\t\tDSS_UPDATE_TIME as timestamp\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tisolationLevel: 'READ_UNCOMMITTED',\n\tformat: 'table',\n\tstaged: false) ~> Dimension\nDimension select(mapColumn(\n\t\teach(match(true()),\n\t\t\t'DIMPREFIX_'+$$ = $$)\n\t),\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> SelectDimension\nDataSource, SelectDimension lookup(SOURCE3_ID == DIMPREFIX_SOURCE3_ID,\n\tmultiple: false,\n\tpickup: 'any',\n\tbroadcast: 'auto')~> LookupDimension\nLookupDimension select(mapColumn(\n\t\tSOURCE3_ID,\n\t\tDSS_CREATE_TIME = DIMPREFIX_DSS_CREATE_TIME,\n\t\teach(match(left(name,length('DIMPREFIX_'))!='DIMPREFIX_'),\n\t\t\treplace($$,'VALUE','ATTRIBUTE') = $$)\n\t),\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> SelectColumns\nSelectColumns derive(DSS_CREATE_TIME = iif(isNull(DSS_CREATE_TIME), currentTimestamp(), DSS_CREATE_TIME),\n\t\tDSS_UPDATE_TIME = toString(currentTimestamp())) ~> DerivedColumns\nDerivedColumns alterRow(upsertIf(true())) ~> AlterRow\nAlterRow sink(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tinput(\n\t\tDIMENSION2_KEY as integer,\n\t\tSOURCE3_ID as integer,\n\t\tNCHAR_ATTRIBUTE1 as string,\n\t\tNCHAR_ATTRIBUTE2 as string,\n\t\tDATETIME_ATTRIBUTE1 as timestamp,\n\t\tDATETIME_ATTRIBUTE2 as timestamp,\n\t\tDSS_CREATE_TIME as timestamp,\n\t\tDSS_UPDATE_TIME as timestamp\n\t),\n\tdeletable:false,\n\tinsertable:false,\n\tupdateable:false,\n\tupsertable:true,\n\tkeys:['SOURCE3_ID'],\n\tformat: 'table',\n\tstaged: true,\n\tpreSQLs:['EXEC\t[dbo].[ZeroRow]\\n\t\t@p_tabname = N\\'TMPL_DIMENSION2\\',\\n\t\t@p_keycolname = N\\'DIMENSION2_KEY\\',\\n\t\t@p_varchar = N\\'Unknown\\',\\n\t\t@p_numeric = NULL,\\n\t\t@p_date = NULL,\\n\t\t@p_time = NULL,\\n\t\t@p_bit = NULL'],\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true,\n\terrorHandlingOption: 'stopOnFirstError') ~> DimensionSink"
-				}
-			},
-			"dependsOn": [
-				"[concat(variables('workspaceId'), '/datasets/TMPL_DATASOURCE3')]",
-				"[concat(variables('workspaceId'), '/datasets/TMPL_DIMENSION2')]"
-			]
-		},
-		{
-			"name": "[concat(parameters('workspaceName'), '/TemplateFact')]",
-			"type": "Microsoft.Synapse/workspaces/dataflows",
-			"apiVersion": "2019-06-01-preview",
-			"properties": {
-				"folder": {
-					"name": "Templates"
-				},
-				"type": "MappingDataFlow",
-				"typeProperties": {
-					"sources": [
-						{
-							"dataset": {
-								"referenceName": "TMPL_STAGING",
-								"type": "DatasetReference"
-							},
-							"name": "Source"
-						},
-						{
-							"dataset": {
-								"referenceName": "TMPL_DIMENSION1",
-								"type": "DatasetReference"
-							},
-							"name": "Dimension1"
-						},
-						{
-							"dataset": {
-								"referenceName": "TMPL_DIMENSION2",
-								"type": "DatasetReference"
-							},
-							"name": "Dimension2"
-						},
-						{
-							"dataset": {
-								"referenceName": "TMPL_FACT",
-								"type": "DatasetReference"
-							},
-							"name": "Fact"
-						}
-					],
-					"sinks": [
-						{
-							"dataset": {
-								"referenceName": "TMPL_FACT",
-								"type": "DatasetReference"
-							},
-							"name": "FactSink"
-						}
-					],
-					"transformations": [
-						{
-							"name": "SelectSource"
-						},
-						{
-							"name": "LookupDimension1"
-						},
-						{
-							"name": "Select1"
-						},
-						{
-							"name": "LookupDimension2"
-						},
-						{
-							"name": "Select2"
-						},
-						{
-							"name": "SelectFact"
-						},
-						{
-							"name": "LookupFact"
-						},
-						{
-							"name": "Select3"
-						},
-						{
-							"name": "DerivedColumns"
-						},
-						{
-							"name": "AlterRow"
-						}
-					],
-					"script": "source(output(\n\t\tSRC1_SOURCE1_ID as integer,\n\t\tSRC1_SOURCE2_REF_ID as integer,\n\t\tSRC1_SOURCE3_REF_ID as integer,\n\t\tSRC1_NCHAR_VALUE1 as string,\n\t\tSRC1_NCHAR_VALUE2 as string,\n\t\tSRC1_NUMERIC_VALUE1 as decimal(18,4),\n\t\tSRC1_NUMERIC_VALUE2 as decimal(18,4),\n\t\tSRC1_DATETIME_VALUE1 as timestamp,\n\t\tSRC1_DATETIME_VALUE2 as timestamp,\n\t\tSRC1_CDC_TIMESTAMP as timestamp,\n\t\tSRC2_SOURCE2_ID as integer,\n\t\tSRC2_NCHAR_VALUE1 as string,\n\t\tSRC2_NCHAR_VALUE2 as string,\n\t\tSRC2_NUMERIC_VALUE1 as decimal(18,4),\n\t\tSRC2_NUMERIC_VALUE2 as decimal(18,4),\n\t\tSRC2_DATETIME_VALUE1 as timestamp,\n\t\tSRC2_DATETIME_VALUE2 as timestamp,\n\t\tSRC3_SOURCE3_ID as integer,\n\t\tSRC3_NCHAR_VALUE1 as string,\n\t\tSRC3_NCHAR_VALUE2 as string,\n\t\tSRC3_NUMERIC_VALUE1 as decimal(18,4),\n\t\tSRC3_NUMERIC_VALUE2 as decimal(18,4),\n\t\tSRC3_DATETIME_VALUE1 as timestamp,\n\t\tSRC3_DATETIME_VALUE2 as timestamp,\n\t\tDSS_CREATE_TIME as timestamp\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tignoreNoFilesFound: false,\n\tformat: 'parquet') ~> Source\nsource(output(\n\t\tDIMENSION1_KEY as integer,\n\t\tSOURCE2_ID as integer,\n\t\tNCHAR_ATTRIBUTE1 as string,\n\t\tNCHAR_ATTRIBUTE2 as string,\n\t\tDATETIME_ATTRIBUTE1 as timestamp,\n\t\tDATETIME_ATTRIBUTE2 as timestamp,\n\t\tDSS_CREATE_TIME as timestamp,\n\t\tDSS_UPDATE_TIME as timestamp\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tisolationLevel: 'READ_UNCOMMITTED',\n\tquery: 'select * from TMPL_DIMENSION1 d where exists (select 1 from ADLS_TMPL_STAGING_KEY k where k.SRC1_SOURCE2_REF_ID = d.SOURCE2_ID)',\n\tformat: 'query',\n\tstaged: false) ~> Dimension1\nsource(output(\n\t\tDIMENSION2_KEY as integer,\n\t\tSOURCE3_ID as integer,\n\t\tNCHAR_ATTRIBUTE1 as string,\n\t\tNCHAR_ATTRIBUTE2 as string,\n\t\tDATETIME_ATTRIBUTE1 as timestamp,\n\t\tDATETIME_ATTRIBUTE2 as timestamp,\n\t\tDSS_CREATE_TIME as timestamp,\n\t\tDSS_UPDATE_TIME as timestamp\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tisolationLevel: 'READ_UNCOMMITTED',\n\tquery: 'select * from TMPL_DIMENSION2 d where exists (select 1 from ADLS_TMPL_STAGING_KEY k where k.SRC1_SOURCE3_REF_ID = d.SOURCE3_ID)',\n\tformat: 'query',\n\tstaged: false) ~> Dimension2\nsource(output(\n\t\tDIMENSION1_KEY as integer,\n\t\tDIMENSION2_KEY as integer,\n\t\tSOURCE1_ID as integer,\n\t\tSRC1_MEASURE1 as decimal(18,4),\n\t\tSRC1_MEASURE2 as decimal(18,4),\n\t\tSRC2_MEASURE1 as decimal(18,4),\n\t\tSRC2_MEASURE2 as decimal(18,4),\n\t\tSRC3_MEASURE1 as decimal(18,4),\n\t\tSRC3_MEASURE2 as decimal(18,4),\n\t\tSRC1_CDC_TIMESTAMP as timestamp,\n\t\tDSS_CREATE_TIME as timestamp,\n\t\tDSS_UPDATE_TIME as timestamp\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tisolationLevel: 'READ_UNCOMMITTED',\n\tformat: 'table',\n\tstaged: false) ~> Fact\nSource select(mapColumn(\n\t\teach(match(true()),\n\t\t\t'SOURCE_'+$$ = $$)\n\t),\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> SelectSource\nSelectSource, Dimension1 lookup(SOURCE_SRC1_SOURCE2_REF_ID == SOURCE2_ID,\n\tmultiple: false,\n\tpickup: 'any',\n\tbroadcast: 'auto')~> LookupDimension1\nLookupDimension1 select(mapColumn(\n\t\teach(match(left(name,length('SOURCE_'))=='SOURCE_')),\n\t\teach(match(right(name,length('_KEY'))=='_KEY'))\n\t),\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> Select1\nSelect1, Dimension2 lookup(SOURCE_SRC1_SOURCE3_REF_ID == SOURCE3_ID,\n\tmultiple: false,\n\tpickup: 'any',\n\tbroadcast: 'auto')~> LookupDimension2\nLookupDimension2 select(mapColumn(\n\t\teach(match(left(name,length('SOURCE_'))=='SOURCE_')),\n\t\teach(match(right(name,length('_KEY'))=='_KEY'))\n\t),\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> Select2\nFact select(mapColumn(\n\t\teach(match(true()),\n\t\t\t'FACT_'+$$ = $$)\n\t),\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> SelectFact\nSelect2, SelectFact lookup(SOURCE_SRC1_SOURCE1_ID == FACT_SOURCE1_ID,\n\tmultiple: false,\n\tpickup: 'any',\n\tbroadcast: 'auto')~> LookupFact\nLookupFact select(mapColumn(\n\t\tSOURCE1_ID = SOURCE_SRC1_SOURCE1_ID,\n\t\tSRC1_CDC_TIMESTAMP = SOURCE_SRC1_CDC_TIMESTAMP,\n\t\tDSS_CREATE_TIME = FACT_DSS_CREATE_TIME,\n\t\teach(match(right(name,length('_KEY'))=='_KEY'&&left(name,length('FACT_'))!='FACT_')),\n\t\teach(match(left(name,length('SOURCE_'))=='SOURCE_'&&instr(name,'NUMERIC')>0),\n\t\t\treplace(right($$,length($$)-length('SOURCE_')),'NUMERIC_VALUE','MEASURE') = $$)\n\t),\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> Select3\nSelect3 derive(each(match(right(name,length('_KEY'))=='_KEY'), $$ = iifNull($$, 0)),\n\t\tDSS_CREATE_TIME = iif(isNull(DSS_CREATE_TIME), currentTimestamp(), DSS_CREATE_TIME),\n\t\tDSS_UPDATE_TIME = currentTimestamp()) ~> DerivedColumns\nDerivedColumns alterRow(upsertIf(true())) ~> AlterRow\nAlterRow sink(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tinput(\n\t\tDIMENSION1_KEY as integer,\n\t\tDIMENSION2_KEY as integer,\n\t\tSOURCE1_ID as integer,\n\t\tSRC1_MEASURE1 as decimal(18,4),\n\t\tSRC1_MEASURE2 as decimal(18,4),\n\t\tSRC2_MEASURE1 as decimal(18,4),\n\t\tSRC2_MEASURE2 as decimal(18,4),\n\t\tSRC3_MEASURE1 as decimal(18,4),\n\t\tSRC3_MEASURE2 as decimal(18,4),\n\t\tSRC1_CDC_TIMESTAMP as timestamp,\n\t\tDSS_CREATE_TIME as timestamp,\n\t\tDSS_UPDATE_TIME as timestamp\n\t),\n\tdeletable:false,\n\tinsertable:false,\n\tupdateable:false,\n\tupsertable:true,\n\tkeys:['SOURCE1_ID'],\n\tformat: 'table',\n\tstaged: true,\n\tallowCopyCommand: true,\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true,\n\terrorHandlingOption: 'stopOnFirstError') ~> FactSink"
-				}
-			},
-			"dependsOn": [
-				"[concat(variables('workspaceId'), '/datasets/TMPL_STAGING')]",
-				"[concat(variables('workspaceId'), '/datasets/TMPL_DIMENSION1')]",
-				"[concat(variables('workspaceId'), '/datasets/TMPL_DIMENSION2')]",
-				"[concat(variables('workspaceId'), '/datasets/TMPL_FACT')]"
-			]
+			"dependsOn": []
 		},
 		{
 			"name": "[concat(parameters('workspaceName'), '/TemplateIncrementalStaging')]",
@@ -2173,7 +2731,7 @@
 						"spark.dynamicAllocation.enabled": "false",
 						"spark.dynamicAllocation.minExecutors": "2",
 						"spark.dynamicAllocation.maxExecutors": "2",
-						"spark.autotune.trackingId": "f870b825-e443-4655-a8d3-29f08746c0c8"
+						"spark.autotune.trackingId": "d95e6506-d940-4baa-9d8d-ca0f8c9d9441"
 					}
 				},
 				"metadata": {
@@ -2198,15 +2756,13 @@
 						"sparkVersion": "3.1",
 						"nodeCount": 3,
 						"cores": 4,
-						"memory": 28,
-						"automaticScaleJobs": false
+						"memory": 28
 					},
 					"sessionKeepAliveTimeout": 30
 				},
 				"cells": [
 					{
 						"cell_type": "code",
-						"metadata": {},
 						"source": [
 							"import uuid\r\n",
 							"import binascii\r\n",
@@ -2279,6 +2835,631 @@
 						],
 						"outputs": [],
 						"execution_count": 3
+					}
+				]
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/Canadian Television Schedule')]",
+			"type": "Microsoft.Synapse/workspaces/notebooks",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"folder": {
+					"name": "Data Analysis with Python and PySpark"
+				},
+				"nbformat": 4,
+				"nbformat_minor": 2,
+				"bigDataPool": {
+					"referenceName": "ivsspark",
+					"type": "BigDataPoolReference"
+				},
+				"sessionProperties": {
+					"driverMemory": "28g",
+					"driverCores": 4,
+					"executorMemory": "28g",
+					"executorCores": 4,
+					"numExecutors": 2,
+					"conf": {
+						"spark.dynamicAllocation.enabled": "false",
+						"spark.dynamicAllocation.minExecutors": "2",
+						"spark.dynamicAllocation.maxExecutors": "2",
+						"spark.autotune.trackingId": "12d8dd52-cc54-4616-b7d6-0545be62690b"
+					}
+				},
+				"metadata": {
+					"saveOutput": true,
+					"enableDebugMode": false,
+					"kernelspec": {
+						"name": "synapse_pyspark",
+						"display_name": "Synapse PySpark"
+					},
+					"language_info": {
+						"name": "python"
+					},
+					"a365ComputeOptions": {
+						"id": "/subscriptions/f939f8f3-2652-4a45-88ae-78a7782ec9df/resourceGroups/ivs-dwh-rg/providers/Microsoft.Synapse/workspaces/ivs-synapse/bigDataPools/ivsspark",
+						"name": "ivsspark",
+						"type": "Spark",
+						"endpoint": "https://ivs-synapse.dev.azuresynapse.net/livyApi/versions/2019-11-01-preview/sparkPools/ivsspark",
+						"auth": {
+							"type": "AAD",
+							"authResource": "https://dev.azuresynapse.net"
+						},
+						"sparkVersion": "3.1",
+						"nodeCount": 3,
+						"cores": 4,
+						"memory": 28
+					},
+					"sessionKeepAliveTimeout": 30
+				},
+				"cells": [
+					{
+						"cell_type": "markdown",
+						"metadata": {
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"Simple Data Frame"
+						]
+					},
+					{
+						"cell_type": "code",
+						"source": [
+							"import pyspark.sql.functions as F\r\n",
+							"\r\n",
+							"my_grocery_list = (\r\n",
+							"    ['Banana', 2, 1.74],\r\n",
+							"    ['Apple', 4, 2.04],\r\n",
+							"    ['Carrot', 1, 1.09],\r\n",
+							"    ['Cake', 1, 10.99]\r\n",
+							")\r\n",
+							"\r\n",
+							"df_grocery_list = spark.createDataFrame(\r\n",
+							"    my_grocery_list, ['Item', 'Quantity', 'Price']\r\n",
+							")\r\n",
+							"\r\n",
+							"df_grocery_list.printSchema()"
+						],
+						"outputs": [],
+						"execution_count": 43
+					},
+					{
+						"cell_type": "markdown",
+						"metadata": {
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"Read the source"
+						]
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"#Root path var\r\n",
+							"adls_path = \"abfss://learning@ivsdatastorage.dfs.core.windows.net/DataAnalysisPythonPySpark\"\r\n",
+							"\r\n",
+							"#Load text file to data frame\r\n",
+							"df_tv_sched = spark.read.text(adls_path + \"/data/broadcast_logs/BroadcastLogs_2018_Q3_M8_sample.CSV\")\r\n",
+							"\r\n",
+							"#df_tv_sched.show(5, 500)\r\n",
+							"\r\n",
+							"#Parse csv to data frame\r\n",
+							"logs = spark.read.csv(\r\n",
+							"    path = adls_path + \"/data/broadcast_logs/BroadcastLogs_2018_Q3_M8_sample.CSV\",\r\n",
+							"    sep = \"|\",\r\n",
+							"    inferSchema= True,\r\n",
+							"    header = True,\r\n",
+							"    timestampFormat = \"yyyy-MM-dd\")\r\n",
+							"\r\n",
+							"logs.printSchema()\r\n",
+							"\r\n",
+							"#logs.show()"
+						],
+						"outputs": [],
+						"execution_count": 44
+					},
+					{
+						"cell_type": "markdown",
+						"metadata": {
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"Basic operations"
+						]
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"#select\r\n",
+							"logs.select(\"BroadcastLogID\", \"LogServiceID\", \"LogDate\").show(5)\r\n",
+							"\r\n",
+							"logs.select([\"BroadCastLogID\", \"LogServiceID\", \"LogDate\"]).show(5)\r\n",
+							"\r\n",
+							"logs.select(F.col(\"BroadCastLogID\"), F.col(\"LogServiceID\"), F.col(\"LogDate\")).show(5)"
+						],
+						"outputs": [],
+						"execution_count": 45
+					},
+					{
+						"cell_type": "markdown",
+						"metadata": {
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"Peeking at the data frame in chunks of three columns"
+						]
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"import numpy as np\r\n",
+							"\r\n",
+							"column_split = np.array_split(\r\n",
+							"    np.array(logs.columns), len(logs.columns) // 3 #// means integer division\r\n",
+							")  \r\n",
+							" \r\n",
+							"print(column_split)\r\n",
+							"\r\n",
+							"for x in column_split:\r\n",
+							"    logs.select(*x).show(5) #asterix explodes array into list of values\r\n",
+							"    #print(*x)\r\n",
+							"    #print(x)\r\n",
+							"\r\n",
+							""
+						],
+						"outputs": [],
+						"execution_count": 46
+					},
+					{
+						"cell_type": "markdown",
+						"metadata": {
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"Show data frame in table format"
+						]
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							},
+							"collapsed": false
+						},
+						"source": [
+							"display(logs.take(10))"
+						],
+						"outputs": [],
+						"execution_count": 47
+					},
+					{
+						"cell_type": "markdown",
+						"metadata": {
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"Remove columns from dataframe"
+						]
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							},
+							"collapsed": false
+						},
+						"source": [
+							"display(logs.drop(\"BroadCastLogID\", \"LogServiceID\").take(10))\r\n",
+							"\r\n",
+							"#Check if column is a part of data frame\r\n",
+							"print(\"BroadCastLogID\" in logs.columns)\r\n",
+							"\r\n",
+							"#same with select (loop on columns array)\r\n",
+							"display(logs.select([x for x in logs.columns if x not in [\"BroadcastLogID\", \"LogServiceID\"]]).take(5))"
+						],
+						"outputs": [],
+						"execution_count": 48
+					},
+					{
+						"cell_type": "markdown",
+						"metadata": {
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"Exercise 4.1\r\n",
+							"Let’s take the following file, called sample.csv, which contains three columns:\r\n",
+							"\r\n",
+							"Item,Quantity,Price\r\n",
+							"$Banana, organic$,1,0.99\r\n",
+							"Pear,7,1.24\r\n",
+							"$Cake, chocolate$,1,14.50\r\n",
+							"Complete the following code to ingest the file successfully.\r\n",
+							"\r\n",
+							"sample = spark.read.csv([...],\r\n",
+							"                        sep=[...],\r\n",
+							"                        header=[...],\r\n",
+							"                        quote=[...],\r\n",
+							"                        inferSchema=[...]\r\n",
+							")\r\n",
+							"(Note: If you want to test your code, sample.csv is available in the book’s repository under data/sample.csv/sample.csv). "
+						]
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"#Root path var\r\n",
+							"adls_path = \"abfss://learning@ivsdatastorage.dfs.core.windows.net/DataAnalysisPythonPySpark\"\r\n",
+							"\r\n",
+							"df_grocery_list = spark.read.csv(\r\n",
+							"    path=adls_path+\"/data/sample/sample.csv\",\r\n",
+							"    sep=\",\", \r\n",
+							"    header=True, \r\n",
+							"    quote=\"$\", \r\n",
+							"    inferSchema=True)\r\n",
+							"\r\n",
+							"df_grocery_list.printSchema()"
+						],
+						"outputs": [],
+						"execution_count": null
+					},
+					{
+						"cell_type": "markdown",
+						"metadata": {
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"Add calculated columns"
+						]
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"logs.select(F.col(\"Duration\")).show(5)\r\n",
+							"\r\n",
+							"#Extract time components\r\n",
+							"logs.select(\r\n",
+							"    F.col(\"Duration\"),\r\n",
+							"    F.col(\"Duration\").substr(1,2).cast(\"int\").alias(\"dur_hours\"),\r\n",
+							"    F.col(\"Duration\").substr(4,2).cast(\"int\").alias(\"dur_minutes\"),\r\n",
+							"    F.col(\"Duration\").substr(7,2).cast(\"int\").alias(\"dur_seconds\")\r\n",
+							").distinct().show(5)\r\n",
+							"\r\n",
+							"#Calculate duration in seconds\r\n",
+							"logs.select(\r\n",
+							"    F.col(\"Duration\"),\r\n",
+							"    (\r\n",
+							"        F.col(\"Duration\").substr(1,2).cast(\"int\") * 3600 +\r\n",
+							"        F.col(\"Duration\").substr(4,2).cast(\"int\") * 60 +\r\n",
+							"        F.col(\"Duration\").substr(7,2).cast(\"int\")\r\n",
+							"    ).alias(\"dur_seconds\")\r\n",
+							").distinct().show(5)\r\n",
+							"\r\n",
+							"#Adding calculation as a new column into data frame\r\n",
+							"logs = logs.withColumn(\r\n",
+							"    \"Duration_seconds\",\r\n",
+							"    F.col(\"Duration\").substr(1,2).cast(\"int\") * 3600 +\r\n",
+							"    F.col(\"Duration\").substr(4,2).cast(\"int\") * 60 +\r\n",
+							"    F.col(\"Duration\").substr(7,2).cast(\"int\")\r\n",
+							")\r\n",
+							"\r\n",
+							"#Rename column\r\n",
+							"logs = logs.withColumnRenamed(\"Duration_seconds\", \"dur_sec\")\r\n",
+							"\r\n",
+							"#Lowercasing all columns (toDF creates new dataframe from another)\r\n",
+							"logs = logs.toDF(*[x.lower() for x in logs.columns]) #asterisk converts array into list of values (doesn't work without that)\r\n",
+							"\r\n",
+							"#Sorting columns\r\n",
+							"logs = logs.select(sorted(logs.columns, reverse = True))\r\n",
+							"\r\n",
+							"logs.printSchema()"
+						],
+						"outputs": [],
+						"execution_count": null
+					},
+					{
+						"cell_type": "markdown",
+						"metadata": {
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"Data profiling"
+						]
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"#for i in logs.columns:\r\n",
+							"    #logs.describe(i).show(truncate = False)\r\n",
+							"\r\n",
+							"\r\n",
+							"for i in logs.columns:\r\n",
+							"    logs.select(i).summary().show() #stats can be defined as list of columns within summary() statement"
+						],
+						"outputs": [],
+						"execution_count": null
+					},
+					{
+						"cell_type": "markdown",
+						"metadata": {
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"Exercise 4.3\r\n",
+							"Reread the data in a logs_raw data frame (the data file is ./data/broadcast_logsBroadcastLogs_2018_Q3_M8.CSV), this time without passing any optional parameters. Print the first five rows of data, as well as the schema. What are the differences in terms of data and schema between logs and logs_raw?"
+						]
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"#Root path var\r\n",
+							"adls_path = \"abfss://learning@ivsdatastorage.dfs.core.windows.net/DataAnalysisPythonPySpark\"\r\n",
+							"\r\n",
+							"#Parse csv to data frame\r\n",
+							"logs_raw = spark.read.csv(\r\n",
+							"    path = adls_path + \"/data/broadcast_logs/BroadcastLogs_2018_Q3_M8_sample.CSV\")\r\n",
+							"\r\n",
+							"logs_raw.printSchema()\r\n",
+							"\r\n",
+							"logs_raw.show(5, 500)"
+						],
+						"outputs": [],
+						"execution_count": null
+					},
+					{
+						"cell_type": "markdown",
+						"metadata": {
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"Exercise 4.4\r\n",
+							"Create a new data frame, logs_clean, that contains only the columns that do not end with ID."
+						]
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							},
+							"collapsed": false
+						},
+						"source": [
+							"logs_clean = logs.select(*[x for x in logs.columns if x[-2:] != \"ID\"])\r\n",
+							"\r\n",
+							"display(logs_clean.take(10))"
+						],
+						"outputs": [],
+						"execution_count": null
+					},
+					{
+						"cell_type": "markdown",
+						"metadata": {
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"Join operation"
+						]
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"log_identifier=spark.read.csv(\r\n",
+							"    path=adls_path + \"/data/broadcast_logs/ReferenceTables/LogIdentifier.csv\",\r\n",
+							"    sep=\"|\",\r\n",
+							"    inferSchema=True,\r\n",
+							"    header=True\r\n",
+							")\r\n",
+							"\r\n",
+							"log_identifier.printSchema()\r\n",
+							"\r\n",
+							"#log_identifier.show(5)\r\n",
+							"\r\n",
+							"#verbose\r\n",
+							"#logs.join(\r\n",
+							"#    log_identifier,\r\n",
+							"#    on=(logs[\"LogServiceID\"] == log_identifier[\"LogServiceID\"]) & (log_identifier[\"PrimaryFG\"] == 1)\r\n",
+							"#    how=\"inner\"\r\n",
+							"#)\r\n",
+							"\r\n",
+							"#compact version if column match and inner join (default)\r\n",
+							"logs.join(\r\n",
+							"    log_identifier,\r\n",
+							"    on=\"LogServiceID\"\r\n",
+							")\r\n",
+							"\r\n",
+							"#remove duplicated column from data frame (1)\r\n",
+							"logs.join(\r\n",
+							"    log_identifier,\r\n",
+							"    logs[\"LogServiceID\"] == log_identifier[\"LogServiceID\"]\r\n",
+							").drop(log_identifier[\"LogServiceID\"]).printSchema()\r\n",
+							"\r\n",
+							"#remove duplicated column from data frame (2), works only with F.col in second expression\r\n",
+							"logs_and_channels = logs.alias(\"left\").join(\r\n",
+							"    log_identifier.alias(\"right\"),\r\n",
+							"    logs[\"LogServiceID\"] == log_identifier[\"LogServiceID\"]\r\n",
+							")\r\n",
+							"\r\n",
+							"logs_and_channels.drop(F.col(\"right.LogServiceID\")).printSchema()  \r\n",
+							"\r\n",
+							"#adding two more reference sources:\r\n",
+							"cd_category=spark.read.csv(\r\n",
+							"    path=adls_path + \"/data/broadcast_logs/ReferenceTables/CD_Category.csv\",\r\n",
+							"    sep=\"|\",\r\n",
+							"    inferSchema=True,\r\n",
+							"    header=True\r\n",
+							")\r\n",
+							"\r\n",
+							"cd_program_class=spark.read.csv(\r\n",
+							"    path=adls_path + \"/data/broadcast_logs/ReferenceTables/CD_ProgramClass.csv\",\r\n",
+							"    sep=\"|\",\r\n",
+							"    inferSchema=True,\r\n",
+							"    header=True\r\n",
+							")\r\n",
+							"\r\n",
+							"full_log = logs_and_channels.join(cd_category, \"CategoryID\", \"left\").join(\r\n",
+							"    cd_program_class, how=\"left\", on=\"ProgramClassID\")\r\n",
+							"\r\n",
+							"full_log.show(5)"
+						],
+						"outputs": [],
+						"execution_count": 59
 					}
 				]
 			},
@@ -3199,6 +4380,1139 @@
 			"dependsOn": []
 		},
 		{
+			"name": "[concat(parameters('workspaceName'), '/Pride and Prejudice')]",
+			"type": "Microsoft.Synapse/workspaces/notebooks",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"folder": {
+					"name": "Data Analysis with Python and PySpark"
+				},
+				"nbformat": 4,
+				"nbformat_minor": 2,
+				"bigDataPool": {
+					"referenceName": "ivsspark",
+					"type": "BigDataPoolReference"
+				},
+				"sessionProperties": {
+					"driverMemory": "28g",
+					"driverCores": 4,
+					"executorMemory": "28g",
+					"executorCores": 4,
+					"numExecutors": 2,
+					"conf": {
+						"spark.dynamicAllocation.enabled": "false",
+						"spark.dynamicAllocation.minExecutors": "2",
+						"spark.dynamicAllocation.maxExecutors": "2",
+						"spark.autotune.trackingId": "445b3b83-887d-44c5-adad-7114bb43ab78"
+					}
+				},
+				"metadata": {
+					"saveOutput": true,
+					"enableDebugMode": false,
+					"kernelspec": {
+						"name": "synapse_pyspark",
+						"display_name": "Synapse PySpark"
+					},
+					"language_info": {
+						"name": "python"
+					},
+					"a365ComputeOptions": {
+						"id": "/subscriptions/f939f8f3-2652-4a45-88ae-78a7782ec9df/resourceGroups/ivs-dwh-rg/providers/Microsoft.Synapse/workspaces/ivs-synapse/bigDataPools/ivsspark",
+						"name": "ivsspark",
+						"type": "Spark",
+						"endpoint": "https://ivs-synapse.dev.azuresynapse.net/livyApi/versions/2019-11-01-preview/sparkPools/ivsspark",
+						"auth": {
+							"type": "AAD",
+							"authResource": "https://dev.azuresynapse.net"
+						},
+						"sparkVersion": "3.1",
+						"nodeCount": 3,
+						"cores": 4,
+						"memory": 28
+					},
+					"sessionKeepAliveTimeout": 30
+				},
+				"cells": [
+					{
+						"cell_type": "markdown",
+						"metadata": {
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"Activate eager evaluation (instead of lazy)"
+						]
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"#from pyspark.sql import SparkSession\r\n",
+							" \r\n",
+							"#spark = (SparkSession.builder\r\n",
+							"#                     .config(\"spark.sql.repl.eagerEval.enabled\", \"True\")\r\n",
+							"#                     .getOrCreate())"
+						],
+						"outputs": [],
+						"execution_count": 1
+					},
+					{
+						"cell_type": "markdown",
+						"metadata": {
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"Reading data into a data frame with spark.read"
+						]
+					},
+					{
+						"cell_type": "code",
+						"source": [
+							"#Root path var\r\n",
+							"adls_path = \"abfss://learning@ivsdatastorage.dfs.core.windows.net/DataAnalysisPythonPySpark\"\r\n",
+							"\r\n",
+							"#Load text file to data frame\r\n",
+							"book = spark.read.text(adls_path + \"/data/gutenberg_books/1342-0.txt\")\r\n",
+							"\r\n",
+							"book\r\n",
+							"\r\n",
+							""
+						],
+						"outputs": [],
+						"execution_count": null
+					},
+					{
+						"cell_type": "markdown",
+						"metadata": {
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"Explore schema"
+						]
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"book.printSchema()\r\n",
+							"\r\n",
+							"print(book.dtypes)\r\n",
+							"\r\n",
+							"#print(spark.__doc__)\r\n",
+							"\r\n",
+							"dir(book)"
+						],
+						"outputs": [],
+						"execution_count": null
+					},
+					{
+						"cell_type": "markdown",
+						"metadata": {
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"Code assistance"
+						]
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"#General recommendations\r\n",
+							"print(spark.__doc__)\r\n",
+							"\r\n",
+							"#Methods available for the object\r\n",
+							"dir(book)\r\n",
+							"\r\n",
+							"#Documentation on the object\r\n",
+							"book.__doc__"
+						],
+						"outputs": [],
+						"execution_count": null
+					},
+					{
+						"cell_type": "markdown",
+						"metadata": {
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"Explore data"
+						]
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"#book.show()\r\n",
+							"\r\n",
+							"book.show(n=10, truncate=100, vertical=True)"
+						],
+						"outputs": [],
+						"execution_count": null
+					},
+					{
+						"cell_type": "markdown",
+						"metadata": {
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"Splitting lines of text into arrays or words"
+						]
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"from pyspark.sql.functions import split\r\n",
+							"\r\n",
+							"lines = book.select(split(book.value, ' ').alias('line'))\r\n",
+							"\r\n",
+							"#Alternative ways to select data:\r\n",
+							"#book.select(book.value)\r\n",
+							"#book.select(book[\"value\"])\r\n",
+							"#book.select(col(\"value\"))\r\n",
+							"#book.select(\"value\")\r\n",
+							"\r\n",
+							"#Alternative ways to alias data:\r\n",
+							"# This looks a lot cleaner\r\n",
+							"#lines = book.select(split(book.value, \" \").alias(\"line\"))\r\n",
+							"# This is messier, and you have to remember the name PySpark assigns automatically\r\n",
+							"#lines = book.select(split(book.value, \" \"))\r\n",
+							"#lines = lines.withColumnRenamed(\"split(value, , -1)\", \"line\")\r\n",
+							"\r\n",
+							"lines.show(5, 100)\r\n",
+							"\r\n",
+							"lines.printSchema()\r\n",
+							"\r\n",
+							""
+						],
+						"outputs": [],
+						"execution_count": null
+					},
+					{
+						"cell_type": "markdown",
+						"metadata": {
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"Exploding arrays into rows"
+						]
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"from pyspark.sql.functions import explode\r\n",
+							"\r\n",
+							"words = lines.select(explode(lines.line).alias(\"word\"))\r\n",
+							"\r\n",
+							"words.show(30, 30)"
+						],
+						"outputs": [],
+						"execution_count": null
+					},
+					{
+						"cell_type": "markdown",
+						"metadata": {
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"Cleansing data (lowering case, remove punctuation and empty words)"
+						]
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"from pyspark.sql.functions import lower, regexp_extract\r\n",
+							"\r\n",
+							"words_lower = words.select(lower(words.word).alias('word_lower'))\r\n",
+							"\r\n",
+							"words_clean = words_lower.select(regexp_extract(words_lower.word_lower, \"[a-z]+\", 0).alias(\"word\"))\r\n",
+							"\r\n",
+							"words_not_null = words_clean.filter(words_clean.word != \"\")\r\n",
+							"\r\n",
+							"words_not_null.show(30,30)"
+						],
+						"outputs": [],
+						"execution_count": null
+					},
+					{
+						"cell_type": "markdown",
+						"metadata": {
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"Exercise 2.2\r\n",
+							"Given the following data frame, programmatically count the number of columns that aren’t strings (answer = only one column isn’t a string).\r\n",
+							"\r\n",
+							"createDataFrame() allows you to create a data frame from a variety of sources, such as a pandas data frame or (in this case) a list of lists."
+						]
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"exo2_2_df = spark.createDataFrame(\r\n",
+							"    [[\"test\", \"more test\", 10_000_000_000]], [\"one\", \"two\", \"three\"]\r\n",
+							")\r\n",
+							" \r\n",
+							"#exo2_2_df.printSchema()\r\n",
+							"\r\n",
+							"dfcolumns = spark.createDataFrame(exo2_2_df.dtypes, ['name', 'type'])\r\n",
+							"\r\n",
+							"dfcolumns_filtered = dfcolumns.filter(dfcolumns.type != 'string')\r\n",
+							"\r\n",
+							"print('Non-string columns number:')\r\n",
+							"print(dfcolumns_filtered.count())\r\n",
+							""
+						],
+						"outputs": [],
+						"execution_count": null
+					},
+					{
+						"cell_type": "markdown",
+						"metadata": {
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"Exercise 2.3\r\n",
+							"Rewrite the following code snippet, removing the withColumnRenamed method. Which version is clearer and easier to read?"
+						]
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"#Root path var\r\n",
+							"adls_path = \"abfss://learning@ivsdatastorage.dfs.core.windows.net/DataAnalysisPythonPySpark\"\r\n",
+							"\r\n",
+							"from pyspark.sql.functions import col, length\r\n",
+							" \r\n",
+							"# The `length` function returns the number of characters in a string column.\r\n",
+							" \r\n",
+							"exo2_3_df = (\r\n",
+							"    spark.read.text(adls_path + \"/data/gutenberg_books/1342-0.txt\")\r\n",
+							"    .select(length(col(\"value\")))\r\n",
+							"    .withColumnRenamed(\"length(value)\", \"number_of_char\")\r\n",
+							")\r\n",
+							"\r\n",
+							"exo2_3_df.show()\r\n",
+							"\r\n",
+							"#Version with .withColumnRenamed easier to read"
+						],
+						"outputs": [],
+						"execution_count": null
+					},
+					{
+						"cell_type": "markdown",
+						"metadata": {
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"Exercise 2.4\r\n",
+							"Assume a data frame exo2_4_df. The following code block gives an error. What is the problem, and how can you solve it?"
+						]
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"from pyspark.sql.functions import col, greatest\r\n",
+							" \r\n",
+							"exo2_4_df = spark.createDataFrame(\r\n",
+							"    [[\"key\", 10_000, 20_000]], [\"key\", \"value1\", \"value2\"]\r\n",
+							")\r\n",
+							" \r\n",
+							"exo2_4_df.printSchema()\r\n",
+							"# root\r\n",
+							"#  |-- key: string (containsNull = true)\r\n",
+							"#  |-- value1: long (containsNull = true)\r\n",
+							"#  |-- value2: long (containsNull = true)\r\n",
+							" \r\n",
+							"# `greatest` will return the greatest value of the list of column names,\r\n",
+							"# skipping null value\r\n",
+							" \r\n",
+							"# The following statement will return an error\r\n",
+							"from pyspark.sql.utils import AnalysisException\r\n",
+							" \r\n",
+							"try:\r\n",
+							"    exo2_4_mod = exo2_4_df.select(\r\n",
+							"        greatest(col(\"value1\"), col(\"value2\")).alias(\"maximum_value\")\r\n",
+							"    ).select(\"key\", \"max_value\")\r\n",
+							"except AnalysisException as err:\r\n",
+							"    print(err)\r\n",
+							"\r\n",
+							"#modified code\r\n",
+							"exo2_4_df.select(col(\"key\"),\r\n",
+							"        greatest(col(\"value1\"), col(\"value2\")).alias(\"maximum_value\")\r\n",
+							"    ).select(\"key\", \"maximum_value\").show()"
+						],
+						"outputs": [],
+						"execution_count": null
+					},
+					{
+						"cell_type": "markdown",
+						"metadata": {
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"Exercise 2.5\r\n",
+							"Let’s take our words_nonull data frame, available in the next listing. You can use the code from the repository (code/Ch02/end_of_chapter.py) in your REPL to get the data frame loaded.\r\n",
+							"\r\n",
+							"a) Remove all of the occurrences of the word is.\r\n",
+							"\r\n",
+							"b) (Challenge) Using the length function, keep only the words with more than three characters."
+						]
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"#words_not_null.show()\r\n",
+							"\r\n",
+							"#a\r\n",
+							"words_no_is = words_not_null.filter(col(\"word\") != 'is')\r\n",
+							"\r\n",
+							"#words_no_is.show()\r\n",
+							"\r\n",
+							"#b\r\n",
+							"words_longer_than_3 = (words_not_null.select(col(\"word\"), length(col(\"word\")).alias(\"word_length\"))\r\n",
+							"    .filter(col(\"word_length\") > 3)\r\n",
+							"    .select(\"word\")\r\n",
+							")\r\n",
+							"\r\n",
+							"#words_longer_than_3.show()"
+						],
+						"outputs": [],
+						"execution_count": null
+					},
+					{
+						"cell_type": "markdown",
+						"metadata": {
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"The where clause takes a Boolean expression over one or many columns to filter the data frame. Beyond the usual Boolean operators (>, <, ==, <=, >=, !=), PySpark provides other functions that return Boolean columns in the pyspark.sql.functions module.\r\n",
+							"\r\n",
+							"A good example is the isin() method (applied on a Column object, like col(...).isin(...)), which takes a list of values as a parameter, and will return only the records where the value in the column equals a member of the list.\r\n",
+							"\r\n",
+							"Let’s say you want to remove the words is, not, the and if from your list of words, using a single where() method on the words_nonull data frame. Write the code to do so."
+						]
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"no_short_words = words_not_null.where(~col(\"word\").isin(\"is\", \"not\", \"the\"))\r\n",
+							"\r\n",
+							"#no_short_words = words_not_null.where(col(\"word\").isin(\"is\", \"not\", \"the\") == False)\r\n",
+							"\r\n",
+							"no_short_words.show()"
+						],
+						"outputs": [],
+						"execution_count": null
+					},
+					{
+						"cell_type": "markdown",
+						"metadata": {
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"Exercise 2.7\r\n",
+							"One of your friends comes to you with the following code. They have no idea why it doesn’t work. Can you diagnose the problem in the try block, explain why it is an error, and provide a fix?"
+						]
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"from pyspark.sql.functions import col, split\r\n",
+							"\r\n",
+							"#Root path var\r\n",
+							"adls_path = \"abfss://learning@ivsdatastorage.dfs.core.windows.net/DataAnalysisPythonPySpark\"\r\n",
+							" \r\n",
+							"try:\r\n",
+							"    book = spark.read.text(adls_path + \"/data/gutenberg_books/1342-0.txt\")\r\n",
+							"    book = book.printSchema()\r\n",
+							"    lines = book.select(split(book.value, \" \").alias(\"line\"))\r\n",
+							"    words = lines.select(explode(col(\"line\")).alias(\"word\"))\r\n",
+							"except AnalysisException as err:\r\n",
+							"    print(err)\r\n",
+							"\r\n",
+							"\r\n",
+							"#fix:\r\n",
+							"try:\r\n",
+							"    book = spark.read.text(adls_path + \"/data/gutenberg_books/1342-0.txt\")\r\n",
+							"#    book = book.printSchema()\r\n",
+							"    lines = book.select(split(book.value, \" \").alias(\"line\"))\r\n",
+							"    words = lines.select(explode(col(\"line\")).alias(\"word\"))\r\n",
+							"except AnalysisException as err:\r\n",
+							"    print(err)\r\n",
+							""
+						],
+						"outputs": [],
+						"execution_count": null
+					},
+					{
+						"cell_type": "markdown",
+						"metadata": {
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"Book wording analysis continuation"
+						]
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"groups = words_not_null.groupby(col(\"word\"))\r\n",
+							"\r\n",
+							"print(groups)\r\n",
+							"\r\n",
+							"result = words_not_null.groupby(col(\"word\")).count()\r\n",
+							"\r\n",
+							"result.show()"
+						],
+						"outputs": [],
+						"execution_count": null
+					},
+					{
+						"cell_type": "markdown",
+						"metadata": {
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"Exercise 3.1\r\n",
+							"\r\n",
+							"Starting with the words_not_null seen in this section, which of the following expressions would return the number of words per letter count (e.g., there are X one-letter words, Y two-letter words, etc.)?\r\n",
+							"\r\n",
+							"Assume that pyspark.sql.functions.col, pyspark.sql.functions.length are imported.\r\n",
+							"\r\n",
+							"a) words_not_null.select(length(col(\"word\"))).groupby(\"length\").count()\r\n",
+							"\r\n",
+							"b) words_not_null.select(length(col(\"word\")).alias(\"length\")).groupby(\"length\").count()\r\n",
+							"\r\n",
+							"c) words_not_null.groupby(\"length\").select(\"length\").count()\r\n",
+							"\r\n",
+							"d) None of those options would work."
+						]
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"words_not_null.select(length(col(\"word\")).alias(\"length\")).groupby(\"length\").count().show()"
+						],
+						"outputs": [],
+						"execution_count": null
+					},
+					{
+						"cell_type": "markdown",
+						"metadata": {
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"Book wording analysis continuation"
+						]
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"result = words_not_null.groupby(col(\"word\")).count().orderBy(col(\"count\"), ascending = False)\r\n",
+							"\r\n",
+							"#Root path var\r\n",
+							"adls_path = \"abfss://learning@ivsdatastorage.dfs.core.windows.net/DataAnalysisPythonPySpark\"\r\n",
+							"\r\n",
+							"result.write.csv(adls_path + \"/output/Pride and Prejudice/partitioned\")\r\n",
+							"\r\n",
+							"result.coalesce(1).write.csv(adls_path + \"/output/Pride and Prejudice/single file\")"
+						],
+						"outputs": [],
+						"execution_count": null
+					},
+					{
+						"cell_type": "markdown",
+						"metadata": {
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"Simplifying code"
+						]
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"import pyspark.sql.functions as F\r\n",
+							"\r\n",
+							"#Root path var\r\n",
+							"adls_path = \"abfss://learning@ivsdatastorage.dfs.core.windows.net/DataAnalysisPythonPySpark\"\r\n",
+							" \r\n",
+							"results = (\r\n",
+							"    spark.read.text(adls_path + \"/data/gutenberg_books/1342-0.txt\")\r\n",
+							"    .select(F.split(F.col(\"value\"), \" \").alias(\"line\"))\r\n",
+							"    .select(F.explode(F.col(\"line\")).alias(\"word\"))\r\n",
+							"    .select(F.lower(F.col(\"word\")).alias(\"word\"))\r\n",
+							"    .select(F.regexp_extract(F.col(\"word\"), \"[a-z']*\", 0).alias(\"word\"))\r\n",
+							"    .where(F.col(\"word\") != \"\")\r\n",
+							"    .groupby(\"word\")\r\n",
+							"    .count()\r\n",
+							"    .orderBy(F.col(\"count\"), ascending = False)\r\n",
+							")\r\n",
+							"\r\n",
+							"results.show()"
+						],
+						"outputs": [],
+						"execution_count": null
+					},
+					{
+						"cell_type": "markdown",
+						"metadata": {
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"Processing more books"
+						]
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"import pyspark.sql.functions as F\r\n",
+							"\r\n",
+							"#Root path var\r\n",
+							"adls_path = \"abfss://learning@ivsdatastorage.dfs.core.windows.net/DataAnalysisPythonPySpark\"\r\n",
+							" \r\n",
+							"results = (\r\n",
+							"    spark.read.text(adls_path + \"/data/gutenberg_books/*.txt\")\r\n",
+							"    .select(F.split(F.col(\"value\"), \" \").alias(\"line\"))\r\n",
+							"    .select(F.explode(F.col(\"line\")).alias(\"word\"))\r\n",
+							"    .select(F.lower(F.col(\"word\")).alias(\"word\"))\r\n",
+							"    .select(F.regexp_extract(F.col(\"word\"), \"[a-z']*\", 0).alias(\"word\"))\r\n",
+							"    .where(F.col(\"word\") != \"\")\r\n",
+							"    .groupby(\"word\")\r\n",
+							"    .count()\r\n",
+							"    .orderBy(F.col(\"count\"), ascending = False)\r\n",
+							")\r\n",
+							"\r\n",
+							"results.show()"
+						],
+						"outputs": [],
+						"execution_count": null
+					},
+					{
+						"cell_type": "markdown",
+						"metadata": {
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"Exercise 3.3\r\n",
+							"By modifying the word_count_submit.py program, return the number of distinct words in Jane Austen’s Pride and Prejudice. (Hint: results contains one record for each unique word.)\r\n",
+							"\r\n",
+							"(Challenge) Wrap your program in a function that takes a file name as a parameter. It should return the number of distinct words."
+						]
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"import pyspark.sql.functions as F\r\n",
+							"\r\n",
+							"#Root path var\r\n",
+							"adls_path = \"abfss://learning@ivsdatastorage.dfs.core.windows.net/DataAnalysisPythonPySpark\"\r\n",
+							" \r\n",
+							"result = (\r\n",
+							"    spark.read.text(adls_path + \"/data/gutenberg_books/1342-0.txt\")\r\n",
+							"    .select(F.split(F.col(\"value\"), \" \").alias(\"line\"))\r\n",
+							"    .select(F.explode(F.col(\"line\")).alias(\"word\"))\r\n",
+							"    .select(F.lower(F.col(\"word\")).alias(\"word\"))\r\n",
+							"    .select(F.regexp_extract(F.col(\"word\"), \"[a-z']*\", 0).alias(\"word\"))\r\n",
+							"    .where(F.col(\"word\") != \"\")\r\n",
+							"    .select(F.col(\"word\"))\r\n",
+							"    .distinct()\r\n",
+							"    .count()\r\n",
+							")\r\n",
+							"\r\n",
+							"print(result)\r\n",
+							"\r\n",
+							"def bookDistCount(fName):\r\n",
+							"    #Root path var\r\n",
+							"    adls_path = \"abfss://learning@ivsdatastorage.dfs.core.windows.net/DataAnalysisPythonPySpark\"\r\n",
+							"    \r\n",
+							"    result = (\r\n",
+							"        spark.read.text(adls_path + \"/data/gutenberg_books/\" + fName)\r\n",
+							"        .select(F.split(F.col(\"value\"), \" \").alias(\"line\"))\r\n",
+							"        .select(F.explode(F.col(\"line\")).alias(\"word\"))\r\n",
+							"        .select(F.lower(F.col(\"word\")).alias(\"word\"))\r\n",
+							"        .select(F.regexp_extract(F.col(\"word\"), \"[a-z']*\", 0).alias(\"word\"))\r\n",
+							"        .where(F.col(\"word\") != \"\")\r\n",
+							"        .select(F.col(\"word\"))\r\n",
+							"        .distinct()\r\n",
+							"        .count()\r\n",
+							"    )\r\n",
+							"\r\n",
+							"    return result\r\n",
+							"\r\n",
+							"\r\n",
+							"print(bookDistCount(\"1661-0.txt\"))"
+						],
+						"outputs": [],
+						"execution_count": null
+					},
+					{
+						"cell_type": "markdown",
+						"metadata": {
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"Exercise 3.4\r\n",
+							"Taking word_count_submit.py, modify the script to return a sample of five words that appear only once in Jane Austen’s Pride and Prejudice."
+						]
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"#Root path var\r\n",
+							"adls_path = \"abfss://learning@ivsdatastorage.dfs.core.windows.net/DataAnalysisPythonPySpark\"\r\n",
+							" \r\n",
+							"results = (\r\n",
+							"    spark.read.text(adls_path + \"/data/gutenberg_books/1342-0.txt\")\r\n",
+							"    .select(F.split(F.col(\"value\"), \" \").alias(\"line\"))\r\n",
+							"    .select(F.explode(F.col(\"line\")).alias(\"word\"))\r\n",
+							"    .select(F.lower(F.col(\"word\")).alias(\"word\"))\r\n",
+							"    .select(F.regexp_extract(F.col(\"word\"), \"[a-z']*\", 0).alias(\"word\"))\r\n",
+							"    .where(F.col(\"word\") != \"\")\r\n",
+							"    .groupby(\"word\")\r\n",
+							"    .count()\r\n",
+							"    .where(F.col(\"count\") == 1)\r\n",
+							")\r\n",
+							"\r\n",
+							"results.show(5)"
+						],
+						"outputs": [],
+						"execution_count": null
+					},
+					{
+						"cell_type": "markdown",
+						"metadata": {
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"Exercise 3.5\r\n",
+							"Using the substring function (refer to PySpark’s API or the pyspark shell if needed), return the top five most popular first letters (keep only the first letter of each word).\r\n",
+							"\r\n",
+							"Compute the number of words starting with a consonant or a vowel. (Hint: The isin() function might be useful.)"
+						]
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"adls_path = \"abfss://learning@ivsdatastorage.dfs.core.windows.net/DataAnalysisPythonPySpark\"\r\n",
+							" \r\n",
+							"results = (\r\n",
+							"    spark.read.text(adls_path + \"/data/gutenberg_books/1342-0.txt\")\r\n",
+							"    .select(F.split(F.col(\"value\"), \" \").alias(\"line\"))\r\n",
+							"    .select(F.explode(F.col(\"line\")).alias(\"word\"))\r\n",
+							"    .select(F.lower(F.col(\"word\")).alias(\"word\"))\r\n",
+							"    .select(F.regexp_extract(F.col(\"word\"), \"[a-z']*\", 0).alias(\"word\"))\r\n",
+							"    .where(F.col(\"word\") != \"\")\r\n",
+							"    .groupby(F.substring(F.col(\"word\"), 1, 1).alias(\"firstLetter\"))\r\n",
+							"    .count()\r\n",
+							"    .orderBy(F.col(\"count\"), ascending = False)\r\n",
+							")\r\n",
+							"\r\n",
+							"results.show(5)\r\n",
+							"\r\n",
+							"results_vowels = (\r\n",
+							"    spark.read.text(adls_path + \"/data/gutenberg_books/1342-0.txt\")\r\n",
+							"    .select(F.split(F.col(\"value\"), \" \").alias(\"line\"))\r\n",
+							"    .select(F.explode(F.col(\"line\")).alias(\"word\"))\r\n",
+							"    .select(F.lower(F.col(\"word\")).alias(\"word\"))\r\n",
+							"    .select(F.regexp_extract(F.col(\"word\"), \"[a-z']*\", 0).alias(\"word\"))\r\n",
+							"    .where(F.col(\"word\") != \"\")\r\n",
+							"    .groupby(F.substring(F.col(\"word\"), 1, 1).alias(\"firstLetter\"))\r\n",
+							"    .count()\r\n",
+							"    .where(F.col(\"firstLetter\").isin(['a','e','i','o','u','y']))\r\n",
+							"    .orderBy(F.col(\"count\"), ascending = False)\r\n",
+							")\r\n",
+							"\r\n",
+							"results_vowels.show(5)\r\n",
+							"\r\n",
+							"results_consonants = (\r\n",
+							"    spark.read.text(adls_path + \"/data/gutenberg_books/1342-0.txt\")\r\n",
+							"    .select(F.split(F.col(\"value\"), \" \").alias(\"line\"))\r\n",
+							"    .select(F.explode(F.col(\"line\")).alias(\"word\"))\r\n",
+							"    .select(F.lower(F.col(\"word\")).alias(\"word\"))\r\n",
+							"    .select(F.regexp_extract(F.col(\"word\"), \"[a-z']*\", 0).alias(\"word\"))\r\n",
+							"    .where(F.col(\"word\") != \"\")\r\n",
+							"    .groupby(F.substring(F.col(\"word\"), 1, 1).alias(\"firstLetter\"))\r\n",
+							"    .count()\r\n",
+							"    .where(~F.col(\"firstLetter\").isin(['a','e','i','o','u','y']))\r\n",
+							"    .orderBy(F.col(\"count\"), ascending = False)\r\n",
+							")\r\n",
+							"\r\n",
+							"results_consonants.show(5)"
+						],
+						"outputs": [],
+						"execution_count": null
+					},
+					{
+						"cell_type": "markdown",
+						"metadata": {
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"Exercise 3.6\r\n",
+							"Let’s say you want to get both the count() and sum() of a GroupedData object. Why doesn’t this code work? Map the inputs and outputs of each method.\r\n",
+							"\r\n",
+							"my_data_frame.groupby(\"my_column\").count().sum()"
+						]
+					},
+					{
+						"cell_type": "code",
+						"metadata": {
+							"jupyter": {
+								"source_hidden": false,
+								"outputs_hidden": false
+							},
+							"nteract": {
+								"transient": {
+									"deleting": false
+								}
+							}
+						},
+						"source": [
+							"adls_path = \"abfss://learning@ivsdatastorage.dfs.core.windows.net/DataAnalysisPythonPySpark\"\r\n",
+							" \r\n",
+							"results = (\r\n",
+							"    spark.read.text(adls_path + \"/data/gutenberg_books/1342-0.txt\")\r\n",
+							"    .select(F.split(F.col(\"value\"), \" \").alias(\"line\"))\r\n",
+							"    .select(F.explode(F.col(\"line\")).alias(\"word\"))\r\n",
+							"    .select(F.lower(F.col(\"word\")).alias(\"word\"))\r\n",
+							"    .select(F.regexp_extract(F.col(\"word\"), \"[a-z']*\", 0).alias(\"word\"))\r\n",
+							"    .where(F.col(\"word\") != \"\")\r\n",
+							"    .groupby(F.col(\"word\"))\r\n",
+							"    .count()\r\n",
+							"    .groupby(F.col(\"word\"))\r\n",
+							"    .sum(\"count\")\r\n",
+							")\r\n",
+							"\r\n",
+							"results.show()"
+						],
+						"outputs": [],
+						"execution_count": null
+					}
+				]
+			},
+			"dependsOn": []
+		},
+		{
 			"name": "[concat(parameters('workspaceName'), '/ivsspark')]",
 			"type": "Microsoft.Synapse/workspaces/bigDataPools",
 			"apiVersion": "2019-06-01-preview",
@@ -3218,6 +5532,18 @@
 				"sparkVersion": "3.1",
 				"isComputeIsolationEnabled": false,
 				"sessionLevelPackagesEnabled": false,
+				"annotations": []
+			},
+			"dependsOn": [],
+			"location": "westus"
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/ivssql')]",
+			"type": "Microsoft.Synapse/workspaces/sqlPools",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"collation": "SQL_Latin1_General_CP1_CI_AS",
+				"maxSizeBytes": 263882790666240,
 				"annotations": []
 			},
 			"dependsOn": [],
