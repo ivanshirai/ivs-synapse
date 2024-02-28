@@ -1,5 +1,5 @@
 {
-	"name": "ivs_dwh_kv",
+	"name": "template_kv",
 	"properties": {
 		"annotations": [],
 		"type": "AzureKeyVault",

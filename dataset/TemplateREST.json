@@ -1,0 +1,17 @@
+{
+	"name": "TemplateREST",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "template_REST",
+			"type": "LinkedServiceReference"
+		},
+		"parameters": {
+			"p_relative_url": {
+				"type": "string"
+			}
+		},
+		"annotations": [],
+		"type": "RestResource",
+		"schema": []
+	}
+}
