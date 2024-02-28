@@ -1,0 +1,215 @@
+{
+	"name": "ServerlessDBDeploy",
+	"properties": {
+		"description": "Pipeline runs automatically after release deploy to create serverless DB, master key and default credentials",
+		"activities": [
+			{
+				"name": "ForEachServerlessDB",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "FilterKeyVault",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@pipeline().parameters.p_serverless_db",
+						"type": "Expression"
+					},
+					"isSequential": true,
+					"activities": [
+						{
+							"name": "MasterKeySecret",
+							"type": "WebActivity",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 2,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": true,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"method": "GET",
+								"url": {
+									"value": "@concat(activity('FilterKeyVault').output.Value[0].properties.typeProperties.baseUrl,\n'secrets/', item().MasterKeySecret, '?api-version=7.3')",
+									"type": "Expression"
+								},
+								"connectVia": {
+									"referenceName": "SHIR",
+									"type": "IntegrationRuntimeReference"
+								},
+								"authentication": {
+									"type": "MSI",
+									"resource": "https://vault.azure.net"
+								}
+							}
+						},
+						{
+							"name": "ServerlessDBCreate",
+							"type": "Script",
+							"dependsOn": [
+								{
+									"activity": "MasterKeySecret",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 2,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"linkedServiceName": {
+								"referenceName": "serverless_ARIR",
+								"type": "LinkedServiceReference",
+								"parameters": {
+									"p_database": "master"
+								}
+							},
+							"typeProperties": {
+								"scripts": [
+									{
+										"type": "NonQuery",
+										"text": {
+											"value": "if not exists (select name from sys.databases WHERE name = '@{item().serverlessDB}')\nbegin create database @{item().serverlessDB} end\n",
+											"type": "Expression"
+										}
+									}
+								],
+								"scriptBlockExecutionTimeout": "02:00:00"
+							}
+						},
+						{
+							"name": "ServerlessDBCredentials",
+							"type": "Script",
+							"dependsOn": [
+								{
+									"activity": "ServerlessDBCreate",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 2,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": true
+							},
+							"userProperties": [],
+							"linkedServiceName": {
+								"referenceName": "serverless_ARIR",
+								"type": "LinkedServiceReference",
+								"parameters": {
+									"p_database": "master"
+								}
+							},
+							"typeProperties": {
+								"scripts": [
+									{
+										"type": "NonQuery",
+										"text": {
+											"value": "IF NOT EXISTS (SELECT [name] from sys.symmetric_keys WHERE [name] = '##MS_DatabaseMasterKey##')\nBEGIN CREATE MASTER KEY ENCRYPTION BY PASSWORD = '@{activity('MasterKeySecret').output.value}' END\n\nIF NOT EXISTS (SELECT [name] from sys.database_scoped_credentials WHERE [name] = '@{item().scopedCredential}')\nBEGIN CREATE DATABASE SCOPED CREDENTIAL @{item().scopedCredential} WITH IDENTITY = 'Managed Identity'  END \n",
+											"type": "Expression"
+										}
+									}
+								],
+								"scriptBlockExecutionTimeout": "02:00:00"
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "LinkedServiceList",
+				"description": "",
+				"type": "WebActivity",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"method": "GET",
+					"url": {
+						"value": "@concat('https://', pipeline().DataFactory, \n'.dev.azuresynapse.net/linkedservices?api-version=2020-12-01')",
+						"type": "Expression"
+					},
+					"connectVia": {
+						"referenceName": "SHIR",
+						"type": "IntegrationRuntimeReference"
+					},
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://dev.azuresynapse.net"
+					}
+				}
+			},
+			{
+				"name": "FilterKeyVault",
+				"type": "Filter",
+				"dependsOn": [
+					{
+						"activity": "LinkedServiceList",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('LinkedServiceList').output.value",
+						"type": "Expression"
+					},
+					"condition": {
+						"value": "@and(equals(item().properties.type, 'AzureKeyVault'), equals(item().properties.name, pipeline().parameters.p_key_vault_linked_service))",
+						"type": "Expression"
+					}
+				}
+			}
+		],
+		"parameters": {
+			"p_serverless_db": {
+				"type": "array",
+				"defaultValue": [
+					{
+						"serverlessDB": "templateDB",
+						"masterkeySecret": "template-sqlpool-master-key",
+						"scopedCredential": "SynapseIdentity"
+					}
+				]
+			},
+			"p_key_vault_linked_service": {
+				"type": "string",
+				"defaultValue": "ivs_dwh_kv"
+			}
+		},
+		"variables": {
+			"v_test": {
+				"type": "String"
+			}
+		},
+		"folder": {
+			"name": "Templates"
+		},
+		"annotations": [],
+		"lastPublishTime": "2023-10-16T14:40:16Z"
+	},
+	"type": "Microsoft.Synapse/workspaces/pipelines"
+}
