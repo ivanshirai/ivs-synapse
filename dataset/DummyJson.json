@@ -1,0 +1,19 @@
+{
+	"name": "DummyJson",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "templaterawst_ARIR",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "Json",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobFSLocation",
+				"fileName": "dummy.json",
+				"fileSystem": "raw"
+			}
+		},
+		"schema": {}
+	}
+}
