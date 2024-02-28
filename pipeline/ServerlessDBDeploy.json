@@ -178,7 +178,7 @@
 						"type": "Expression"
 					},
 					"condition": {
-						"value": "@and(equals(item().properties.type, 'AzureKeyVault'), equals(item().properties.name, pipeline().parameters.p_key_vault_linked_service))",
+						"value": "@and(equals(item().properties.type, 'AzureKeyVault'), equals(item().name, pipeline().parameters.p_key_vault_linked_service))",
 						"type": "Expression"
 					}
 				}
