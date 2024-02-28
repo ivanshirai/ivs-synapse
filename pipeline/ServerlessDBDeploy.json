@@ -112,7 +112,10 @@
 								"referenceName": "serverless_ARIR",
 								"type": "LinkedServiceReference",
 								"parameters": {
-									"p_database": "master"
+									"p_database": {
+										"value": "@item().serverlessDB",
+										"type": "Expression"
+									}
 								}
 							},
 							"typeProperties": {
