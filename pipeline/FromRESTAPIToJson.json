@@ -737,37 +737,15 @@
 				"type": "array",
 				"defaultValue": [
 					{
-						"source": "dataflows",
-						"target": "dataflows",
+						"source": "users",
+						"target": "users",
 						"path": "/",
 						"delta": false,
-						"select": null,
-						"filter": "api-version=2020-12-01",
+						"select": "size=10",
+						"filter": null,
 						"cdcCol": null,
-						"keyCol": "name",
+						"keyCol": "id",
 						"relCol": null
-					},
-					{
-						"source": "datasets",
-						"target": "datasets",
-						"path": "/",
-						"delta": false,
-						"select": null,
-						"filter": "api-version=2020-12-01",
-						"cdcCol": null,
-						"keyCol": "name",
-						"relCol": null
-					},
-					{
-						"source": "dataflows",
-						"target": "dataflows_datasets",
-						"path": "/",
-						"delta": false,
-						"select": null,
-						"filter": "api-version=2020-12-01",
-						"cdcCol": null,
-						"keyCol": "name",
-						"relCol": "properties.typeProperties.sources.dataset.referenceName"
 					}
 				]
 			},
