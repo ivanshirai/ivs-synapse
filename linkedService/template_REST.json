@@ -5,7 +5,7 @@
 		"annotations": [],
 		"type": "RestService",
 		"typeProperties": {
-			"url": "https://gorest.co.in/public/v2/",
+			"url": "https://gorest.co.in/public/v2/users",
 			"enableServerCertificateValidation": false,
 			"authenticationType": "Anonymous"
 		},
