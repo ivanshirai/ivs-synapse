@@ -59,7 +59,7 @@
 									"requestInterval": "00.00:00:00.010",
 									"requestMethod": "GET",
 									"paginationRules": {
-										"supportRFC5988": "true"
+										"AbsoluteUrl.{page}": "RANGE:1:100:1"
 									}
 								},
 								"sink": {
@@ -362,7 +362,7 @@
 									{
 										"type": "Query",
 										"text": {
-											"value": "SELECT count(keyColumn) countRows\n   FROM OPENROWSET(\n          BULK '@{activity('GenericRawJson linked service').output.properties.typeProperties.url}@{pipeline().parameters.c_raw_container}/@{pipeline().parameters.c_raw_root_folder}/@{item().target}/@{concat(if(equals(length(item().target), 0), item().source, item().target), '_', variables('v_cdc_timestamp'))}.json', \n          FORMAT = 'CSV', FIELDQUOTE = '0x0b', FIELDTERMINATOR ='0x0b', ROWTERMINATOR = '\\n') \n   WITH (jsonContent nvarchar(MAX)) AS [result] \n   cross apply openjson(JSON_QUERY(jsonContent, '$.value'))\n   with (keyColumn nvarchar(MAX) '$.@{item().keyCol}')",
+											"value": "SELECT count(@{if(empty(item().crossApplyField), concat('JSON_VALUE (jsonContent, ''$.', item().keyCol, ''')'), 'keyColumn')}) countRows\n   FROM OPENROWSET(\n          BULK '@{activity('GenericRawJson linked service').output.properties.typeProperties.url}@{pipeline().parameters.c_raw_container}/@{pipeline().parameters.c_raw_root_folder}/@{item().target}/@{concat(if(equals(length(item().target), 0), item().source, item().target), '_', variables('v_cdc_timestamp'))}.json', \n          FORMAT = 'CSV', FIELDQUOTE = '0x0b', FIELDTERMINATOR ='0x0b', ROWTERMINATOR = '\\n') \n          WITH (jsonContent varchar(MAX)) AS [result]\n@{if(empty(item().crossApplyField), '', concat(' cross apply openjson(JSON_QUERY(jsonContent, ''$.', item().crossApplyField, ''' with (keyColumn varchar(100) ''$.', item().keyCol, ''')'))}\n",
 											"type": "Expression"
 										}
 									}
@@ -770,8 +770,9 @@
 						"target": "users",
 						"path": "",
 						"delta": false,
+						"crossApplyField": null,
 						"select": null,
-						"filter": "",
+						"filter": "page={page}",
 						"cdcCol": null,
 						"keyCol": "id",
 						"relCol": null
