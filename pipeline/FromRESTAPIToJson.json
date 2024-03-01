@@ -772,7 +772,7 @@
 						"path": "",
 						"delta": false,
 						"select": null,
-						"filter": "size=10",
+						"filter": "page=1",
 						"cdcCol": null,
 						"keyCol": "id",
 						"relCol": null
