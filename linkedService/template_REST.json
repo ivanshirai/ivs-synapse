@@ -1,6 +1,5 @@
 {
 	"name": "template_REST",
-	"type": "Microsoft.Synapse/workspaces/linkedservices",
 	"properties": {
 		"description": "https://gorest.co.in/",
 		"annotations": [],
@@ -8,17 +7,12 @@
 		"typeProperties": {
 			"url": "https://gorest.co.in/public/v2/",
 			"enableServerCertificateValidation": false,
-			"authenticationType": "Anonymous",
-			"authHeaders": {
-				"Authorization": {
-					"type": "SecureString",
-					"value": "**********"
-				}
-			}
+			"authenticationType": "Anonymous"
 		},
 		"connectVia": {
 			"referenceName": "SHIR",
 			"type": "IntegrationRuntimeReference"
 		}
-	}
+	},
+	"type": "Microsoft.Synapse/workspaces/linkedservices"
 }
