@@ -59,7 +59,6 @@
 									"requestInterval": "00.00:00:00.010",
 									"requestMethod": "GET",
 									"paginationRules": {
-										"AbsoluteUrl": "$.nextLink",
 										"supportRFC5988": "true"
 									}
 								},
@@ -772,7 +771,7 @@
 						"path": "",
 						"delta": false,
 						"select": null,
-						"filter": "page=1",
+						"filter": "",
 						"cdcCol": null,
 						"keyCol": "id",
 						"relCol": null
