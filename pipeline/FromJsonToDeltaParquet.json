@@ -791,7 +791,7 @@
 			},
 			"c_raw_root_folder": {
 				"type": "string",
-				"defaultValue": "template"
+				"defaultValue": "FromRESTAPIToJson"
 			},
 			"c_raw_container": {
 				"type": "string",
@@ -811,7 +811,7 @@
 			},
 			"c_serverless_db": {
 				"type": "string",
-				"defaultValue": "template"
+				"defaultValue": "templateDB"
 			},
 			"c_raw_monitoring_folder": {
 				"type": "string",
