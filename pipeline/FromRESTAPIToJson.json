@@ -36,12 +36,6 @@
 									"dependencyConditions": [
 										"Succeeded"
 									]
-								},
-								{
-									"activity": "Set v_test",
-									"dependencyConditions": [
-										"Succeeded"
-									]
 								}
 							],
 							"policy": {
@@ -57,10 +51,7 @@
 									"type": "RestSource",
 									"httpRequestTimeout": "00:01:40",
 									"requestInterval": "00.00:00:00.010",
-									"requestMethod": "GET",
-									"paginationRules": {
-										"AbsoluteUrl.{page}": "RANGE:1:100:1"
-									}
+									"requestMethod": "GET"
 								},
 								"sink": {
 									"type": "JsonSink",
@@ -75,9 +66,13 @@
 							},
 							"inputs": [
 								{
-									"referenceName": "TemplateREST",
+									"referenceName": "azuresynapse",
 									"type": "DatasetReference",
 									"parameters": {
+										"p_workspace": {
+											"value": "@pipeline().DataFactory",
+											"type": "Expression"
+										},
 										"p_relative_url": {
 											"value": "@if(\n    and(\n        item().delta, \n        equals(length(activity('ReadMonitoringBlob').output.firstRow.DeltaLink), 0)\n    ),\n    concat(item().path, \n        item().source, \n        '/delta',\n        if(\n            and(\n                empty(item().select), \n                empty(item().filter)), '',\n            concat('?', item().select, item().filter)\n        )\n    ), \n    if(\n        item().delta,\n        activity('ReadMonitoringBlob').output.firstRow.DeltaLink,\n        concat(\n            item().path, \n            item().source, \n            if(\n                and(\n                    empty(item().select), \n                    and(empty(item().filter), empty(item().cdcCol))), '',\n                concat('?', \n                    if(empty(item().select), '', concat(item().select, '&')),\n                    if(empty(item().filter),\n                        if(not(empty(item().cdcCol)), '$filter=', ''),\n                        if(not(empty(item().cdcCol)), concat(item().filter, '&'), item().filter)\n                    ),\n                    if(and(not(item().delta), not(empty(item().cdcCol))),\n                        concat('(DateModified gt ',\n                            formatDateTime(\n                                if(empty(pipeline().parameters.p_datetime_from),\n                                    addHours(\n                                        activity('ReadMonitoringBlob').output.firstRow.CDCTimestamp,\n                                        pipeline().parameters.c_cdc_offset_hr\n                                    ),                                        \n                                    pipeline().parameters.p_datetime_from\n                                ),\n                            'yyyy-MM-ddTHH:mm:ss.fffffffZ'),\n                            ' and DateModified le ',\n                            formatDateTime(\n                                variables('v_datetime_to'), \n                                'yyyy-MM-ddTHH:mm:ss.fffffffZ'\n                            ), ')'\n                        ), ''\n                    )\n                )\n            )\n        )\n    )\n)",
 											"type": "Expression"
@@ -362,7 +357,7 @@
 									{
 										"type": "Query",
 										"text": {
-											"value": "SELECT count(@{if(empty(item().crossApplyField), concat('JSON_VALUE (jsonContent, ''$.', item().keyCol, ''')'), 'keyColumn')}) countRows\n   FROM OPENROWSET(\n          BULK '@{activity('GenericRawJson linked service').output.properties.typeProperties.url}@{pipeline().parameters.c_raw_container}/@{pipeline().parameters.c_raw_root_folder}/@{item().target}/@{concat(if(equals(length(item().target), 0), item().source, item().target), '_', variables('v_cdc_timestamp'))}.json', \n          FORMAT = 'CSV', FIELDQUOTE = '0x0b', FIELDTERMINATOR ='0x0b', ROWTERMINATOR = '\\n') \n          WITH (jsonContent varchar(MAX)) AS [result]\n@{if(empty(item().crossApplyField), '', concat(' cross apply openjson(JSON_QUERY(jsonContent, ''$.', item().crossApplyField, ''' with (keyColumn varchar(100) ''$.', item().keyCol, ''')'))}\n",
+											"value": "SELECT count(@{if(empty(item().crossApplyField), concat('JSON_VALUE (jsonContent, ''$.', item().keyCol, ''')'), 'keyColumn')}) countRows\n   FROM OPENROWSET(\n          BULK '@{activity('GenericRawJson linked service').output.properties.typeProperties.url}@{pipeline().parameters.c_raw_container}/@{pipeline().parameters.c_raw_root_folder}/@{item().target}/@{concat(if(equals(length(item().target), 0), item().source, item().target), '_', variables('v_cdc_timestamp'))}.json', \n          FORMAT = 'CSV', FIELDQUOTE = '0x0b', FIELDTERMINATOR ='0x0b', ROWTERMINATOR = '\\n') \n          WITH (jsonContent varchar(MAX)) AS [result]\n@{if(empty(item().crossApplyField), '', concat(' cross apply openjson(JSON_QUERY(jsonContent, ''$.', item().crossApplyField, ''')) with (keyColumn varchar(100) ''$.', item().keyCol, ''')'))}\n",
 											"type": "Expression"
 										}
 									}
@@ -628,30 +623,6 @@
 									}
 								]
 							}
-						},
-						{
-							"name": "Set v_test",
-							"type": "SetVariable",
-							"dependsOn": [
-								{
-									"activity": "ReadMonitoringBlob",
-									"dependencyConditions": [
-										"Succeeded"
-									]
-								}
-							],
-							"policy": {
-								"secureOutput": false,
-								"secureInput": false
-							},
-							"userProperties": [],
-							"typeProperties": {
-								"variableName": "v_test",
-								"value": {
-									"value": "@if(\n    and(\n        item().delta, \n        equals(length(activity('ReadMonitoringBlob').output.firstRow.DeltaLink), 0)\n    ),\n    concat(item().path, \n        item().source, \n        '/delta',\n        if(\n            and(\n                empty(item().select), \n                empty(item().filter)), '',\n            concat('?', item().select, item().filter)\n        )\n    ), \n    if(\n        item().delta,\n        activity('ReadMonitoringBlob').output.firstRow.DeltaLink,\n        concat(\n            item().path, \n            item().source, \n            if(\n                and(\n                    empty(item().select), \n                    and(empty(item().filter), empty(item().cdcCol))), '',\n                concat('?', \n                    if(empty(item().select), '', concat(item().select, '&')),\n                    if(empty(item().filter),\n                        if(not(empty(item().cdcCol)), '$filter=', ''),\n                        if(not(empty(item().cdcCol)), concat(item().filter, '&'), item().filter)\n                    ),\n                    if(and(not(item().delta), not(empty(item().cdcCol))),\n                        concat('(DateModified gt ',\n                            formatDateTime(\n                                if(empty(pipeline().parameters.p_datetime_from),\n                                    addHours(\n                                        activity('ReadMonitoringBlob').output.firstRow.CDCTimestamp,\n                                        pipeline().parameters.c_cdc_offset_hr\n                                    ),                                        \n                                    pipeline().parameters.p_datetime_from\n                                ),\n                            'yyyy-MM-ddTHH:mm:ss.fffffffZ'),\n                            ' and DateModified le ',\n                            formatDateTime(\n                                variables('v_datetime_to'), \n                                'yyyy-MM-ddTHH:mm:ss.fffffffZ'\n                            ), ')'\n                        ), ''\n                    )\n                )\n            )\n        )\n    )\n)",
-									"type": "Expression"
-								}
-							}
 						}
 					]
 				}
@@ -766,52 +737,40 @@
 				"type": "array",
 				"defaultValue": [
 					{
-						"source": "users",
-						"target": "users",
-						"path": "",
+						"source": "dataflows",
+						"target": "dataflows",
+						"path": "/",
 						"delta": false,
-						"crossApplyField": null,
+						"crossApplyField": "value",
 						"select": null,
-						"filter": "page={page}",
+						"filter": "api-version=2020-12-01",
 						"cdcCol": null,
-						"keyCol": "id",
+						"keyCol": "name",
 						"relCol": null
 					},
 					{
-						"source": "posts",
-						"target": "posts",
-						"path": "",
+						"source": "datasets",
+						"target": "datasets",
+						"path": "/",
 						"delta": false,
-						"crossApplyField": null,
+						"crossApplyField": "value",
 						"select": null,
-						"filter": "page={page}",
+						"filter": "api-version=2020-12-01",
 						"cdcCol": null,
-						"keyCol": "id",
+						"keyCol": "name",
 						"relCol": null
 					},
 					{
-						"source": "comments",
-						"target": "comments",
-						"path": "",
+						"source": "dataflows",
+						"target": "dataflows_datasets",
+						"path": "/",
 						"delta": false,
-						"crossApplyField": null,
+						"crossApplyField": "value",
 						"select": null,
-						"filter": "page={page}",
+						"filter": "api-version=2020-12-01",
 						"cdcCol": null,
-						"keyCol": "id",
-						"relCol": null
-					},
-					{
-						"source": "todos",
-						"target": "todos",
-						"path": "",
-						"delta": false,
-						"crossApplyField": null,
-						"select": null,
-						"filter": "page={page}",
-						"cdcCol": null,
-						"keyCol": "id",
-						"relCol": null
+						"keyCol": "name",
+						"relCol": "properties.typeProperties.sources.dataset.referenceName"
 					}
 				]
 			},

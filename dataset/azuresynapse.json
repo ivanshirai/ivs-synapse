@@ -1,0 +1,32 @@
+{
+	"name": "azuresynapse",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "azuresynapse_REST",
+			"type": "LinkedServiceReference",
+			"parameters": {
+				"p_workspace": {
+					"value": "@dataset().p_workspace",
+					"type": "Expression"
+				}
+			}
+		},
+		"parameters": {
+			"p_workspace": {
+				"type": "string"
+			},
+			"p_relative_url": {
+				"type": "string"
+			}
+		},
+		"annotations": [],
+		"type": "RestResource",
+		"typeProperties": {
+			"relativeUrl": {
+				"value": "@dataset().p_relative_url",
+				"type": "Expression"
+			}
+		},
+		"schema": []
+	}
+}
