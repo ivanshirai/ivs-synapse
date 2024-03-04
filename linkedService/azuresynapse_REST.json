@@ -1,0 +1,22 @@
+{
+	"name": "azuresynapse_REST",
+	"properties": {
+		"parameters": {
+			"p_workspace": {
+				"type": "string"
+			}
+		},
+		"annotations": [],
+		"type": "RestService",
+		"typeProperties": {
+			"url": "@{concat('https://', linkedService().p_workspace, '.dev.azuresynapse.net')}",
+			"enableServerCertificateValidation": true,
+			"authenticationType": "ManagedServiceIdentity",
+			"aadResourceId": "https://dev.azuresynapse.net/"
+		},
+		"connectVia": {
+			"referenceName": "SHIR",
+			"type": "IntegrationRuntimeReference"
+		}
+	}
+}
