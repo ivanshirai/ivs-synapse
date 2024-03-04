@@ -1,0 +1,175 @@
+{
+	"name": "FromJsonToDeltaParquet_RelationsMM",
+	"properties": {
+		"folder": {
+			"name": "Templates"
+		},
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "GenericRawJson_NoExtension",
+						"type": "DatasetReference"
+					},
+					"name": "RawDataset"
+				},
+				{
+					"dataset": {
+						"referenceName": "GenericRawCSV_NoHeaderNoQuote",
+						"type": "DatasetReference"
+					},
+					"name": "fileList"
+				}
+			],
+			"sinks": [
+				{
+					"linkedService": {
+						"referenceName": "templateenrst_ARIR",
+						"type": "LinkedServiceReference"
+					},
+					"name": "EnrichedDeltaLake"
+				},
+				{
+					"linkedService": {
+						"referenceName": "templateenrst_ARIR",
+						"type": "LinkedServiceReference"
+					},
+					"name": "EnrichedDLSchemaEvolution"
+				}
+			],
+			"transformations": [
+				{
+					"name": "flattenKey"
+				},
+				{
+					"name": "alterRow"
+				},
+				{
+					"name": "elicitDuplicates"
+				},
+				{
+					"name": "derivedColumns",
+					"description": "Added as Window function cannot interpret byName('Id') as valid for OVER statement"
+				},
+				{
+					"name": "filterDuplicates"
+				},
+				{
+					"name": "removeTempColumns"
+				},
+				{
+					"name": "cdcValue"
+				},
+				{
+					"name": "lookupCDC"
+				},
+				{
+					"name": "filterAll"
+				},
+				{
+					"name": "flattenRel"
+				}
+			],
+			"scriptLines": [
+				"parameters{",
+				"     c_target_container as string ('sandpit'),",
+				"     c_target_folder as string ('FromJsonToDeltaParquet_RelationsMM'),",
+				"     c_key_column_name as string ('name'),",
+				"     c_cdc_column_name as string ('fileName'),",
+				"     c_enriched_cdc_column as string ('cdcTimestamp'),",
+				"     c_relation_column_name as string ('properties.typeProperties.sources.dataset.referenceName')",
+				"}",
+				"source(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     ignoreNoFilesFound: false,",
+				"     fileList: true,",
+				"     rowUrlColumn: 'fileName',",
+				"     documentForm: 'documentPerLine',",
+				"     dateFormats: ['yyyy-MM-dd'],",
+				"     timestampFormats: ['yyyy-MM-dd\\'T\\'HH:mm:ss.SSS\\'Z\\'','yyyy-MM-dd\\'T\\'HH:mm:ss\\'Z\\''],",
+				"     preferredIntegralType: 'long',",
+				"     preferredFractionalType: 'decimal') ~> RawDataset",
+				"source(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     ignoreNoFilesFound: false) ~> fileList",
+				"RawDataset foldDown(unroll((byName('value'))),",
+				"     mapColumn(",
+				"          fileName,",
+				"          every((byName('value')),match(locate('@',name)==0),",
+				"               $0 = $$)",
+				"     ),",
+				"     skipDuplicateMapInputs: false,",
+				"     skipDuplicateMapOutputs: false) ~> flattenKey",
+				"removeTempColumns alterRow(upsertIf(true())) ~> alterRow",
+				"derivedColumns window(over(keyColumn),",
+				"     desc(toString(byName($c_cdc_column_name)), true),",
+				"     rowNum = rowNumber()) ~> elicitDuplicates",
+				"lookupCDC derive(keyColumn = toString(byName($c_key_column_name)) + '-' + toString(byName(replace($c_relation_column_name, '.', ''))),",
+				"          dssUpdateTime = currentUTC(),",
+				"          each(match(name=='cdcValue'), $c_enriched_cdc_column = $$)) ~> derivedColumns",
+				"elicitDuplicates filter(rowNum == 1 && not(isNull(keyColumn))) ~> filterDuplicates",
+				"filterDuplicates select(mapColumn(",
+				"          each(match(name!='rowNum'&&name!='fileName'&&name!='keyColumn'&&name!='cdcValue'))",
+				"     ),",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true) ~> removeTempColumns",
+				"fileList aggregate(cdcValue = max(replace(reverse(substring(reverse(toString(byPosition(1))), 0, locate('_', reverse(toString(byPosition(1)))) - 1)), '.json'))) ~> cdcValue",
+				"flattenRel, cdcValue lookup(0 == 0,",
+				"     multiple: false,",
+				"     pickup: 'any',",
+				"     broadcast: 'right')~> lookupCDC",
+				"removeTempColumns filter(false()) ~> filterAll",
+				"flattenKey foldDown(unroll((byName($c_relation_column_name))),",
+				"     mapColumn(",
+				"          fileName,",
+				"          each(match(name==$c_key_column_name||name==$c_relation_column_name),",
+				"               replace($$,'.','') = $$)",
+				"     ),",
+				"     skipDuplicateMapInputs: false,",
+				"     skipDuplicateMapOutputs: false) ~> flattenRel",
+				"alterRow sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     format: 'delta',",
+				"     compressionType: 'snappy',",
+				"     compressionLevel: 'Fastest',",
+				"     fileSystem: ($c_target_container),",
+				"     folderPath: ($c_target_folder),",
+				"     mergeSchema: false,",
+				"     autoCompact: true,",
+				"     optimizedWrite: true,",
+				"     vacuum: 1,",
+				"     deletable: false,",
+				"     insertable: false,",
+				"     updateable: false,",
+				"     upsertable: true,",
+				"     keys:(array($c_key_column_name, replace($c_relation_column_name, '.', ''))),",
+				"     umask: 0022,",
+				"     preCommands: [],",
+				"     postCommands: [],",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     saveOrder: 2) ~> EnrichedDeltaLake",
+				"filterAll sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     format: 'delta',",
+				"     fileSystem: ($c_target_container),",
+				"     folderPath: ($c_target_folder),",
+				"     mergeSchema: true,",
+				"     autoCompact: true,",
+				"     optimizedWrite: true,",
+				"     vacuum: 1,",
+				"     deletable: false,",
+				"     insertable: true,",
+				"     updateable: false,",
+				"     upsertable: false,",
+				"     umask: 0022,",
+				"     preCommands: [],",
+				"     postCommands: [],",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     saveOrder: 1) ~> EnrichedDLSchemaEvolution"
+			]
+		}
+	}
+}
