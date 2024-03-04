@@ -11,6 +11,12 @@
 						"dependencyConditions": [
 							"Succeeded"
 						]
+					},
+					{
+						"activity": "GenericEnrichedParquet linked service",
+						"dependencyConditions": [
+							"Succeeded"
+						]
 					}
 				],
 				"userProperties": [],
@@ -672,6 +678,69 @@
 						"resource": "https://dev.azuresynapse.net/"
 					}
 				}
+			},
+			{
+				"name": "GenericEnrichedParquet attributes",
+				"type": "WebActivity",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"method": "GET",
+					"url": {
+						"value": "@concat('https://', pipeline().DataFactory, '.dev.azuresynapse.net/datasets/GenericEnrichedParquet?api-version=2020-12-01')",
+						"type": "Expression"
+					},
+					"connectVia": {
+						"referenceName": "SHIR",
+						"type": "IntegrationRuntimeReference"
+					},
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://dev.azuresynapse.net/"
+					}
+				}
+			},
+			{
+				"name": "GenericEnrichedParquet linked service",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "GenericEnrichedParquet attributes",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"method": "GET",
+					"url": {
+						"value": "@concat('https://', pipeline().DataFactory, '.dev.azuresynapse.net/linkedservices/', activity('GenericEnrichedParquet attributes').output.properties.linkedServiceName.referenceName, '?api-version=2020-12-01')",
+						"type": "Expression"
+					},
+					"connectVia": {
+						"referenceName": "SHIR",
+						"type": "IntegrationRuntimeReference"
+					},
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://dev.azuresynapse.net/"
+					}
+				}
 			}
 		],
 		"parameters": {
@@ -722,7 +791,7 @@
 			},
 			"c_raw_root_folder": {
 				"type": "string",
-				"defaultValue": "FromRESTAPIToJson"
+				"defaultValue": "template"
 			},
 			"c_raw_container": {
 				"type": "string",
@@ -750,7 +819,7 @@
 			},
 			"c_external_data_source": {
 				"type": "string",
-				"defaultValue": "TemplateDL"
+				"defaultValue": "template"
 			},
 			"c_enriched_schema": {
 				"type": "string",
