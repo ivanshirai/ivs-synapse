@@ -37,7 +37,7 @@
 		},
 		"template_REST_properties_typeProperties_url": {
 			"type": "string",
-			"defaultValue": "https://random-data-api.com/api/v2/"
+			"defaultValue": "https://gorest.co.in/public/v2/"
 		},
 		"template_kv_properties_typeProperties_baseUrl": {
 			"type": "string",
@@ -54,6 +54,14 @@
 		"templaterawst_ARIR_properties_typeProperties_url": {
 			"type": "string",
 			"defaultValue": "https://ivsraw.dfs.core.windows.net/"
+		},
+		"azuresynapse_REST_properties_typeProperties_url": {
+			"type": "string",
+			"defaultValue": "@{concat('https://', linkedService().p_workspace, '.dev.azuresynapse.net')}"
+		},
+		"azuresynapse_REST_properties_typeProperties_aadResourceId": {
+			"type": "string",
+			"defaultValue": "https://dev.azuresynapse.net/"
 		}
 	},
 	"variables": {
@@ -115,11 +123,7 @@
 											"type": "RestSource",
 											"httpRequestTimeout": "00:01:40",
 											"requestInterval": "00.00:00:00.010",
-											"requestMethod": "GET",
-											"paginationRules": {
-												"AbsoluteUrl": "$.nextLink",
-												"supportRFC5988": "true"
-											}
+											"requestMethod": "GET"
 										},
 										"sink": {
 											"type": "JsonSink",
@@ -134,9 +138,13 @@
 									},
 									"inputs": [
 										{
-											"referenceName": "TemplateREST",
+											"referenceName": "azuresynapse",
 											"type": "DatasetReference",
 											"parameters": {
+												"p_workspace": {
+													"value": "@pipeline().DataFactory",
+													"type": "Expression"
+												},
 												"p_relative_url": {
 													"value": "@if(\n    and(\n        item().delta, \n        equals(length(activity('ReadMonitoringBlob').output.firstRow.DeltaLink), 0)\n    ),\n    concat(item().path, \n        item().source, \n        '/delta',\n        if(\n            and(\n                empty(item().select), \n                empty(item().filter)), '',\n            concat('?', item().select, item().filter)\n        )\n    ), \n    if(\n        item().delta,\n        activity('ReadMonitoringBlob').output.firstRow.DeltaLink,\n        concat(\n            item().path, \n            item().source, \n            if(\n                and(\n                    empty(item().select), \n                    and(empty(item().filter), empty(item().cdcCol))), '',\n                concat('?', \n                    if(empty(item().select), '', concat(item().select, '&')),\n                    if(empty(item().filter),\n                        if(not(empty(item().cdcCol)), '$filter=', ''),\n                        if(not(empty(item().cdcCol)), concat(item().filter, '&'), item().filter)\n                    ),\n                    if(and(not(item().delta), not(empty(item().cdcCol))),\n                        concat('(DateModified gt ',\n                            formatDateTime(\n                                if(empty(pipeline().parameters.p_datetime_from),\n                                    addHours(\n                                        activity('ReadMonitoringBlob').output.firstRow.CDCTimestamp,\n                                        pipeline().parameters.c_cdc_offset_hr\n                                    ),                                        \n                                    pipeline().parameters.p_datetime_from\n                                ),\n                            'yyyy-MM-ddTHH:mm:ss.fffffffZ'),\n                            ' and DateModified le ',\n                            formatDateTime(\n                                variables('v_datetime_to'), \n                                'yyyy-MM-ddTHH:mm:ss.fffffffZ'\n                            ), ')'\n                        ), ''\n                    )\n                )\n            )\n        )\n    )\n)",
 													"type": "Expression"
@@ -422,7 +430,7 @@
 											{
 												"type": "Query",
 												"text": {
-													"value": "SELECT count(keyColumn) countRows\n   FROM OPENROWSET(\n          BULK '@{activity('GenericRawJson linked service').output.properties.typeProperties.url}@{pipeline().parameters.c_raw_container}/@{pipeline().parameters.c_raw_root_folder}/@{item().target}/@{concat(if(equals(length(item().target), 0), item().source, item().target), '_', variables('v_cdc_timestamp'))}.json', \n          FORMAT = 'CSV', FIELDQUOTE = '0x0b', FIELDTERMINATOR ='0x0b', ROWTERMINATOR = '\\n') \n   WITH (jsonContent nvarchar(MAX)) AS [result] \n   cross apply openjson(JSON_QUERY(jsonContent, '$.value'))\n   with (keyColumn nvarchar(MAX) '$.@{item().keyCol}')",
+													"value": "SELECT count(@{if(empty(item().crossApplyField), concat('JSON_VALUE (jsonContent, ''$.', item().keyCol, ''')'), 'keyColumn')}) countRows\n   FROM OPENROWSET(\n          BULK '@{activity('GenericRawJson linked service').output.properties.typeProperties.url}@{pipeline().parameters.c_raw_container}/@{pipeline().parameters.c_raw_root_folder}/@{item().target}/@{concat(if(equals(length(item().target), 0), item().source, item().target), '_', variables('v_cdc_timestamp'))}.json', \n          FORMAT = 'CSV', FIELDQUOTE = '0x0b', FIELDTERMINATOR ='0x0b', ROWTERMINATOR = '\\n') \n          WITH (jsonContent varchar(MAX)) AS [result]\n@{if(empty(item().crossApplyField), '', concat(' cross apply openjson(JSON_QUERY(jsonContent, ''$.', item().crossApplyField, ''')) with (keyColumn varchar(100) ''$.', item().keyCol, ''')'))}\n",
 													"type": "Expression"
 												}
 											}
@@ -808,15 +816,40 @@
 						"type": "array",
 						"defaultValue": [
 							{
-								"source": "users",
-								"target": "users",
+								"source": "dataflows",
+								"target": "dataflows",
 								"path": "/",
 								"delta": false,
-								"select": "size=10",
-								"filter": null,
+								"crossApplyField": "value",
+								"select": null,
+								"filter": "api-version=2020-12-01",
 								"cdcCol": null,
-								"keyCol": "id",
+								"keyCol": "name",
 								"relCol": null
+							},
+							{
+								"source": "datasets",
+								"target": "datasets",
+								"path": "/",
+								"delta": false,
+								"crossApplyField": "value",
+								"select": null,
+								"filter": "api-version=2020-12-01",
+								"cdcCol": null,
+								"keyCol": "name",
+								"relCol": null
+							},
+							{
+								"source": "dataflows",
+								"target": "dataflows_datasets",
+								"path": "/",
+								"delta": false,
+								"crossApplyField": "value",
+								"select": null,
+								"filter": "api-version=2020-12-01",
+								"cdcCol": null,
+								"keyCol": "name",
+								"relCol": "properties.typeProperties.sources.dataset.referenceName"
 							}
 						]
 					},
@@ -862,6 +895,9 @@
 					},
 					"v_monitor": {
 						"type": "String"
+					},
+					"v_test": {
+						"type": "String"
 					}
 				},
 				"folder": {
@@ -872,7 +908,7 @@
 			},
 			"dependsOn": [
 				"[concat(variables('workspaceId'), '/integrationRuntimes/SHIR')]",
-				"[concat(variables('workspaceId'), '/datasets/TemplateREST')]",
+				"[concat(variables('workspaceId'), '/datasets/azuresynapse')]",
 				"[concat(variables('workspaceId'), '/datasets/GenericRawJson')]",
 				"[concat(variables('workspaceId'), '/linkedServices/serverless_ARIR')]",
 				"[concat(variables('workspaceId'), '/datasets/DummyJson')]"
@@ -1812,7 +1848,12 @@
 				},
 				"annotations": [],
 				"type": "RestResource",
-				"typeProperties": {},
+				"typeProperties": {
+					"relativeUrl": {
+						"value": "@dataset().p_relative_url",
+						"type": "Expression"
+					}
+				},
 				"schema": []
 			},
 			"dependsOn": [
@@ -1976,7 +2017,7 @@
 			"type": "Microsoft.Synapse/workspaces/linkedServices",
 			"apiVersion": "2019-06-01-preview",
 			"properties": {
-				"description": "https://random-data-api.com/documentation",
+				"description": "https://gorest.co.in/",
 				"annotations": [],
 				"type": "RestService",
 				"typeProperties": {
@@ -5548,6 +5589,1666 @@
 			},
 			"dependsOn": [],
 			"location": "westus"
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/FromJsonToDeltaParquet_Basic')]",
+			"type": "Microsoft.Synapse/workspaces/dataflows",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"folder": {
+					"name": "Templates"
+				},
+				"type": "MappingDataFlow",
+				"typeProperties": {
+					"sources": [
+						{
+							"dataset": {
+								"referenceName": "GenericRawJson_NoExtension",
+								"type": "DatasetReference"
+							},
+							"name": "RawDataset"
+						},
+						{
+							"dataset": {
+								"referenceName": "GenericRawCSV_NoHeaderNoQuote",
+								"type": "DatasetReference"
+							},
+							"name": "fileList"
+						}
+					],
+					"sinks": [
+						{
+							"linkedService": {
+								"referenceName": "templateenrst_ARIR",
+								"type": "LinkedServiceReference"
+							},
+							"name": "EnrichedDeltaLake"
+						},
+						{
+							"linkedService": {
+								"referenceName": "templateenrst_ARIR",
+								"type": "LinkedServiceReference"
+							},
+							"name": "EnrichedDLSchemaEvolution"
+						}
+					],
+					"transformations": [
+						{
+							"name": "flatten"
+						},
+						{
+							"name": "alterRow"
+						},
+						{
+							"name": "elicitDuplicates"
+						},
+						{
+							"name": "derivedId",
+							"description": "Added as Window function cannot interpret byName('Id') as valid for OVER statement"
+						},
+						{
+							"name": "filterDuplicates"
+						},
+						{
+							"name": "removeTempColumns"
+						},
+						{
+							"name": "filterAll"
+						},
+						{
+							"name": "cdcValue"
+						},
+						{
+							"name": "lookupCDC"
+						}
+					],
+					"scriptLines": [
+						"parameters{",
+						"     c_target_container as string ('sandpit'),",
+						"     c_target_folder as string ('FromJsonToDeltaParquet_Basic'),",
+						"     c_key_column_name as string ('name'),",
+						"     c_cdc_column_name as string ('fileName'),",
+						"     c_enriched_cdc_column as string ('cdcTimestamp')",
+						"}",
+						"source(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     ignoreNoFilesFound: false,",
+						"     fileList: true,",
+						"     rowUrlColumn: 'fileName',",
+						"     documentForm: 'documentPerLine',",
+						"     dateFormats: ['yyyy-MM-dd'],",
+						"     timestampFormats: ['yyyy-MM-dd\\'T\\'HH:mm:ss.SSS\\'Z\\'','yyyy-MM-dd\\'T\\'HH:mm:ss\\'Z\\''],",
+						"     preferredIntegralType: 'long',",
+						"     preferredFractionalType: 'decimal') ~> RawDataset",
+						"source(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     ignoreNoFilesFound: false) ~> fileList",
+						"RawDataset foldDown(unroll((byName('value'))),",
+						"     mapColumn(",
+						"          fileName,",
+						"          every((byName('value')),match(locate('@',name)==0),",
+						"               $0 = $$)",
+						"     ),",
+						"     skipDuplicateMapInputs: false,",
+						"     skipDuplicateMapOutputs: false) ~> flatten",
+						"removeTempColumns alterRow(upsertIf(true())) ~> alterRow",
+						"derivedId window(over(keyColumn),",
+						"     desc(toString(byName($c_cdc_column_name)), true),",
+						"     rowNum = rowNumber()) ~> elicitDuplicates",
+						"lookupCDC derive(keyColumn = toString(byName($c_key_column_name)),",
+						"          dssUpdateTime = currentUTC(),",
+						"          each(match(name=='cdcValue'), $c_enriched_cdc_column = $$),",
+						"          each(match(true()), $$ = toString($$))) ~> derivedId",
+						"elicitDuplicates filter(rowNum == 1 && not(isNull(keyColumn))) ~> filterDuplicates",
+						"filterDuplicates select(mapColumn(",
+						"          each(match(name!='rowNum'&&name!='fileName'&&name!='keyColumn'&&name!='cdcValue'&&left(name,length('properties.'))!='properties.'))",
+						"     ),",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true) ~> removeTempColumns",
+						"removeTempColumns filter(false()) ~> filterAll",
+						"fileList aggregate(cdcValue = max(replace(reverse(substring(reverse(toString(byPosition(1))), 0, locate('_', reverse(toString(byPosition(1)))) - 1)), '.json'))) ~> cdcValue",
+						"flatten, cdcValue lookup(0 == 0,",
+						"     multiple: false,",
+						"     pickup: 'any',",
+						"     broadcast: 'right')~> lookupCDC",
+						"alterRow sink(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     format: 'delta',",
+						"     compressionType: 'snappy',",
+						"     compressionLevel: 'Fastest',",
+						"     fileSystem: ($c_target_container),",
+						"     folderPath: ($c_target_folder),",
+						"     mergeSchema: false,",
+						"     autoCompact: true,",
+						"     optimizedWrite: true,",
+						"     vacuum: 1,",
+						"     deletable: false,",
+						"     insertable: false,",
+						"     updateable: false,",
+						"     upsertable: true,",
+						"     keys:(array($c_key_column_name)),",
+						"     umask: 0022,",
+						"     preCommands: [],",
+						"     postCommands: [],",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true,",
+						"     saveOrder: 2) ~> EnrichedDeltaLake",
+						"filterAll sink(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     format: 'delta',",
+						"     compressionType: 'snappy',",
+						"     compressionLevel: 'Fastest',",
+						"     fileSystem: ($c_target_container),",
+						"     folderPath: ($c_target_folder),",
+						"     mergeSchema: true,",
+						"     autoCompact: true,",
+						"     optimizedWrite: true,",
+						"     vacuum: 1,",
+						"     deletable: false,",
+						"     insertable: true,",
+						"     updateable: false,",
+						"     upsertable: false,",
+						"     umask: 0022,",
+						"     preCommands: [],",
+						"     postCommands: [],",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true,",
+						"     saveOrder: 1) ~> EnrichedDLSchemaEvolution"
+					]
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/datasets/GenericRawJson_NoExtension')]",
+				"[concat(variables('workspaceId'), '/datasets/GenericRawCSV_NoHeaderNoQuote')]",
+				"[concat(variables('workspaceId'), '/linkedServices/templateenrst_ARIR')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/GenericRawJson_NoExtension')]",
+			"type": "Microsoft.Synapse/workspaces/datasets",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "templaterawst_ARIR",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"p_container": {
+						"type": "string"
+					},
+					"p_folder": {
+						"type": "string"
+					},
+					"p_file": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"type": "Json",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"fileName": {
+							"value": "@dataset().p_file",
+							"type": "Expression"
+						},
+						"folderPath": {
+							"value": "@dataset().p_folder",
+							"type": "Expression"
+						},
+						"fileSystem": {
+							"value": "@dataset().p_container",
+							"type": "Expression"
+						}
+					}
+				},
+				"schema": {}
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/linkedServices/templaterawst_ARIR')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/GenericRawCSV_NoHeaderNoQuote')]",
+			"type": "Microsoft.Synapse/workspaces/datasets",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "templaterawst_ARIR",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"p_container": {
+						"type": "string"
+					},
+					"p_folder": {
+						"type": "string"
+					},
+					"p_file": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"type": "DelimitedText",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"fileName": {
+							"value": "@concat(dataset().p_file, '.csv')",
+							"type": "Expression"
+						},
+						"folderPath": {
+							"value": "@dataset().p_folder",
+							"type": "Expression"
+						},
+						"fileSystem": {
+							"value": "@dataset().p_container",
+							"type": "Expression"
+						}
+					},
+					"columnDelimiter": ",",
+					"escapeChar": "\\",
+					"firstRowAsHeader": false,
+					"quoteChar": ""
+				},
+				"schema": []
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/linkedServices/templaterawst_ARIR')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/FromJsonToDeltaParquet_Relations11')]",
+			"type": "Microsoft.Synapse/workspaces/dataflows",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"folder": {
+					"name": "Templates"
+				},
+				"type": "MappingDataFlow",
+				"typeProperties": {
+					"sources": [
+						{
+							"dataset": {
+								"referenceName": "GenericRawJson_NoExtension",
+								"type": "DatasetReference"
+							},
+							"name": "RawDataset"
+						},
+						{
+							"dataset": {
+								"referenceName": "GenericRawCSV_NoHeaderNoQuote",
+								"type": "DatasetReference"
+							},
+							"name": "fileList"
+						}
+					],
+					"sinks": [
+						{
+							"linkedService": {
+								"referenceName": "templateenrst_ARIR",
+								"type": "LinkedServiceReference"
+							},
+							"name": "EnrichedDeltaLake"
+						},
+						{
+							"linkedService": {
+								"referenceName": "templateenrst_ARIR",
+								"type": "LinkedServiceReference"
+							},
+							"name": "EnrichedDLSchemaEvolution"
+						}
+					],
+					"transformations": [
+						{
+							"name": "flatten"
+						},
+						{
+							"name": "alterRow"
+						},
+						{
+							"name": "elicitDuplicates"
+						},
+						{
+							"name": "derivedColumns",
+							"description": "Added as Window function cannot interpret byName('Id') as valid for OVER statement"
+						},
+						{
+							"name": "filterDuplicates"
+						},
+						{
+							"name": "removeTempColumns"
+						},
+						{
+							"name": "cdcValue"
+						},
+						{
+							"name": "lookupCDC"
+						},
+						{
+							"name": "filterAll"
+						}
+					],
+					"scriptLines": [
+						"parameters{",
+						"     c_target_container as string ('sandpit'),",
+						"     c_target_folder as string ('FromJsonToDeltaParquet_Relations11'),",
+						"     c_key_column_name as string ('name'),",
+						"     c_cdc_column_name as string ('fileName'),",
+						"     c_enriched_cdc_column as string ('cdcTimestamp')",
+						"}",
+						"source(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     ignoreNoFilesFound: false,",
+						"     fileList: true,",
+						"     rowUrlColumn: 'fileName',",
+						"     documentForm: 'documentPerLine',",
+						"     dateFormats: ['yyyy-MM-dd'],",
+						"     timestampFormats: ['yyyy-MM-dd\\'T\\'HH:mm:ss.SSS\\'Z\\'','yyyy-MM-dd\\'T\\'HH:mm:ss\\'Z\\''],",
+						"     preferredIntegralType: 'long',",
+						"     preferredFractionalType: 'decimal') ~> RawDataset",
+						"source(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     ignoreNoFilesFound: false) ~> fileList",
+						"RawDataset foldDown(unroll((byName('value'))),",
+						"     mapColumn(",
+						"          fileName,",
+						"          every((byName('value')),match(locate('@',name)==0),",
+						"               iif(instr($0,'.')>0||$0==$c_key_column_name,replace($0,'.',''),$0+$c_key_column_name) = $$)",
+						"     ),",
+						"     skipDuplicateMapInputs: false,",
+						"     skipDuplicateMapOutputs: false) ~> flatten",
+						"removeTempColumns alterRow(upsertIf(true())) ~> alterRow",
+						"derivedColumns window(over(keyColumn),",
+						"     desc(toString(byName($c_cdc_column_name)), true),",
+						"     rowNum = rowNumber()) ~> elicitDuplicates",
+						"lookupCDC derive(keyColumn = toString(byName($c_key_column_name)),",
+						"          dssUpdateTime = currentUTC(),",
+						"          each(match(name=='cdcValue'), $c_enriched_cdc_column = $$)) ~> derivedColumns",
+						"elicitDuplicates filter(rowNum == 1 && not(isNull(keyColumn))) ~> filterDuplicates",
+						"filterDuplicates select(mapColumn(",
+						"          each(match(name!='rowNum'&&name!='fileName'&&name!='keyColumn'&&name!='cdcValue'))",
+						"     ),",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true) ~> removeTempColumns",
+						"fileList aggregate(cdcValue = max(replace(reverse(substring(reverse(toString(byPosition(1))), 0, locate('_', reverse(toString(byPosition(1)))) - 1)), '.json'))) ~> cdcValue",
+						"flatten, cdcValue lookup(0 == 0,",
+						"     multiple: false,",
+						"     pickup: 'any',",
+						"     broadcast: 'right')~> lookupCDC",
+						"removeTempColumns filter(false()) ~> filterAll",
+						"alterRow sink(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     format: 'delta',",
+						"     compressionType: 'snappy',",
+						"     compressionLevel: 'Fastest',",
+						"     fileSystem: ($c_target_container),",
+						"     folderPath: ($c_target_folder),",
+						"     mergeSchema: false,",
+						"     autoCompact: true,",
+						"     optimizedWrite: true,",
+						"     vacuum: 1,",
+						"     deletable: false,",
+						"     insertable: false,",
+						"     updateable: false,",
+						"     upsertable: true,",
+						"     keys:(array($c_key_column_name)),",
+						"     umask: 0022,",
+						"     preCommands: [],",
+						"     postCommands: [],",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true,",
+						"     saveOrder: 2) ~> EnrichedDeltaLake",
+						"filterAll sink(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     format: 'delta',",
+						"     fileSystem: ($c_target_container),",
+						"     folderPath: ($c_target_folder),",
+						"     mergeSchema: true,",
+						"     autoCompact: true,",
+						"     optimizedWrite: true,",
+						"     vacuum: 1,",
+						"     deletable: false,",
+						"     insertable: true,",
+						"     updateable: false,",
+						"     upsertable: false,",
+						"     umask: 0022,",
+						"     preCommands: [],",
+						"     postCommands: [],",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true,",
+						"     saveOrder: 1) ~> EnrichedDLSchemaEvolution"
+					]
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/datasets/GenericRawJson_NoExtension')]",
+				"[concat(variables('workspaceId'), '/datasets/GenericRawCSV_NoHeaderNoQuote')]",
+				"[concat(variables('workspaceId'), '/linkedServices/templateenrst_ARIR')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/FromJsonToDeltaParquet_RelationsMM')]",
+			"type": "Microsoft.Synapse/workspaces/dataflows",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"folder": {
+					"name": "Templates"
+				},
+				"type": "MappingDataFlow",
+				"typeProperties": {
+					"sources": [
+						{
+							"dataset": {
+								"referenceName": "GenericRawJson_NoExtension",
+								"type": "DatasetReference"
+							},
+							"name": "RawDataset"
+						},
+						{
+							"dataset": {
+								"referenceName": "GenericRawCSV_NoHeaderNoQuote",
+								"type": "DatasetReference"
+							},
+							"name": "fileList"
+						}
+					],
+					"sinks": [
+						{
+							"linkedService": {
+								"referenceName": "templateenrst_ARIR",
+								"type": "LinkedServiceReference"
+							},
+							"name": "EnrichedDeltaLake"
+						},
+						{
+							"linkedService": {
+								"referenceName": "templateenrst_ARIR",
+								"type": "LinkedServiceReference"
+							},
+							"name": "EnrichedDLSchemaEvolution"
+						}
+					],
+					"transformations": [
+						{
+							"name": "flattenKey"
+						},
+						{
+							"name": "alterRow"
+						},
+						{
+							"name": "elicitDuplicates"
+						},
+						{
+							"name": "derivedColumns",
+							"description": "Added as Window function cannot interpret byName('Id') as valid for OVER statement"
+						},
+						{
+							"name": "filterDuplicates"
+						},
+						{
+							"name": "removeTempColumns"
+						},
+						{
+							"name": "cdcValue"
+						},
+						{
+							"name": "lookupCDC"
+						},
+						{
+							"name": "filterAll"
+						},
+						{
+							"name": "flattenRel"
+						}
+					],
+					"scriptLines": [
+						"parameters{",
+						"     c_target_container as string ('sandpit'),",
+						"     c_target_folder as string ('FromJsonToDeltaParquet_RelationsMM'),",
+						"     c_key_column_name as string ('name'),",
+						"     c_cdc_column_name as string ('fileName'),",
+						"     c_enriched_cdc_column as string ('cdcTimestamp'),",
+						"     c_relation_column_name as string ('properties.typeProperties.sources.dataset.referenceName')",
+						"}",
+						"source(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     ignoreNoFilesFound: false,",
+						"     fileList: true,",
+						"     rowUrlColumn: 'fileName',",
+						"     documentForm: 'documentPerLine',",
+						"     dateFormats: ['yyyy-MM-dd'],",
+						"     timestampFormats: ['yyyy-MM-dd\\'T\\'HH:mm:ss.SSS\\'Z\\'','yyyy-MM-dd\\'T\\'HH:mm:ss\\'Z\\''],",
+						"     preferredIntegralType: 'long',",
+						"     preferredFractionalType: 'decimal') ~> RawDataset",
+						"source(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     ignoreNoFilesFound: false) ~> fileList",
+						"RawDataset foldDown(unroll((byName('value'))),",
+						"     mapColumn(",
+						"          fileName,",
+						"          every((byName('value')),match(locate('@',name)==0),",
+						"               $0 = $$)",
+						"     ),",
+						"     skipDuplicateMapInputs: false,",
+						"     skipDuplicateMapOutputs: false) ~> flattenKey",
+						"removeTempColumns alterRow(upsertIf(true())) ~> alterRow",
+						"derivedColumns window(over(keyColumn),",
+						"     desc(toString(byName($c_cdc_column_name)), true),",
+						"     rowNum = rowNumber()) ~> elicitDuplicates",
+						"lookupCDC derive(keyColumn = toString(byName($c_key_column_name)) + '-' + toString(byName(replace($c_relation_column_name, '.', ''))),",
+						"          dssUpdateTime = currentUTC(),",
+						"          each(match(name=='cdcValue'), $c_enriched_cdc_column = $$)) ~> derivedColumns",
+						"elicitDuplicates filter(rowNum == 1 && not(isNull(keyColumn))) ~> filterDuplicates",
+						"filterDuplicates select(mapColumn(",
+						"          each(match(name!='rowNum'&&name!='fileName'&&name!='keyColumn'&&name!='cdcValue'))",
+						"     ),",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true) ~> removeTempColumns",
+						"fileList aggregate(cdcValue = max(replace(reverse(substring(reverse(toString(byPosition(1))), 0, locate('_', reverse(toString(byPosition(1)))) - 1)), '.json'))) ~> cdcValue",
+						"flattenRel, cdcValue lookup(0 == 0,",
+						"     multiple: false,",
+						"     pickup: 'any',",
+						"     broadcast: 'right')~> lookupCDC",
+						"removeTempColumns filter(false()) ~> filterAll",
+						"flattenKey foldDown(unroll((byName($c_relation_column_name))),",
+						"     mapColumn(",
+						"          fileName,",
+						"          each(match(name==$c_key_column_name||name==$c_relation_column_name),",
+						"               replace($$,'.','') = $$)",
+						"     ),",
+						"     skipDuplicateMapInputs: false,",
+						"     skipDuplicateMapOutputs: false) ~> flattenRel",
+						"alterRow sink(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     format: 'delta',",
+						"     compressionType: 'snappy',",
+						"     compressionLevel: 'Fastest',",
+						"     fileSystem: ($c_target_container),",
+						"     folderPath: ($c_target_folder),",
+						"     mergeSchema: false,",
+						"     autoCompact: true,",
+						"     optimizedWrite: true,",
+						"     vacuum: 1,",
+						"     deletable: false,",
+						"     insertable: false,",
+						"     updateable: false,",
+						"     upsertable: true,",
+						"     keys:(array($c_key_column_name, replace($c_relation_column_name, '.', ''))),",
+						"     umask: 0022,",
+						"     preCommands: [],",
+						"     postCommands: [],",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true,",
+						"     saveOrder: 2) ~> EnrichedDeltaLake",
+						"filterAll sink(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     format: 'delta',",
+						"     fileSystem: ($c_target_container),",
+						"     folderPath: ($c_target_folder),",
+						"     mergeSchema: true,",
+						"     autoCompact: true,",
+						"     optimizedWrite: true,",
+						"     vacuum: 1,",
+						"     deletable: false,",
+						"     insertable: true,",
+						"     updateable: false,",
+						"     upsertable: false,",
+						"     umask: 0022,",
+						"     preCommands: [],",
+						"     postCommands: [],",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true,",
+						"     saveOrder: 1) ~> EnrichedDLSchemaEvolution"
+					]
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/datasets/GenericRawJson_NoExtension')]",
+				"[concat(variables('workspaceId'), '/datasets/GenericRawCSV_NoHeaderNoQuote')]",
+				"[concat(variables('workspaceId'), '/linkedServices/templateenrst_ARIR')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/FromJsonToDeltaParquet')]",
+			"type": "Microsoft.Synapse/workspaces/pipelines",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"activities": [
+					{
+						"name": "ForEachDataset",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "GenericRawJson linked service",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "GenericEnrichedParquet linked service",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@pipeline().parameters.p_datasets",
+								"type": "Expression"
+							},
+							"isSequential": false,
+							"activities": [
+								{
+									"name": "copyFileList",
+									"type": "Copy",
+									"dependsOn": [
+										{
+											"activity": "DatetimeFrom",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 2,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "SqlDWSource",
+											"sqlReaderQuery": {
+												"value": "@concat('SELECT STRING_AGG(cast(jsonName as varchar(max)), char(10)) ListOfFiles ',\n        'FROM ( SELECT right(result.filepath(), ',\n        'len(result.filepath()) - charindex(''', \n        pipeline().parameters.c_raw_root_folder, \n        ''', result.filepath()) + 1) jsonName, max(',\n        item().keyCol, ') ', item().keyCol, ' FROM OPENROWSET(',\n        'BULK ''', activity('GenericRawJson linked service').output.properties.typeProperties.url, '/',\n        pipeline().parameters.c_raw_container, '/', \n        pipeline().parameters.c_raw_root_folder, '/',\n        item().target, '/*.json'',  FORMAT = ''CSV'', FIELDQUOTE = ''0x0b'', ',\n        'FIELDTERMINATOR =''0x0b'', ROWTERMINATOR = ''\\n'') ',\n        'WITH (jsonContent nvarchar(MAX)) ',\n        'AS [result] CROSS apply ',\n        'openjson(JSON_QUERY(jsonContent, ''$.value'')) ',\n        'WITH (', item().keyCol, ' nvarchar(1000) ''$.\"',\n        item().keyCol, '\"'') WHERE reverse(substring(reverse(result.filepath()), 1, charindex(''/'', reverse(result.filepath())) - 1))',\n        if(\n                not(empty(pipeline().parameters.p_datetime_to)), \n                ' between ',\n                ' >= '\n        ),\n        '''', item().target, '_', \n        activity('DatetimeFrom').output.resultSets[0].rows[0].CDCTimestamp, '.json''',\n        if(not(empty(pipeline().parameters.p_datetime_to)), \n            concat(' and ''', item().target, '_', \n                replace(replace(replace(replace(replace(\n                    formatDateTime(\n                        pipeline().parameters.p_datetime_to, \n                        'yyyy-MM-ddTHH:mm:ss.fffffffZ'\n                    ), \n                    '0000Z', 'Z'), '000Z', 'Z'), '00Z', 'Z'), '0Z', 'Z'), '.Z', 'Z'\n                ), \n                '.json'''\n            ), \n            ''\n        ), \n        ' GROUP BY result.filepath()) q'\n)",
+												"type": "Expression"
+											},
+											"queryTimeout": "02:00:00",
+											"partitionOption": "None"
+										},
+										"sink": {
+											"type": "DelimitedTextSink",
+											"storeSettings": {
+												"type": "AzureBlobFSWriteSettings"
+											},
+											"formatSettings": {
+												"type": "DelimitedTextWriteSettings",
+												"quoteAllText": true,
+												"fileExtension": ".txt"
+											}
+										},
+										"enableStaging": false,
+										"translator": {
+											"type": "TabularTranslator",
+											"mappings": [
+												{
+													"source": {
+														"name": "ListOfFiles",
+														"physicalType": "nvarchar"
+													},
+													"sink": {
+														"ordinal": 1
+													}
+												}
+											],
+											"typeConversion": true,
+											"typeConversionSettings": {
+												"allowDataTruncation": true,
+												"treatBooleanAsNumber": false
+											}
+										}
+									},
+									"inputs": [
+										{
+											"referenceName": "GenericServerlessSQL",
+											"type": "DatasetReference",
+											"parameters": {
+												"p_database": {
+													"value": "@pipeline().parameters.c_serverless_db",
+													"type": "Expression"
+												},
+												"p_schema": "dummy",
+												"p_table": "master"
+											}
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "GenericRawCSV_NoHeaderNoQuote",
+											"type": "DatasetReference",
+											"parameters": {
+												"p_container": {
+													"value": "@pipeline().parameters.c_raw_monitoring_container",
+													"type": "Expression"
+												},
+												"p_folder": {
+													"value": "@concat(pipeline().parameters.c_raw_monitoring_folder, '/',\n    pipeline().parameters.c_raw_root_folder, '/', \n    item().target)",
+													"type": "Expression"
+												},
+												"p_file": {
+													"value": "@pipeline().parameters.c_file_list_blob",
+													"type": "Expression"
+												}
+											}
+										}
+									]
+								},
+								{
+									"name": "countRows",
+									"type": "Script",
+									"dependsOn": [
+										{
+											"activity": "DatetimeFrom",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 2,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"linkedServiceName": {
+										"referenceName": "serverless_ARIR",
+										"type": "LinkedServiceReference",
+										"parameters": {
+											"p_database": "master"
+										}
+									},
+									"typeProperties": {
+										"scripts": [
+											{
+												"type": "Query",
+												"text": {
+													"value": "@concat('select count(*) countRows FROM OPENROWSET(',\n        'BULK ''', activity('GenericRawJson linked service').output.properties.typeProperties.url, '/',\n        pipeline().parameters.c_raw_container, '/', \n        pipeline().parameters.c_raw_root_folder, '/',\n        item().target, '/*.json'',  FORMAT = ''CSV'', FIELDQUOTE = ''0x0b'', ',\n        'FIELDTERMINATOR =''0x0b'', ROWTERMINATOR = ''\\n'') ',\n        'WITH (jsonContent nvarchar(MAX)) ',\n        'AS [result] CROSS apply ',\n        'openjson(JSON_QUERY(jsonContent, ''$.value'')) ',\n        'WITH (', item().keyCol, ' nvarchar(1000) ''$.\"',\n        item().keyCol, '\"'')  WHERE reverse(substring(reverse(result.filepath()), 1, charindex(''/'', reverse(result.filepath())) - 1))',\n        if(not(empty(pipeline().parameters.p_datetime_to)), \n           ' between ',\n           ' >= '),\n        '''', item().target, '_', \n        activity('DatetimeFrom').output.resultSets[0].rows[0].CDCTimestamp, '.json''',\n        if(not(empty(pipeline().parameters.p_datetime_to)), \n            concat(' and ''', item().target, '_', \n                replace(replace(replace(replace(replace(\n                    formatDateTime(\n                        pipeline().parameters.p_datetime_to, \n                        'yyyy-MM-ddTHH:mm:ss.fffffffZ'\n                    ), \n                    '0000Z', 'Z'), '000Z', 'Z'), '00Z', 'Z'), '0Z', 'Z'), '.Z', 'Z'\n                ), \n                '.json'''\n            ), \n            ''\n        )\n)",
+													"type": "Expression"
+												}
+											}
+										],
+										"scriptBlockExecutionTimeout": "02:00:00"
+									}
+								},
+								{
+									"name": "switchTypes",
+									"type": "Switch",
+									"dependsOn": [
+										{
+											"activity": "copyFileList",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										},
+										{
+											"activity": "countRows",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"on": {
+											"value": "@if(greater(activity('countRows').output.resultSets[0].rows[0].countRows, 0),\nitem().type, 'none')",
+											"type": "Expression"
+										},
+										"cases": [
+											{
+												"value": "relationsMM",
+												"activities": [
+													{
+														"name": "FromJsonToDeltaParquet_RelationsMM",
+														"type": "ExecuteDataFlow",
+														"dependsOn": [],
+														"policy": {
+															"timeout": "0.12:00:00",
+															"retry": 2,
+															"retryIntervalInSeconds": 30,
+															"secureOutput": false,
+															"secureInput": false
+														},
+														"userProperties": [],
+														"typeProperties": {
+															"dataflow": {
+																"referenceName": "FromJsonToDeltaParquet_RelationsMM",
+																"type": "DataFlowReference",
+																"parameters": {
+																	"c_target_container": {
+																		"value": "'@{pipeline().parameters.c_enriched_container}'",
+																		"type": "Expression"
+																	},
+																	"c_target_folder": {
+																		"value": "'@{concat(pipeline().parameters.c_enriched_root_folder, '/',\nitem().target)}'",
+																		"type": "Expression"
+																	},
+																	"c_key_column_name": {
+																		"value": "'@{item().keyCol}'",
+																		"type": "Expression"
+																	},
+																	"c_cdc_column_name": {
+																		"value": "'@{coalesce(item().cdcCol, 'fileName')}'",
+																		"type": "Expression"
+																	},
+																	"c_enriched_cdc_column": {
+																		"value": "'@{pipeline().parameters.c_enriched_cdc_column}'",
+																		"type": "Expression"
+																	},
+																	"c_relation_column_name": {
+																		"value": "'@{item().relCol}'",
+																		"type": "Expression"
+																	}
+																},
+																"datasetParameters": {
+																	"RawDataset": {
+																		"p_container": {
+																			"value": "@pipeline().parameters.c_raw_monitoring_container",
+																			"type": "Expression"
+																		},
+																		"p_folder": {
+																			"value": "@concat(pipeline().parameters.c_raw_monitoring_folder, '/', \npipeline().parameters.c_raw_root_folder, '/',\nitem().target)",
+																			"type": "Expression"
+																		},
+																		"p_file": {
+																			"value": "@concat(pipeline().parameters.c_file_list_blob, '.csv')",
+																			"type": "Expression"
+																		}
+																	},
+																	"fileList": {
+																		"p_container": {
+																			"value": "@pipeline().parameters.c_raw_monitoring_container",
+																			"type": "Expression"
+																		},
+																		"p_folder": {
+																			"value": "@concat(pipeline().parameters.c_raw_monitoring_folder, '/', \npipeline().parameters.c_raw_root_folder, '/',\nitem().target)",
+																			"type": "Expression"
+																		},
+																		"p_file": {
+																			"value": "@pipeline().parameters.c_file_list_blob",
+																			"type": "Expression"
+																		}
+																	},
+																	"EnrichedDeltaLake": {},
+																	"EnrichedDLSchemaEvolution": {}
+																}
+															},
+															"staging": {},
+															"compute": {
+																"coreCount": 8,
+																"computeType": "General"
+															},
+															"traceLevel": "Fine"
+														}
+													}
+												]
+											},
+											{
+												"value": "relations11",
+												"activities": [
+													{
+														"name": "FromJsonToDeltaParquet_Relations11",
+														"type": "ExecuteDataFlow",
+														"dependsOn": [],
+														"policy": {
+															"timeout": "0.12:00:00",
+															"retry": 2,
+															"retryIntervalInSeconds": 30,
+															"secureOutput": false,
+															"secureInput": false
+														},
+														"userProperties": [],
+														"typeProperties": {
+															"dataflow": {
+																"referenceName": "FromJsonToDeltaParquet_Relations11",
+																"type": "DataFlowReference",
+																"parameters": {
+																	"c_target_container": {
+																		"value": "'@{pipeline().parameters.c_enriched_container}'",
+																		"type": "Expression"
+																	},
+																	"c_target_folder": {
+																		"value": "'@{concat(pipeline().parameters.c_enriched_root_folder, '/',\nitem().target)}'",
+																		"type": "Expression"
+																	},
+																	"c_key_column_name": {
+																		"value": "'@{item().keyCol}'",
+																		"type": "Expression"
+																	},
+																	"c_cdc_column_name": {
+																		"value": "'@{coalesce(item().cdcCol, 'fileName')}'",
+																		"type": "Expression"
+																	},
+																	"c_enriched_cdc_column": {
+																		"value": "'@{item().relCol}'",
+																		"type": "Expression"
+																	}
+																},
+																"datasetParameters": {
+																	"RawDataset": {
+																		"p_container": {
+																			"value": "@pipeline().parameters.c_raw_monitoring_container",
+																			"type": "Expression"
+																		},
+																		"p_folder": {
+																			"value": "@concat(pipeline().parameters.c_raw_monitoring_folder, '/', \npipeline().parameters.c_raw_root_folder, '/',\nitem().target)",
+																			"type": "Expression"
+																		},
+																		"p_file": {
+																			"value": "@concat(pipeline().parameters.c_file_list_blob, '.csv')",
+																			"type": "Expression"
+																		}
+																	},
+																	"fileList": {
+																		"p_container": {
+																			"value": "@pipeline().parameters.c_raw_monitoring_container",
+																			"type": "Expression"
+																		},
+																		"p_folder": {
+																			"value": "@pipeline().parameters.c_raw_monitoring_folder",
+																			"type": "Expression"
+																		},
+																		"p_file": {
+																			"value": "@pipeline().parameters.c_file_list_blob",
+																			"type": "Expression"
+																		}
+																	},
+																	"EnrichedDeltaLake": {},
+																	"EnrichedDLSchemaEvolution": {}
+																}
+															},
+															"staging": {},
+															"compute": {
+																"coreCount": 8,
+																"computeType": "General"
+															},
+															"traceLevel": "Fine"
+														}
+													}
+												]
+											},
+											{
+												"value": "basic",
+												"activities": [
+													{
+														"name": "FromJsonToDeltaParquet_Basic",
+														"type": "ExecuteDataFlow",
+														"dependsOn": [],
+														"policy": {
+															"timeout": "0.12:00:00",
+															"retry": 2,
+															"retryIntervalInSeconds": 30,
+															"secureOutput": false,
+															"secureInput": false
+														},
+														"userProperties": [],
+														"typeProperties": {
+															"dataflow": {
+																"referenceName": "FromJsonToDeltaParquet_Basic",
+																"type": "DataFlowReference",
+																"parameters": {
+																	"c_target_container": {
+																		"value": "'@{pipeline().parameters.c_enriched_container}'",
+																		"type": "Expression"
+																	},
+																	"c_target_folder": {
+																		"value": "'@{concat(pipeline().parameters.c_enriched_root_folder, '/',\nitem().target)}'",
+																		"type": "Expression"
+																	},
+																	"c_key_column_name": {
+																		"value": "'@{item().keyCol}'",
+																		"type": "Expression"
+																	},
+																	"c_cdc_column_name": {
+																		"value": "'@{coalesce(item().cdcCol, 'fileName')}'",
+																		"type": "Expression"
+																	},
+																	"c_enriched_cdc_column": {
+																		"value": "'@{pipeline().parameters.c_enriched_cdc_column}'",
+																		"type": "Expression"
+																	}
+																},
+																"datasetParameters": {
+																	"RawDataset": {
+																		"p_container": {
+																			"value": "@pipeline().parameters.c_raw_monitoring_container",
+																			"type": "Expression"
+																		},
+																		"p_folder": {
+																			"value": "@concat(pipeline().parameters.c_raw_monitoring_folder, '/',\n    pipeline().parameters.c_raw_root_folder, '/', \n    item().target)",
+																			"type": "Expression"
+																		},
+																		"p_file": {
+																			"value": "@concat(pipeline().parameters.c_file_list_blob, '.csv')",
+																			"type": "Expression"
+																		}
+																	},
+																	"fileList": {
+																		"p_container": {
+																			"value": "@pipeline().parameters.c_raw_monitoring_container",
+																			"type": "Expression"
+																		},
+																		"p_folder": {
+																			"value": "@concat(pipeline().parameters.c_raw_monitoring_folder, '/', \npipeline().parameters.c_raw_root_folder, '/',\nitem().target)",
+																			"type": "Expression"
+																		},
+																		"p_file": {
+																			"value": "@pipeline().parameters.c_file_list_blob",
+																			"type": "Expression"
+																		}
+																	},
+																	"EnrichedDeltaLake": {},
+																	"EnrichedDLSchemaEvolution": {}
+																}
+															},
+															"staging": {},
+															"compute": {
+																"coreCount": 8,
+																"computeType": "General"
+															},
+															"traceLevel": "Fine"
+														}
+													}
+												]
+											}
+										]
+									}
+								},
+								{
+									"name": "If dataTypeReplace not empty",
+									"type": "IfCondition",
+									"dependsOn": [
+										{
+											"activity": "If RowCount not Zero",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"expression": {
+											"value": "@and(not(empty(item().dataTypeReplace)),\ngreater(activity('countRows').output.resultSets[0].rows[0].countRows, 0))",
+											"type": "Expression"
+										},
+										"ifTrueActivities": [
+											{
+												"name": "Generate SQL",
+												"type": "Script",
+												"dependsOn": [],
+												"policy": {
+													"timeout": "0.12:00:00",
+													"retry": 2,
+													"retryIntervalInSeconds": 30,
+													"secureOutput": false,
+													"secureInput": false
+												},
+												"userProperties": [],
+												"linkedServiceName": {
+													"referenceName": "serverless_ARIR",
+													"type": "LinkedServiceReference",
+													"parameters": {
+														"p_database": "master"
+													}
+												},
+												"typeProperties": {
+													"scripts": [
+														{
+															"type": "Query",
+															"text": {
+																"value": "select 'create or alter view  \n@{concat(if(empty(pipeline().parameters.c_enriched_schema), '', concat(pipeline().parameters.c_enriched_schema, '.')), item().target)}\nas select * from OPENROWSET(BULK ''@{item().target}'', \t\n\tDATA_SOURCE = ''@{pipeline().parameters.c_external_data_source}'', \t\n\tFORMAT = ''Delta''\n) WITH (' +\nSTRING_AGG('[' + \ncast(colName as varchar(max)) + '] ' + \ndataType, ',' + char(10)) \nWITHIN GROUP (ORDER BY column_id ASC) +\n') as r' as SQL\nfrom (select \nc.name colName, coalesce(r.dataType,\nCASE \n      WHEN t.[name] IN ('varchar', 'char', 'varbinary') THEN t.[name] + '(' + IIF(c.max_length = -1, 'max', CAST(c.max_length AS VARCHAR(25))) + ')' \n      WHEN t.[name] IN ('nvarchar','nchar') THEN t.[name] + '(' + IIF(c.max_length = -1, 'max', CAST(c.max_length / 2 AS VARCHAR(25)))+ ')'      \n      WHEN t.[name] IN ('decimal', 'numeric') THEN t.[name] + '(' + CAST(c.[precision] AS VARCHAR(25)) + ', ' + CAST(c.[scale] AS VARCHAR(25)) + ')'\n      WHEN t.[name] IN ('datetime2') THEN t.[name] + '(' + CAST(c.[scale] AS VARCHAR(25)) + ')'\n      ELSE t.[name]\nEND) AS dataType,\nc.column_id\nfrom sys.columns c\njoin sys.views v on v.object_id = c.object_id\njoin sys.schemas s on s.schema_id = v.schema_id\njoin sys.types t on c.user_type_id = t.user_type_id \nleft outer join (select * from OpenJson(N'@{item().dataTypeReplace}')\nWITH (col varchar(255), dataType varchar(255)) as r) r\non r.col = c.name\nwhere s.name = '@{pipeline().parameters.c_enriched_schema}' and v.name = '@{item().target}') q",
+																"type": "Expression"
+															}
+														}
+													],
+													"scriptBlockExecutionTimeout": "02:00:00"
+												}
+											},
+											{
+												"name": "rebuildView",
+												"type": "Script",
+												"dependsOn": [
+													{
+														"activity": "Generate SQL",
+														"dependencyConditions": [
+															"Succeeded"
+														]
+													}
+												],
+												"policy": {
+													"timeout": "0.12:00:00",
+													"retry": 2,
+													"retryIntervalInSeconds": 30,
+													"secureOutput": false,
+													"secureInput": false
+												},
+												"userProperties": [],
+												"linkedServiceName": {
+													"referenceName": "serverless_ARIR",
+													"type": "LinkedServiceReference",
+													"parameters": {
+														"p_database": "master"
+													}
+												},
+												"typeProperties": {
+													"scripts": [
+														{
+															"type": "NonQuery",
+															"text": {
+																"value": "@activity('Generate SQL').output.resultSets[0].rows[0].SQL",
+																"type": "Expression"
+															}
+														}
+													],
+													"scriptBlockExecutionTimeout": "02:00:00"
+												}
+											}
+										]
+									}
+								},
+								{
+									"name": "DatetimeFrom",
+									"type": "Script",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 2,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"linkedServiceName": {
+										"referenceName": "serverless_ARIR",
+										"type": "LinkedServiceReference",
+										"parameters": {
+											"p_database": "master"
+										}
+									},
+									"typeProperties": {
+										"scripts": [
+											{
+												"type": "Query",
+												"text": {
+													"value": "@if(and(empty(pipeline().parameters.p_datetime_from),\n        not(empty(pipeline().parameters.c_enriched_cdc_column))\n    ),\n    concat('if exists (select 1 from sys.columns c join sys.views v on v.object_id = c.object_id join sys.schemas s on s.schema_id = v.schema_id where s.name = ''', pipeline().parameters.c_enriched_schema, ''' and v.name = ''', item().target, ''' and c.name = ''', pipeline().parameters.c_enriched_cdc_column, ''') ',\n        'exec(''select dateadd(mcs, 1, cast(max(', pipeline().parameters.c_enriched_cdc_column, ') as datetime2)) CDCTimestamp from ',\n        if(empty(pipeline().parameters.c_enriched_schema), '', concat(pipeline().parameters.c_enriched_schema, '.')), item().target,\n        ''') else select ''1900-01-01'' as CDCTimestamp'\n    ),\n    concat('select ''', replace(replace(replace(replace(replace(\n                    formatDateTime(\n                        pipeline().parameters.p_datetime_from, \n                        'yyyy-MM-ddTHH:mm:ss.fffffffZ'\n                    ), \n                    '0000Z', 'Z'), '000Z', 'Z'), '00Z', 'Z'), '0Z', 'Z'), '.Z', 'Z'\n                ),\n        ''' as CDCTimestamp'\n    )\n)",
+													"type": "Expression"
+												}
+											}
+										],
+										"scriptBlockExecutionTimeout": "02:00:00"
+									}
+								},
+								{
+									"name": "If RowCount not Zero",
+									"type": "IfCondition",
+									"dependsOn": [
+										{
+											"activity": "switchTypes",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"expression": {
+											"value": "@greater(activity('countRows').output.resultSets[0].rows[0].countRows, 0)",
+											"type": "Expression"
+										},
+										"ifTrueActivities": [
+											{
+												"name": "createView",
+												"type": "Script",
+												"dependsOn": [],
+												"policy": {
+													"timeout": "0.12:00:00",
+													"retry": 2,
+													"retryIntervalInSeconds": 30,
+													"secureOutput": false,
+													"secureInput": false
+												},
+												"userProperties": [],
+												"linkedServiceName": {
+													"referenceName": "serverless_ARIR",
+													"type": "LinkedServiceReference",
+													"parameters": {
+														"p_database": "master"
+													}
+												},
+												"typeProperties": {
+													"scripts": [
+														{
+															"type": "Query",
+															"text": {
+																"value": "create or alter view \n@{if(empty(pipeline().parameters.c_enriched_schema), item().target, concat(pipeline().parameters.c_enriched_schema, '.', item().target))}\nas select * from OPENROWSET(\n\tBULK '@{item().target}', \t\n\tDATA_SOURCE = '@{pipeline().parameters.c_external_data_source}', \t\n\tFORMAT = 'Delta'\n) as r",
+																"type": "Expression"
+															}
+														}
+													],
+													"scriptBlockExecutionTimeout": "02:00:00"
+												}
+											}
+										]
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "GenericRawJson attributes",
+						"type": "WebActivity",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"method": "GET",
+							"headers": {},
+							"url": {
+								"value": "@concat('https://', pipeline().DataFactory, '.dev.azuresynapse.net/datasets/GenericRawJson?api-version=2020-12-01')",
+								"type": "Expression"
+							},
+							"connectVia": {
+								"referenceName": "SHIR",
+								"type": "IntegrationRuntimeReference"
+							},
+							"authentication": {
+								"type": "MSI",
+								"resource": "https://dev.azuresynapse.net/"
+							}
+						}
+					},
+					{
+						"name": "GenericRawJson linked service",
+						"type": "WebActivity",
+						"dependsOn": [
+							{
+								"activity": "GenericRawJson attributes",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"method": "GET",
+							"headers": {},
+							"url": {
+								"value": "@concat('https://', pipeline().DataFactory, '.dev.azuresynapse.net/linkedservices/', activity('GenericRawJson attributes').output.properties.linkedServiceName.referenceName, '?api-version=2020-12-01')",
+								"type": "Expression"
+							},
+							"connectVia": {
+								"referenceName": "SHIR",
+								"type": "IntegrationRuntimeReference"
+							},
+							"authentication": {
+								"type": "MSI",
+								"resource": "https://dev.azuresynapse.net/"
+							}
+						}
+					},
+					{
+						"name": "GenericEnrichedParquet attributes",
+						"type": "WebActivity",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"method": "GET",
+							"headers": {},
+							"url": {
+								"value": "@concat('https://', pipeline().DataFactory, '.dev.azuresynapse.net/datasets/GenericEnrichedParquet?api-version=2020-12-01')",
+								"type": "Expression"
+							},
+							"connectVia": {
+								"referenceName": "SHIR",
+								"type": "IntegrationRuntimeReference"
+							},
+							"authentication": {
+								"type": "MSI",
+								"resource": "https://dev.azuresynapse.net/"
+							}
+						}
+					},
+					{
+						"name": "GenericEnrichedParquet linked service",
+						"type": "WebActivity",
+						"dependsOn": [
+							{
+								"activity": "GenericEnrichedParquet attributes",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"method": "GET",
+							"headers": {},
+							"url": {
+								"value": "@concat('https://', pipeline().DataFactory, '.dev.azuresynapse.net/linkedservices/', activity('GenericEnrichedParquet attributes').output.properties.linkedServiceName.referenceName, '?api-version=2020-12-01')",
+								"type": "Expression"
+							},
+							"connectVia": {
+								"referenceName": "SHIR",
+								"type": "IntegrationRuntimeReference"
+							},
+							"authentication": {
+								"type": "MSI",
+								"resource": "https://dev.azuresynapse.net/"
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"parameters": {
+					"p_datasets": {
+						"type": "array",
+						"defaultValue": [
+							{
+								"type": "basic",
+								"target": "dataflows",
+								"cdcCol": null,
+								"keyCol": "name",
+								"dataTypeReplace": [
+									{
+										"col": "type",
+										"dataType": "nvarchar(200)"
+									}
+								],
+								"relCol": null
+							},
+							{
+								"type": "basic",
+								"target": "datasets",
+								"cdcCol": null,
+								"keyCol": "name",
+								"dataTypeReplace": [
+									{
+										"col": "type",
+										"dataType": "nvarchar(200)"
+									}
+								],
+								"relCol": null
+							},
+							{
+								"type": "relationsMM",
+								"target": "dataflows_datasets",
+								"cdcCol": null,
+								"keyCol": "name",
+								"dataTypeReplace": null,
+								"relCol": "properties.typeProperties.sources.dataset.referenceName"
+							}
+						]
+					},
+					"p_datetime_from": {
+						"type": "string"
+					},
+					"p_datetime_to": {
+						"type": "string"
+					},
+					"c_raw_root_folder": {
+						"type": "string",
+						"defaultValue": "template"
+					},
+					"c_raw_container": {
+						"type": "string",
+						"defaultValue": "sandpit"
+					},
+					"c_enriched_container": {
+						"type": "string",
+						"defaultValue": "sandpit"
+					},
+					"c_enriched_root_folder": {
+						"type": "string",
+						"defaultValue": "FromJsonToDeltaParquet"
+					},
+					"c_file_list_blob": {
+						"type": "string",
+						"defaultValue": "fileList"
+					},
+					"c_serverless_db": {
+						"type": "string",
+						"defaultValue": "template"
+					},
+					"c_raw_monitoring_folder": {
+						"type": "string",
+						"defaultValue": "PipelineMonitoring"
+					},
+					"c_external_data_source": {
+						"type": "string",
+						"defaultValue": "template"
+					},
+					"c_enriched_schema": {
+						"type": "string",
+						"defaultValue": "enr"
+					},
+					"c_enriched_cdc_column": {
+						"type": "string",
+						"defaultValue": "cdcTimestamp"
+					},
+					"c_raw_monitoring_container": {
+						"type": "string",
+						"defaultValue": "sandpit"
+					}
+				},
+				"variables": {
+					"v_datetime_from": {
+						"type": "String"
+					},
+					"v_datetime_to": {
+						"type": "String"
+					},
+					"v_array": {
+						"type": "Array"
+					},
+					"v_array_tmp": {
+						"type": "Array"
+					},
+					"v_string": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "Templates"
+				},
+				"annotations": [],
+				"lastPublishTime": "2023-10-16T14:40:57Z"
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/integrationRuntimes/SHIR')]",
+				"[concat(variables('workspaceId'), '/datasets/GenericServerlessSQL')]",
+				"[concat(variables('workspaceId'), '/datasets/GenericRawCSV_NoHeaderNoQuote')]",
+				"[concat(variables('workspaceId'), '/linkedServices/serverless_ARIR')]",
+				"[concat(variables('workspaceId'), '/dataflows/FromJsonToDeltaParquet_RelationsMM')]",
+				"[concat(variables('workspaceId'), '/dataflows/FromJsonToDeltaParquet_Relations11')]",
+				"[concat(variables('workspaceId'), '/dataflows/FromJsonToDeltaParquet_Basic')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/GenericServerlessSQL')]",
+			"type": "Microsoft.Synapse/workspaces/datasets",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "serverless_ARIR",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"p_database": {
+							"value": "@dataset().p_database",
+							"type": "Expression"
+						}
+					}
+				},
+				"parameters": {
+					"p_database": {
+						"type": "string"
+					},
+					"p_schema": {
+						"type": "string"
+					},
+					"p_table": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"type": "AzureSqlDWTable",
+				"schema": [],
+				"typeProperties": {
+					"schema": {
+						"value": "@dataset().p_schema",
+						"type": "Expression"
+					},
+					"table": {
+						"value": "@dataset().p_table",
+						"type": "Expression"
+					}
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/linkedServices/serverless_ARIR')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/azuresynapse_REST')]",
+			"type": "Microsoft.Synapse/workspaces/linkedServices",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"parameters": {
+					"p_workspace": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"type": "RestService",
+				"typeProperties": {
+					"url": "[parameters('azuresynapse_REST_properties_typeProperties_url')]",
+					"enableServerCertificateValidation": true,
+					"authenticationType": "ManagedServiceIdentity",
+					"aadResourceId": "[parameters('azuresynapse_REST_properties_typeProperties_aadResourceId')]"
+				},
+				"connectVia": {
+					"referenceName": "SHIR",
+					"type": "IntegrationRuntimeReference"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/integrationRuntimes/SHIR')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/azuresynapse')]",
+			"type": "Microsoft.Synapse/workspaces/datasets",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "azuresynapse_REST",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"p_workspace": {
+							"value": "@dataset().p_workspace",
+							"type": "Expression"
+						}
+					}
+				},
+				"parameters": {
+					"p_workspace": {
+						"type": "string"
+					},
+					"p_relative_url": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"type": "RestResource",
+				"typeProperties": {
+					"relativeUrl": {
+						"value": "@dataset().p_relative_url",
+						"type": "Expression"
+					}
+				},
+				"schema": []
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/linkedServices/azuresynapse_REST')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/GenericEnrichedParquet')]",
+			"type": "Microsoft.Synapse/workspaces/datasets",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "templateenrst_ARIR",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"p_container": {
+						"type": "string"
+					},
+					"p_folder": {
+						"type": "string"
+					},
+					"p_file": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"type": "Parquet",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"fileName": {
+							"value": "@concat(dataset().p_file, '.parquet')",
+							"type": "Expression"
+						},
+						"folderPath": {
+							"value": "@dataset().p_folder",
+							"type": "Expression"
+						},
+						"fileSystem": {
+							"value": "@dataset().p_container",
+							"type": "Expression"
+						}
+					},
+					"compressionCodec": "snappy"
+				},
+				"schema": []
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/linkedServices/templateenrst_ARIR')]"
+			]
 		}
 	]
 }

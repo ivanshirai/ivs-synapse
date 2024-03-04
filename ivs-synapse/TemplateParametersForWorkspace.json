@@ -24,7 +24,7 @@
 			"value": "https://ivsdatastorage.dfs.core.windows.net"
 		},
 		"template_REST_properties_typeProperties_url": {
-			"value": "https://random-data-api.com/api/v2/"
+			"value": "https://gorest.co.in/public/v2/"
 		},
 		"template_kv_properties_typeProperties_baseUrl": {
 			"value": "https://ivs-dwh-kv.vault.azure.net/"
@@ -37,6 +37,12 @@
 		},
 		"templaterawst_ARIR_properties_typeProperties_url": {
 			"value": "https://ivsraw.dfs.core.windows.net/"
+		},
+		"azuresynapse_REST_properties_typeProperties_url": {
+			"value": "@{concat('https://', linkedService().p_workspace, '.dev.azuresynapse.net')}"
+		},
+		"azuresynapse_REST_properties_typeProperties_aadResourceId": {
+			"value": "https://dev.azuresynapse.net/"
 		}
 	}
 }
