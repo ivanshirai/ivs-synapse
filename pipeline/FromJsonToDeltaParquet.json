@@ -50,7 +50,7 @@
 								"source": {
 									"type": "SqlDWSource",
 									"sqlReaderQuery": {
-										"value": "@concat('SELECT STRING_AGG(cast(jsonName as varchar(max)), char(10)) ListOfFiles ',\n        'FROM ( SELECT right(result.filepath(), ',\n        'len(result.filepath()) - charindex(''', \n        pipeline().parameters.c_raw_root_folder, \n        ''', result.filepath()) + 1) jsonName, max(',\n        item().keyCol, ') ', item().keyCol, ' FROM OPENROWSET(',\n        'BULK ''', activity('GenericRawJson linked service').output.properties.typeProperties.url, '/',\n        pipeline().parameters.c_raw_container, '/', \n        pipeline().parameters.c_raw_root_folder, '/',\n        item().target, '/*.json'',  FORMAT = ''CSV'', FIELDQUOTE = ''0x0b'', ',\n        'FIELDTERMINATOR =''0x0b'', ROWTERMINATOR = ''\\n'') ',\n        'WITH (jsonContent nvarchar(MAX)) ',\n        'AS [result] CROSS apply ',\n        'openjson(JSON_QUERY(jsonContent, ''$.value'')) ',\n        'WITH (', item().keyCol, ' nvarchar(1000) ''$.\"',\n        item().keyCol, '\"'') WHERE reverse(substring(reverse(result.filepath()), 1, charindex(''/'', reverse(result.filepath())) - 1))',\n        if(\n                not(empty(pipeline().parameters.p_datetime_to)), \n                ' between ',\n                ' >= '\n        ),\n        '''', item().target, '_', \n        activity('DatetimeFrom').output.resultSets[0].rows[0].CDCTimestamp, '.json''',\n        if(not(empty(pipeline().parameters.p_datetime_to)), \n            concat(' and ''', item().target, '_', \n                replace(replace(replace(replace(replace(\n                    formatDateTime(\n                        pipeline().parameters.p_datetime_to, \n                        'yyyy-MM-ddTHH:mm:ss.fffffffZ'\n                    ), \n                    '0000Z', 'Z'), '000Z', 'Z'), '00Z', 'Z'), '0Z', 'Z'), '.Z', 'Z'\n                ), \n                '.json'''\n            ), \n            ''\n        ), \n        ' GROUP BY result.filepath()) q'\n)",
+										"value": "@concat('SELECT STRING_AGG(cast(jsonName as varchar(max)), char(10)) ListOfFiles ',\n        'FROM ( SELECT right(result.filepath(), ',\n        'len(result.filepath()) - charindex(''', \n        pipeline().parameters.c_raw_root_folder, \n        ''', result.filepath()) + 1) jsonName, max(',\n        item().keyCol, ') ', item().keyCol, ' FROM OPENROWSET(',\n        'BULK ''', activity('GenericRawJson linked service').output.properties.typeProperties.url, \n        pipeline().parameters.c_raw_container, '/', \n        pipeline().parameters.c_raw_root_folder, '/',\n        item().target, '/*.json'',  FORMAT = ''CSV'', FIELDQUOTE = ''0x0b'', ',\n        'FIELDTERMINATOR =''0x0b'', ROWTERMINATOR = ''\\n'') ',\n        'WITH (jsonContent nvarchar(MAX)) ',\n        'AS [result] CROSS apply ',\n        'openjson(JSON_QUERY(jsonContent, ''$.value'')) ',\n        'WITH (', item().keyCol, ' nvarchar(1000) ''$.\"',\n        item().keyCol, '\"'') WHERE reverse(substring(reverse(result.filepath()), 1, charindex(''/'', reverse(result.filepath())) - 1))',\n        if(\n                not(empty(pipeline().parameters.p_datetime_to)), \n                ' between ',\n                ' >= '\n        ),\n        '''', item().target, '_', \n        activity('DatetimeFrom').output.resultSets[0].rows[0].CDCTimestamp, '.json''',\n        if(not(empty(pipeline().parameters.p_datetime_to)), \n            concat(' and ''', item().target, '_', \n                replace(replace(replace(replace(replace(\n                    formatDateTime(\n                        pipeline().parameters.p_datetime_to, \n                        'yyyy-MM-ddTHH:mm:ss.fffffffZ'\n                    ), \n                    '0000Z', 'Z'), '000Z', 'Z'), '00Z', 'Z'), '0Z', 'Z'), '.Z', 'Z'\n                ), \n                '.json'''\n            ), \n            ''\n        ), \n        ' GROUP BY result.filepath()) q'\n)",
 										"type": "Expression"
 									},
 									"queryTimeout": "02:00:00",
@@ -154,7 +154,7 @@
 									{
 										"type": "Query",
 										"text": {
-											"value": "@concat('select count(*) countRows FROM OPENROWSET(',\n        'BULK ''', activity('GenericRawJson linked service').output.properties.typeProperties.url, '/',\n        pipeline().parameters.c_raw_container, '/', \n        pipeline().parameters.c_raw_root_folder, '/',\n        item().target, '/*.json'',  FORMAT = ''CSV'', FIELDQUOTE = ''0x0b'', ',\n        'FIELDTERMINATOR =''0x0b'', ROWTERMINATOR = ''\\n'') ',\n        'WITH (jsonContent nvarchar(MAX)) ',\n        'AS [result] CROSS apply ',\n        'openjson(JSON_QUERY(jsonContent, ''$.value'')) ',\n        'WITH (', item().keyCol, ' nvarchar(1000) ''$.\"',\n        item().keyCol, '\"'')  WHERE reverse(substring(reverse(result.filepath()), 1, charindex(''/'', reverse(result.filepath())) - 1))',\n        if(not(empty(pipeline().parameters.p_datetime_to)), \n           ' between ',\n           ' >= '),\n        '''', item().target, '_', \n        activity('DatetimeFrom').output.resultSets[0].rows[0].CDCTimestamp, '.json''',\n        if(not(empty(pipeline().parameters.p_datetime_to)), \n            concat(' and ''', item().target, '_', \n                replace(replace(replace(replace(replace(\n                    formatDateTime(\n                        pipeline().parameters.p_datetime_to, \n                        'yyyy-MM-ddTHH:mm:ss.fffffffZ'\n                    ), \n                    '0000Z', 'Z'), '000Z', 'Z'), '00Z', 'Z'), '0Z', 'Z'), '.Z', 'Z'\n                ), \n                '.json'''\n            ), \n            ''\n        )\n)",
+											"value": "@concat('select count(*) countRows FROM OPENROWSET(',\n        'BULK ''', activity('GenericRawJson linked service').output.properties.typeProperties.url, \n        pipeline().parameters.c_raw_container, '/', \n        pipeline().parameters.c_raw_root_folder, '/',\n        item().target, '/*.json'',  FORMAT = ''CSV'', FIELDQUOTE = ''0x0b'', ',\n        'FIELDTERMINATOR =''0x0b'', ROWTERMINATOR = ''\\n'') ',\n        'WITH (jsonContent nvarchar(MAX)) ',\n        'AS [result] CROSS apply ',\n        'openjson(JSON_QUERY(jsonContent, ''$.value'')) ',\n        'WITH (', item().keyCol, ' nvarchar(1000) ''$.\"',\n        item().keyCol, '\"'')  WHERE reverse(substring(reverse(result.filepath()), 1, charindex(''/'', reverse(result.filepath())) - 1))',\n        if(not(empty(pipeline().parameters.p_datetime_to)), \n           ' between ',\n           ' >= '),\n        '''', item().target, '_', \n        activity('DatetimeFrom').output.resultSets[0].rows[0].CDCTimestamp, '.json''',\n        if(not(empty(pipeline().parameters.p_datetime_to)), \n            concat(' and ''', item().target, '_', \n                replace(replace(replace(replace(replace(\n                    formatDateTime(\n                        pipeline().parameters.p_datetime_to, \n                        'yyyy-MM-ddTHH:mm:ss.fffffffZ'\n                    ), \n                    '0000Z', 'Z'), '000Z', 'Z'), '00Z', 'Z'), '0Z', 'Z'), '.Z', 'Z'\n                ), \n                '.json'''\n            ), \n            ''\n        )\n)",
 											"type": "Expression"
 										}
 									}
@@ -795,11 +795,11 @@
 			},
 			"c_raw_container": {
 				"type": "string",
-				"defaultValue": "sandpit"
+				"defaultValue": "template"
 			},
 			"c_enriched_container": {
 				"type": "string",
-				"defaultValue": "sandpit"
+				"defaultValue": "template"
 			},
 			"c_enriched_root_folder": {
 				"type": "string",
@@ -831,7 +831,7 @@
 			},
 			"c_raw_monitoring_container": {
 				"type": "string",
-				"defaultValue": "sandpit"
+				"defaultValue": "template"
 			}
 		},
 		"variables": {
