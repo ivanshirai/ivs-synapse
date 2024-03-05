@@ -609,7 +609,7 @@
 						"sourceObject": "dataflows",
 						"sourceSchema": "enr",
 						"whereStatement": "",
-						"target": "dataflows_ParquetToDeltaParquet",
+						"target": "dataflows",
 						"processingMode": "bulk",
 						"cdcCol": "",
 						"keyCol": [
@@ -622,7 +622,7 @@
 						"sourceObject": "datasets",
 						"sourceSchema": "enr",
 						"whereStatement": "",
-						"target": "datasets_ParquetToDeltaParquet",
+						"target": "datasets",
 						"processingMode": "bulk",
 						"cdcCol": "",
 						"keyCol": [
@@ -635,7 +635,7 @@
 						"sourceObject": "datasets_relations11",
 						"sourceSchema": "enr",
 						"whereStatement": "",
-						"target": "datasets_relations11_ParquetToDeltaParquet",
+						"target": "datasets_relations11",
 						"processingMode": "incremental",
 						"cdcCol": "enrTimestamp",
 						"keyCol": [
@@ -648,7 +648,7 @@
 						"sourceObject": "dataflows_datasets",
 						"sourceSchema": "enr",
 						"whereStatement": "",
-						"target": "dataflows_datasets_ParquetToDeltaParquet",
+						"target": "dataflows_datasets",
 						"processingMode": "incremental",
 						"cdcCol": "enrTimestamp",
 						"keyCol": [
