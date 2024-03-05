@@ -1,0 +1,20 @@
+{
+	"name": "Template_enr_schema",
+	"properties": {
+		"folder": {
+			"name": "Serverless Deploy"
+		},
+		"content": {
+			"query": "IF NOT EXISTS (SELECT * FROM sys.schemas WHERE name = 'enr') \nEXEC('CREATE SCHEMA [enr]')",
+			"metadata": {
+				"language": "sql"
+			},
+			"currentConnection": {
+				"databaseName": "templateDB",
+				"poolName": "Built-in"
+			},
+			"resultLimit": 5000
+		},
+		"type": "SqlQuery"
+	}
+}
