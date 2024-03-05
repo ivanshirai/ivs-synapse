@@ -2,7 +2,7 @@
 	"name": "FromParquetToDeltaParquet",
 	"properties": {
 		"folder": {
-			"name": "Audit"
+			"name": "Templates"
 		},
 		"type": "MappingDataFlow",
 		"typeProperties": {
