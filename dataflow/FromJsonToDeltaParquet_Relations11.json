@@ -176,7 +176,7 @@
 				"     output: false,",
 				"     saveOrder: 1,",
 				"     mapColumn(",
-				"          PARTITION",
+				"          PARTITION_PRUNING = PARTITION",
 				"     )) ~> sinkPartitionPruning"
 			]
 		}
