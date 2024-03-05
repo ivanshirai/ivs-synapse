@@ -867,14 +867,15 @@
 			},
 			"c_enriched_cdc_column": {
 				"type": "string",
-				"defaultValue": "cdcTimestamp"
+				"defaultValue": "enrTimestamp"
 			},
 			"c_raw_monitoring_container": {
 				"type": "string",
 				"defaultValue": "template"
 			},
 			"c_raw_cdc_column": {
-				"type": "string"
+				"type": "string",
+				"defaultValue": "rawTimestamp"
 			}
 		},
 		"variables": {
