@@ -138,7 +138,7 @@
 				"     AGGREGATE = first(expr($p_partition_formula))) ~> aggregatePartitionPruning",
 				"aggregatePartitionPruning, dummyPartitionPruning union(byName: true)~> unionPartitionPruning",
 				"unionPartitionPruning aggregate(groupBy(CONSTANT),",
-				"     PARTITION = collect(AGGREGATE)) ~> collectPartitionPruning",
+				"     PARTITION = distinct(collect(AGGREGATE))) ~> collectPartitionPruning",
 				"PartitionPruning foldDown(unroll((byName('value'))),",
 				"     mapColumn(",
 				"          every(match(locate('@',name)==0),",
