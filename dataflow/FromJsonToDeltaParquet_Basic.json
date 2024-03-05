@@ -43,7 +43,7 @@
 			],
 			"transformations": [
 				{
-					"name": "flatten"
+					"name": "flattenRaw"
 				},
 				{
 					"name": "alterRow"
@@ -69,6 +69,9 @@
 				},
 				{
 					"name": "collectPartitionPruning"
+				},
+				{
+					"name": "flattenPartition"
 				}
 			],
 			"scriptLines": [
@@ -78,7 +81,7 @@
 				"     c_key_column_name as string ('name'),",
 				"     c_cdc_column_name as string ('fileName'),",
 				"     c_enriched_cdc_column as string ('enrTimestamp'),",
-				"     p_partition_formula as string ('dummy'),",
+				"     p_partition_formula as string (\"'dummy'\"),",
 				"     p_dss_update_time as string ('2023-10-20T00:00:00Z'),",
 				"     c_raw_cdc_column as string ('rawTimestamp')",
 				"}",
@@ -115,15 +118,15 @@
 				"               $0 = $$)",
 				"     ),",
 				"     skipDuplicateMapInputs: false,",
-				"     skipDuplicateMapOutputs: false) ~> flatten",
+				"     skipDuplicateMapOutputs: false) ~> flattenRaw",
 				"removeTempColumns alterRow(upsertIf(true())) ~> alterRow",
 				"derivedId window(over(keyColumn),",
 				"     desc(toString(byName($c_cdc_column_name)), true),",
 				"     rowNum = rowNumber()) ~> elicitDuplicates",
-				"flatten derive(keyColumn = toString(byName($c_key_column_name)),",
+				"flattenRaw derive(keyColumn = toString(byName($c_key_column_name)),",
 				"          each(match(true()), $$ = toString($$)),",
 				"          dssUpdateTime = currentUTC(),",
-				"          each(match(name=='fileName'), $c_enriched_cdc_column = toTimestamp($p_dss_update_time, \"yyyy-MM-dd'T'HH:mm:ss'Z'\"), $c_raw_cdc_column = toTimestamp(replace(reverse(substring(reverse(toString($$)), 0, locate('_', reverse(toString($$))) - 1)), '.json'), \"yyyy-MM-dd'T'HH:mm:ss'Z'\")),",
+				"          each(match(name=='fileName'), $c_enriched_cdc_column = toTimestamp($p_dss_update_time, \"yyyy-MM-dd'T'HH:mm:ss'Z'\"), $c_raw_cdc_column = replace(reverse(substring(reverse(toString($$)), 0, locate('_', reverse(toString($$))) - 1)), '.json')),",
 				"          DELTA_PARTITION = expr($p_partition_formula)) ~> derivedId",
 				"elicitDuplicates filter(rowNum == 1 && not(isNull(keyColumn))) ~> filterDuplicates",
 				"filterDuplicates select(mapColumn(",
@@ -131,12 +134,19 @@
 				"     ),",
 				"     skipDuplicateMapInputs: true,",
 				"     skipDuplicateMapOutputs: true) ~> removeTempColumns",
-				"PartitionPruning aggregate(groupBy(PARTITION = expr($p_partition_formula),",
+				"flattenPartition aggregate(groupBy(PARTITION = expr($p_partition_formula),",
 				"          CONSTANT = 'CONSTANT'),",
 				"     AGGREGATE = first(expr($p_partition_formula))) ~> aggregatePartitionPruning",
 				"aggregatePartitionPruning, dummyPartitionPruning union(byName: true)~> unionPartitionPruning",
 				"unionPartitionPruning aggregate(groupBy(CONSTANT),",
 				"     PARTITION = collect(AGGREGATE)) ~> collectPartitionPruning",
+				"PartitionPruning foldDown(unroll((byName('value'))),",
+				"     mapColumn(",
+				"          every(match(locate('@',name)==0),",
+				"               $0 = $$)",
+				"     ),",
+				"     skipDuplicateMapInputs: false,",
+				"     skipDuplicateMapOutputs: false) ~> flattenPartition",
 				"alterRow sink(allowSchemaDrift: true,",
 				"     validateSchema: false,",
 				"     format: 'delta',",
