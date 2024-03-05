@@ -331,7 +331,19 @@
 																"type": "Expression"
 															},
 															"c_enriched_cdc_column": {
-																"value": "'@{item().relCol}'",
+																"value": "'@{pipeline().parameters.c_enriched_cdc_column}'",
+																"type": "Expression"
+															},
+															"p_partition_formula": {
+																"value": "@concat('\"', item().partitionFormula, '\"')",
+																"type": "Expression"
+															},
+															"p_dss_update_time": {
+																"value": "'@{formatDateTime(variables('v_dss_update_time'), 'yyyy-MM-ddTHH:mm:ssZ')}'",
+																"type": "Expression"
+															},
+															"c_raw_cdc_column": {
+																"value": "'@{pipeline().parameters.c_raw_cdc_column}'",
 																"type": "Expression"
 															}
 														},
@@ -350,19 +362,24 @@
 																	"type": "Expression"
 																}
 															},
-															"fileList": {
+															"PartitionPruning": {
 																"p_container": {
 																	"value": "@pipeline().parameters.c_raw_monitoring_container",
 																	"type": "Expression"
 																},
 																"p_folder": {
-																	"value": "@pipeline().parameters.c_raw_monitoring_folder",
+																	"value": "@concat(pipeline().parameters.c_raw_monitoring_folder, '/', \npipeline().parameters.c_raw_root_folder, '/',\nitem().target)",
 																	"type": "Expression"
 																},
 																"p_file": {
-																	"value": "@pipeline().parameters.c_file_list_blob",
+																	"value": "@concat(pipeline().parameters.c_file_list_blob, '.csv')",
 																	"type": "Expression"
 																}
+															},
+															"dummyPartitionPruning": {
+																"p_database": "master",
+																"p_schema": "dummy",
+																"p_table": "dummy"
 															}
 														}
 													},

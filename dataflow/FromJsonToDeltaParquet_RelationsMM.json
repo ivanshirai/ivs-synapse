@@ -186,12 +186,17 @@
 				"     updateable: false,",
 				"     upsertable: true,",
 				"     keys:(array($c_key_column_name, replace($c_relation_column_name, '.', ''))),",
+				"     pruneCondition: ['DELTA_PARTITION' -> (sinkPartitionPruning#outputs().PARTITION_PRUNING)],",
 				"     umask: 0022,",
 				"     preCommands: [],",
 				"     postCommands: [],",
 				"     skipDuplicateMapInputs: true,",
 				"     skipDuplicateMapOutputs: true,",
-				"     saveOrder: 1) ~> EnrichedDeltaLake",
+				"     saveOrder: 1,",
+				"     partitionBy('key',",
+				"          1,",
+				"          DELTA_PARTITION",
+				"     )) ~> EnrichedDeltaLake",
 				"collectPartitionPruning sink(validateSchema: false,",
 				"     skipDuplicateMapInputs: true,",
 				"     skipDuplicateMapOutputs: true,",
@@ -200,7 +205,7 @@
 				"     output: false,",
 				"     saveOrder: 1,",
 				"     mapColumn(",
-				"          PARTITION",
+				"          PARTITION_PRUNING = PARTITION",
 				"     )) ~> sinkPartitionPruning"
 			]
 		}

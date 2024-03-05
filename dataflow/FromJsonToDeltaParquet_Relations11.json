@@ -81,7 +81,6 @@
 				"     c_key_column_name as string ('name'),",
 				"     c_cdc_column_name as string ('fileName'),",
 				"     c_enriched_cdc_column as string ('enrTimestamp'),",
-				"     c_relation_column_name as string ('properties.typeProperties.sources.dataset.referenceName'),",
 				"     p_partition_formula as string (\"'dummy'\"),",
 				"     p_dss_update_time as string ('2023-10-20T00:00:00Z'),",
 				"     c_raw_cdc_column as string ('rawTimestamp')",
