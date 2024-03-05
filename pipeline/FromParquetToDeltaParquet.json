@@ -1,0 +1,639 @@
+{
+	"name": "FromParquetToDeltaParquet",
+	"properties": {
+		"activities": [
+			{
+				"name": "ForEachDataset",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "GenericRawParquet linked service",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "Set v_dss_update_time",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@pipeline().parameters.p_datasets",
+						"type": "Expression"
+					},
+					"isSequential": false,
+					"activities": [
+						{
+							"name": "copyFileList",
+							"type": "Copy",
+							"dependsOn": [
+								{
+									"activity": "DatetimeFrom",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 2,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "SqlDWSource",
+									"sqlReaderQuery": {
+										"value": "@concat('SELECT STRING_AGG(cast(parquetName as varchar(max)), char(10)) ListOfFiles ',\n        'FROM ( SELECT right(result.filepath(), ',\n        'len(result.filepath()) - charindex(''', \n        pipeline().parameters.c_raw_root_folder, \n        ''', result.filepath()) + 1) parquetName, max(',\n        first(item().keyCol), ') ', first(item().keyCol), ' FROM OPENROWSET(',\n        'BULK ''', activity('GenericRawParquet linked service').output.properties.typeProperties.url, '/',\n        pipeline().parameters.c_raw_container, '/', \n        pipeline().parameters.c_raw_root_folder, '/',\n        item().target, '/*.parquet'',  FORMAT = ''PARQUET'') ',\n        'AS [result] WHERE reverse(substring(reverse(result.filepath()), 1, charindex(''/'', reverse(result.filepath())) - 1))',\n        if(\n                not(empty(pipeline().parameters.p_datetime_to)), \n                ' between ',\n                ' >= '\n        ),\n        '''', item().target, if(empty(item().cdcCol), '', concat('_', activity('DatetimeFrom').output.resultSets[0].rows[0].CDCTimestamp)), '.parquet''',\n        if(not(empty(pipeline().parameters.p_datetime_to)), \n            concat(' and ''', item().target, '_', \n                replace(replace(replace(replace(replace(\n                    formatDateTime(\n                        pipeline().parameters.p_datetime_to, \n                        'yyyy-MM-ddTHH:mm:ss.fffffffZ'\n                    ), \n                    '0000Z', 'Z'), '000Z', 'Z'), '00Z', 'Z'), '0Z', 'Z'), '.Z', 'Z'\n                ), \n                '.parquet'''\n            ), \n            ''\n        ), \n        ' GROUP BY result.filepath()) q'\n)",
+										"type": "Expression"
+									},
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"sink": {
+									"type": "DelimitedTextSink",
+									"storeSettings": {
+										"type": "AzureBlobFSWriteSettings"
+									},
+									"formatSettings": {
+										"type": "DelimitedTextWriteSettings",
+										"quoteAllText": true,
+										"fileExtension": ".txt"
+									}
+								},
+								"enableStaging": false,
+								"translator": {
+									"type": "TabularTranslator",
+									"mappings": [
+										{
+											"source": {
+												"name": "ListOfFiles",
+												"physicalType": "nvarchar"
+											},
+											"sink": {
+												"ordinal": 1
+											}
+										}
+									],
+									"typeConversion": true,
+									"typeConversionSettings": {
+										"allowDataTruncation": true,
+										"treatBooleanAsNumber": false
+									}
+								}
+							},
+							"inputs": [
+								{
+									"referenceName": "GenericServerlessSQL",
+									"type": "DatasetReference",
+									"parameters": {
+										"p_schema": "dbo",
+										"p_table": "dummy",
+										"p_database": "ICP_Data_Store"
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "GenericRawCSV_NoHeaderNoQuote",
+									"type": "DatasetReference",
+									"parameters": {
+										"p_container": {
+											"value": "@pipeline().parameters.c_raw_monitoring_container",
+											"type": "Expression"
+										},
+										"p_folder": {
+											"value": "@concat(pipeline().parameters.c_raw_monitoring_folder, '/', \n    item().target)",
+											"type": "Expression"
+										},
+										"p_file": {
+											"value": "@concat(pipeline().parameters.c_file_list_blob, '_', item().target)",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						},
+						{
+							"name": "countRows",
+							"type": "Script",
+							"dependsOn": [
+								{
+									"activity": "DatetimeFrom",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 2,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"linkedServiceName": {
+								"referenceName": "serverless_ARIR",
+								"type": "LinkedServiceReference",
+								"parameters": {
+									"p_database": {
+										"value": "ICP_Data_Store",
+										"type": "Expression"
+									}
+								}
+							},
+							"typeProperties": {
+								"scripts": [
+									{
+										"type": "Query",
+										"text": {
+											"value": "@concat('select count(*) countRows FROM OPENROWSET(',\n        'BULK ''', activity('GenericRawParquet linked service').output.properties.typeProperties.url, '/',\n        pipeline().parameters.c_raw_container, '/', \n        pipeline().parameters.c_raw_root_folder, '/',\n        item().target, '/*.parquet'',  FORMAT = ''PARQUET'') ', 'AS [result] WHERE reverse(substring(reverse(result.filepath()), 1, charindex(''/'', reverse(result.filepath())) - 1))',\n        if(not(empty(pipeline().parameters.p_datetime_to)), \n           ' between ',\n           ' >= '),\n        '''', item().target, if(empty(item().cdcCol), '', concat('_', activity('DatetimeFrom').output.resultSets[0].rows[0].CDCTimestamp)), '.parquet''',\n        if(not(empty(pipeline().parameters.p_datetime_to)), \n            concat(' and ''', item().target, '_', \n                replace(replace(replace(replace(replace(\n                    formatDateTime(\n                        pipeline().parameters.p_datetime_to, \n                        'yyyy-MM-ddTHH:mm:ss.fffffffZ'\n                    ), \n                    '0000Z', 'Z'), '000Z', 'Z'), '00Z', 'Z'), '0Z', 'Z'), '.Z', 'Z'\n                ), \n                '.parquet'''\n            ), \n            ''\n        )\n)",
+											"type": "Expression"
+										}
+									}
+								],
+								"scriptBlockExecutionTimeout": "02:00:00"
+							}
+						},
+						{
+							"name": "If dataTypeReplace not empty",
+							"type": "IfCondition",
+							"dependsOn": [
+								{
+									"activity": "If RowCount not Zero",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"expression": {
+									"value": "@and(not(empty(item().dataTypeReplace)),\ngreater(activity('countRows').output.resultSets[0].rows[0].countRows, 0))",
+									"type": "Expression"
+								},
+								"ifTrueActivities": [
+									{
+										"name": "Generate SQL",
+										"type": "Script",
+										"dependsOn": [],
+										"policy": {
+											"timeout": "0.12:00:00",
+											"retry": 2,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"linkedServiceName": {
+											"referenceName": "serverless_ARIR",
+											"type": "LinkedServiceReference",
+											"parameters": {
+												"p_database": "ICP_Data_Store"
+											}
+										},
+										"typeProperties": {
+											"scripts": [
+												{
+													"type": "Query",
+													"text": {
+														"value": "select 'create or alter view  \n@{concat(if(empty(pipeline().parameters.c_enriched_schema), '', concat(pipeline().parameters.c_enriched_schema, '.')), item().target)}\nas select * from OPENROWSET(BULK ''@{item().target}'', \t\n\tDATA_SOURCE = ''@{pipeline().parameters.c_external_data_source}'', \t\n\tFORMAT = ''Delta''\n) WITH (' +\nSTRING_AGG('[' + \ncast(colName as varchar(max)) + '] ' + \ndataType, ',' + char(10)) \nWITHIN GROUP (ORDER BY column_id ASC) +\n') as r' as SQL\nfrom (select \nc.name colName, coalesce(r.dataType,\nCASE \n      WHEN t.[name] IN ('varchar', 'char', 'varbinary') THEN t.[name] + '(' + IIF(c.max_length = -1, 'max', CAST(c.max_length AS VARCHAR(25))) + ')' \n      WHEN t.[name] IN ('nvarchar','nchar') THEN t.[name] + '(' + IIF(c.max_length = -1, 'max', CAST(c.max_length / 2 AS VARCHAR(25)))+ ')'      \n      WHEN t.[name] IN ('decimal', 'numeric') THEN t.[name] + '(' + CAST(c.[precision] AS VARCHAR(25)) + ', ' + CAST(c.[scale] AS VARCHAR(25)) + ')'\n      WHEN t.[name] IN ('datetime2') THEN t.[name] + '(' + CAST(c.[scale] AS VARCHAR(25)) + ')'\n      ELSE t.[name]\nEND) AS dataType,\nc.column_id\nfrom sys.columns c\njoin sys.views v on v.object_id = c.object_id\njoin sys.schemas s on s.schema_id = v.schema_id\njoin sys.types t on c.user_type_id = t.user_type_id \nleft outer join (select * from OpenJson(N'@{item().dataTypeReplace}')\nWITH (col varchar(255), dataType varchar(255)) as r) r\non r.col = c.name\nwhere s.name = '@{pipeline().parameters.c_enriched_schema}' and v.name = '@{item().target}') q",
+														"type": "Expression"
+													}
+												}
+											],
+											"scriptBlockExecutionTimeout": "02:00:00"
+										}
+									},
+									{
+										"name": "rebuildView",
+										"type": "Script",
+										"dependsOn": [
+											{
+												"activity": "Generate SQL",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"policy": {
+											"timeout": "0.12:00:00",
+											"retry": 2,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"linkedServiceName": {
+											"referenceName": "serverless_ARIR",
+											"type": "LinkedServiceReference",
+											"parameters": {
+												"p_database": "ICP_Data_Store"
+											}
+										},
+										"typeProperties": {
+											"scripts": [
+												{
+													"type": "NonQuery",
+													"text": {
+														"value": "@activity('Generate SQL').output.resultSets[0].rows[0].SQL",
+														"type": "Expression"
+													}
+												}
+											],
+											"scriptBlockExecutionTimeout": "02:00:00"
+										}
+									}
+								]
+							}
+						},
+						{
+							"name": "DatetimeFrom",
+							"type": "Script",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 2,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"linkedServiceName": {
+								"referenceName": "serverless_ARIR",
+								"type": "LinkedServiceReference",
+								"parameters": {
+									"p_database": {
+										"value": "ICP_Data_Store",
+										"type": "Expression"
+									}
+								}
+							},
+							"typeProperties": {
+								"scripts": [
+									{
+										"type": "Query",
+										"text": {
+											"value": "@if(and(empty(pipeline().parameters.p_datetime_from),\n        not(empty(pipeline().parameters.c_raw_cdc_column))\n    ),\n    concat('if exists (select 1 from sys.columns c join sys.views v on v.object_id = c.object_id join sys.schemas s on s.schema_id = v.schema_id where s.name = ''', pipeline().parameters.c_enriched_schema, ''' and v.name = ''', item().target, ''' and c.name = ''', pipeline().parameters.c_raw_cdc_column, ''') ',\n        'exec(''select dateadd(mcs, 1, cast(max(', pipeline().parameters.c_raw_cdc_column, ') as datetime2)) CDCTimestamp from ',\n        if(empty(pipeline().parameters.c_enriched_schema), '', concat(pipeline().parameters.c_enriched_schema, '.')), item().target,\n        ''') else select ''1900-01-01'' as CDCTimestamp'\n    ),\n    concat('select ''', replace(replace(replace(replace(replace(\n                    formatDateTime(\n                        pipeline().parameters.p_datetime_from, \n                        'yyyy-MM-ddTHH:mm:ss.fffffffZ'\n                    ), \n                    '0000Z', 'Z'), '000Z', 'Z'), '00Z', 'Z'), '0Z', 'Z'), '.Z', 'Z'\n                ),\n        ''' as CDCTimestamp'\n    )\n)",
+											"type": "Expression"
+										}
+									}
+								],
+								"scriptBlockExecutionTimeout": "02:00:00"
+							}
+						},
+						{
+							"name": "If RowCount not Zero",
+							"type": "IfCondition",
+							"dependsOn": [
+								{
+									"activity": "copyFileList",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								},
+								{
+									"activity": "countRows",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"expression": {
+									"value": "@greater(activity('countRows').output.resultSets[0].rows[0].countRows, 0)",
+									"type": "Expression"
+								},
+								"ifTrueActivities": [
+									{
+										"name": "createView",
+										"type": "Script",
+										"dependsOn": [
+											{
+												"activity": "FromParquetToDeltaParquet",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"policy": {
+											"timeout": "0.12:00:00",
+											"retry": 2,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"linkedServiceName": {
+											"referenceName": "serverless_ARIR",
+											"type": "LinkedServiceReference",
+											"parameters": {
+												"p_database": "ICP_Data_Store"
+											}
+										},
+										"typeProperties": {
+											"scripts": [
+												{
+													"type": "Query",
+													"text": {
+														"value": "create or alter view \n@{if(empty(pipeline().parameters.c_enriched_schema), item().target, concat(pipeline().parameters.c_enriched_schema, '.', item().target))}\nas select * from OPENROWSET(\n\tBULK '@{item().target}', \t\n\tDATA_SOURCE = '@{pipeline().parameters.c_external_data_source}', \t\n\tFORMAT = 'Delta'\n) as r",
+														"type": "Expression"
+													}
+												}
+											],
+											"scriptBlockExecutionTimeout": "02:00:00"
+										}
+									},
+									{
+										"name": "FromParquetToDeltaParquet",
+										"type": "ExecuteDataFlow",
+										"dependsOn": [],
+										"policy": {
+											"timeout": "0.12:00:00",
+											"retry": 2,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"dataflow": {
+												"referenceName": "FromParquetToDeltaParquet",
+												"type": "DataFlowReference",
+												"parameters": {
+													"c_target_container": {
+														"value": "'@{pipeline().parameters.c_enriched_container}'",
+														"type": "Expression"
+													},
+													"c_key_column_name": {
+														"value": "'@{replace(replace(replace(string(item().keyCol), '[', ''), ']', ''), '\"', '')}'",
+														"type": "Expression"
+													},
+													"c_raw_cdc_column": {
+														"value": "'@{pipeline().parameters.c_raw_cdc_column}'",
+														"type": "Expression"
+													},
+													"p_dss_update_time": {
+														"value": "'@{formatDateTime(variables('v_dss_update_time'), 'yyyy-MM-ddTHH:mm:ssZ')}'",
+														"type": "Expression"
+													},
+													"c_enr_cdc_column": {
+														"value": "'@{pipeline().parameters.c_enr_cdc_column}'",
+														"type": "Expression"
+													},
+													"p_partition_formula": {
+														"value": "@concat('\"', item().partitionFormula, '\"')",
+														"type": "Expression"
+													},
+													"c_target_root_folder": {
+														"value": "'@{pipeline().parameters.c_enriched_root_folder}'",
+														"type": "Expression"
+													},
+													"p_object": {
+														"value": "'@{item().target}'",
+														"type": "Expression"
+													}
+												},
+												"datasetParameters": {
+													"RawDataset": {
+														"p_container": {
+															"value": "@pipeline().parameters.c_raw_monitoring_container",
+															"type": "Expression"
+														},
+														"p_folder": {
+															"value": "@concat(pipeline().parameters.c_raw_monitoring_folder, '/',\n    item().target)",
+															"type": "Expression"
+														},
+														"p_file": {
+															"value": "@concat(pipeline().parameters.c_file_list_blob, '_', item().target, '.csv')",
+															"type": "Expression"
+														}
+													},
+													"RawPartitionPruning": {
+														"p_container": {
+															"value": "@pipeline().parameters.c_raw_monitoring_container",
+															"type": "Expression"
+														},
+														"p_folder": {
+															"value": "@concat(pipeline().parameters.c_raw_monitoring_folder, '/',\n    item().target)",
+															"type": "Expression"
+														},
+														"p_file": {
+															"value": "@concat(pipeline().parameters.c_file_list_blob, '_', item().target, '.csv')",
+															"type": "Expression"
+														}
+													},
+													"dummyPartitionPruning": {
+														"p_database": "master",
+														"p_schema": "dummy",
+														"p_table": "dummy"
+													}
+												}
+											},
+											"compute": {
+												"coreCount": 8,
+												"computeType": "General"
+											},
+											"traceLevel": "Fine"
+										}
+									}
+								]
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "GenericRawParquet attributes",
+				"type": "WebActivity",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"method": "GET",
+					"url": {
+						"value": "@concat('https://', pipeline().DataFactory, '.dev.azuresynapse.net/datasets/GenericRawParquet?api-version=2020-12-01')",
+						"type": "Expression"
+					},
+					"connectVia": {
+						"referenceName": "SHIR",
+						"type": "IntegrationRuntimeReference"
+					},
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://dev.azuresynapse.net/"
+					}
+				}
+			},
+			{
+				"name": "GenericRawParquet linked service",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "GenericRawParquet attributes",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"method": "GET",
+					"url": {
+						"value": "@concat('https://', pipeline().DataFactory, '.dev.azuresynapse.net/linkedservices/', activity('GenericRawParquet attributes').output.properties.linkedServiceName.referenceName, '?api-version=2020-12-01')",
+						"type": "Expression"
+					},
+					"connectVia": {
+						"referenceName": "SHIR",
+						"type": "IntegrationRuntimeReference"
+					},
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://dev.azuresynapse.net/"
+					}
+				}
+			},
+			{
+				"name": "Set v_dss_update_time",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "v_dss_update_time",
+					"value": {
+						"value": "@utcNow()",
+						"type": "Expression"
+					}
+				}
+			}
+		],
+		"parameters": {
+			"p_datasets": {
+				"type": "array",
+				"defaultValue": [
+					{
+						"sourceObject": "F4211",
+						"sourceSchema": "dbo",
+						"whereStatement": "",
+						"target": "F4211",
+						"processingMode": "incremental",
+						"cdcCol": "CREATE_DATE",
+						"keyCol": [
+							"SDDOCO",
+							"SDDCTO",
+							"SDKCOO",
+							"SDLNID"
+						],
+						"dataTypeReplace": null,
+						"partitionFormula": "'dummy'"
+					}
+				]
+			},
+			"p_datetime_from": {
+				"type": "string"
+			},
+			"p_datetime_to": {
+				"type": "string"
+			},
+			"c_raw_root_folder": {
+				"type": "string",
+				"defaultValue": "ICP_Data_Store"
+			},
+			"c_raw_container": {
+				"type": "string",
+				"defaultValue": "icpdatawarehouse"
+			},
+			"c_enriched_container": {
+				"type": "string",
+				"defaultValue": "enriched"
+			},
+			"c_enriched_root_folder": {
+				"type": "string",
+				"defaultValue": "ICP_Data_Store"
+			},
+			"c_file_list_blob": {
+				"type": "string",
+				"defaultValue": "fileList"
+			},
+			"c_serverless_db": {
+				"type": "string",
+				"defaultValue": "serverlessDB"
+			},
+			"c_raw_monitoring_folder": {
+				"type": "string",
+				"defaultValue": "PipelineMonitoring/ICPDataStore"
+			},
+			"c_external_data_source": {
+				"type": "string",
+				"defaultValue": "Enr_ICP_Data_Store"
+			},
+			"c_enriched_schema": {
+				"type": "string",
+				"defaultValue": "enr"
+			},
+			"c_enr_cdc_column": {
+				"type": "string",
+				"defaultValue": "enrTimestamp"
+			},
+			"c_raw_monitoring_container": {
+				"type": "string",
+				"defaultValue": "icpdatawarehouse"
+			},
+			"c_raw_cdc_column": {
+				"type": "string",
+				"defaultValue": "rawTimestamp"
+			}
+		},
+		"variables": {
+			"v_datetime_from": {
+				"type": "String"
+			},
+			"v_datetime_to": {
+				"type": "String"
+			},
+			"v_array": {
+				"type": "Array"
+			},
+			"v_array_tmp": {
+				"type": "Array"
+			},
+			"v_string": {
+				"type": "String"
+			},
+			"v_dss_update_time": {
+				"type": "String"
+			}
+		},
+		"folder": {
+			"name": "ICP_Store"
+		},
+		"annotations": [],
+		"lastPublishTime": "2023-10-16T14:40:58Z"
+	},
+	"type": "Microsoft.Synapse/workspaces/pipelines"
+}
