@@ -700,7 +700,7 @@
 			},
 			"c_sql_db": {
 				"type": "string",
-				"defaultValue": "template"
+				"defaultValue": "templateDB"
 			}
 		},
 		"variables": {
