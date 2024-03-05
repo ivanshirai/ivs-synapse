@@ -17,6 +17,12 @@
 						"dependencyConditions": [
 							"Succeeded"
 						]
+					},
+					{
+						"activity": "Set v_dss_update_time",
+						"dependencyConditions": [
+							"Succeeded"
+						]
 					}
 				],
 				"userProperties": [],
@@ -391,6 +397,18 @@
 															"c_enriched_cdc_column": {
 																"value": "'@{pipeline().parameters.c_enriched_cdc_column}'",
 																"type": "Expression"
+															},
+															"p_partition_formula": {
+																"value": "@concat('\"', item().partitionFormula, '\"')",
+																"type": "Expression"
+															},
+															"p_dss_update_time": {
+																"value": "'@{formatDateTime(variables('v_dss_update_time'), 'yyyy-MM-ddTHH:mm:ssZ')}'",
+																"type": "Expression"
+															},
+															"c_raw_cdc_column": {
+																"value": "'@{pipeline().parameters.c_raw_cdc_column}'",
+																"type": "Expression"
 															}
 														},
 														"datasetParameters": {
@@ -408,19 +426,24 @@
 																	"type": "Expression"
 																}
 															},
-															"fileList": {
+															"PartitionPruning": {
 																"p_container": {
 																	"value": "@pipeline().parameters.c_raw_monitoring_container",
 																	"type": "Expression"
 																},
 																"p_folder": {
-																	"value": "@concat(pipeline().parameters.c_raw_monitoring_folder, '/', \npipeline().parameters.c_raw_root_folder, '/',\nitem().target)",
+																	"value": "@concat(pipeline().parameters.c_raw_monitoring_folder, '/',\n    pipeline().parameters.c_raw_root_folder, '/', \n    item().target)",
 																	"type": "Expression"
 																},
 																"p_file": {
-																	"value": "@pipeline().parameters.c_file_list_blob",
+																	"value": "@concat(pipeline().parameters.c_file_list_blob, '.csv')",
 																	"type": "Expression"
 																}
+															},
+															"dummyPartitionPruning": {
+																"p_database": "master",
+																"p_schema": "dummy",
+																"p_table": "dummy"
 															}
 														}
 													},
@@ -552,7 +575,7 @@
 									{
 										"type": "Query",
 										"text": {
-											"value": "@if(and(empty(pipeline().parameters.p_datetime_from),\n        not(empty(pipeline().parameters.c_enriched_cdc_column))\n    ),\n    concat('if exists (select 1 from sys.columns c join sys.views v on v.object_id = c.object_id join sys.schemas s on s.schema_id = v.schema_id where s.name = ''', pipeline().parameters.c_enriched_schema, ''' and v.name = ''', item().target, ''' and c.name = ''', pipeline().parameters.c_enriched_cdc_column, ''') ',\n        'exec(''select dateadd(mcs, 1, cast(max(', pipeline().parameters.c_enriched_cdc_column, ') as datetime2)) CDCTimestamp from ',\n        if(empty(pipeline().parameters.c_enriched_schema), '', concat(pipeline().parameters.c_enriched_schema, '.')), item().target,\n        ''') else select ''1900-01-01'' as CDCTimestamp'\n    ),\n    concat('select ''', replace(replace(replace(replace(replace(\n                    formatDateTime(\n                        pipeline().parameters.p_datetime_from, \n                        'yyyy-MM-ddTHH:mm:ss.fffffffZ'\n                    ), \n                    '0000Z', 'Z'), '000Z', 'Z'), '00Z', 'Z'), '0Z', 'Z'), '.Z', 'Z'\n                ),\n        ''' as CDCTimestamp'\n    )\n)",
+											"value": "@if(and(empty(pipeline().parameters.p_datetime_from),\n        not(empty(pipeline().parameters.c_raw_cdc_column))\n    ),\n    concat('if exists (select 1 from sys.columns c join sys.views v on v.object_id = c.object_id join sys.schemas s on s.schema_id = v.schema_id where s.name = ''', pipeline().parameters.c_enriched_schema, ''' and v.name = ''', item().target, ''' and c.name = ''', pipeline().parameters.c_raw_cdc_column, ''') ',\n        'exec(''select dateadd(mcs, 1, cast(max(', pipeline().parameters.c_raw_cdc_column, ') as datetime2)) CDCTimestamp from ',\n        if(empty(pipeline().parameters.c_enriched_schema), '', concat(pipeline().parameters.c_enriched_schema, '.')), item().target,\n        ''') else select ''1900-01-01'' as CDCTimestamp'\n    ),\n    concat('select ''', replace(replace(replace(replace(replace(\n                    formatDateTime(\n                        pipeline().parameters.p_datetime_from, \n                        'yyyy-MM-ddTHH:mm:ss.fffffffZ'\n                    ), \n                    '0000Z', 'Z'), '000Z', 'Z'), '00Z', 'Z'), '0Z', 'Z'), '.Z', 'Z'\n                ),\n        ''' as CDCTimestamp'\n    )\n)",
 											"type": "Expression"
 										}
 									}
@@ -741,6 +764,23 @@
 						"resource": "https://dev.azuresynapse.net/"
 					}
 				}
+			},
+			{
+				"name": "Set v_dss_update_time",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "v_dss_update_time",
+					"value": {
+						"value": "@utcNow()",
+						"type": "Expression"
+					}
+				}
 			}
 		],
 		"parameters": {
@@ -832,6 +872,9 @@
 			"c_raw_monitoring_container": {
 				"type": "string",
 				"defaultValue": "template"
+			},
+			"c_raw_cdc_column": {
+				"type": "string"
 			}
 		},
 		"variables": {
@@ -848,6 +891,9 @@
 				"type": "Array"
 			},
 			"v_string": {
+				"type": "String"
+			},
+			"v_dss_update_time": {
 				"type": "String"
 			}
 		},
