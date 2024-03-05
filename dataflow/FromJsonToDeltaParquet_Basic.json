@@ -107,7 +107,7 @@
 				"     isolationLevel: 'READ_UNCOMMITTED',",
 				"     query: 'select \\'dummy\\' as PARTITION,\\n\\'CONSTANT\\' as CONSTANT, \\'dummy\\' as AGGREGATE',",
 				"     format: 'query',",
-				"     staged: true) ~> dummyPartitionPruning",
+				"     staged: false) ~> dummyPartitionPruning",
 				"RawDataset foldDown(unroll((byName('value'))),",
 				"     mapColumn(",
 				"          fileName,",
