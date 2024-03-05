@@ -113,7 +113,6 @@
 				"     staged: false) ~> dummyPartitionPruning",
 				"RawDataset foldDown(unroll((byName('value'))),",
 				"     mapColumn(",
-				"          fileName,",
 				"          every((byName('value')),match(locate('@',name)==0),",
 				"               $0 = $$)",
 				"     ),",
