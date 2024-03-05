@@ -866,6 +866,15 @@
 						"dataTypeReplace": null,
 						"relCol": "properties.typeProperties.sources.dataset.referenceName",
 						"partitionFormula": "'dummy'"
+					},
+					{
+						"type": "relations11",
+						"target": "datasets_relations11",
+						"cdcCol": null,
+						"keyCol": "name",
+						"dataTypeReplace": null,
+						"relCol": null,
+						"partitionFormula": "'dummy'"
 					}
 				]
 			},
