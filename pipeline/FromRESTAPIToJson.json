@@ -761,6 +761,18 @@
 						"relCol": null
 					},
 					{
+						"source": "datasets",
+						"target": "datasets_relations11",
+						"path": "/",
+						"delta": false,
+						"crossApplyField": "value",
+						"select": null,
+						"filter": "api-version=2020-12-01",
+						"cdcCol": null,
+						"keyCol": "name",
+						"relCol": null
+					},
+					{
 						"source": "dataflows",
 						"target": "dataflows_datasets",
 						"path": "/",
