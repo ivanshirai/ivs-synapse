@@ -13,6 +13,20 @@
 						"type": "DatasetReference"
 					},
 					"name": "RawDataset"
+				},
+				{
+					"dataset": {
+						"referenceName": "GenericRawJson_NoExtension",
+						"type": "DatasetReference"
+					},
+					"name": "PartitionPruning"
+				},
+				{
+					"dataset": {
+						"referenceName": "GenericServerlessSQL",
+						"type": "DatasetReference"
+					},
+					"name": "dummyPartitionPruning"
 				}
 			],
 			"sinks": [
@@ -22,6 +36,9 @@
 						"type": "LinkedServiceReference"
 					},
 					"name": "EnrichedDeltaLake"
+				},
+				{
+					"name": "sinkPartitionPruning"
 				}
 			],
 			"transformations": [
@@ -46,6 +63,21 @@
 				},
 				{
 					"name": "flattenRel"
+				},
+				{
+					"name": "flattenKeyPartition"
+				},
+				{
+					"name": "flattenRelPartition"
+				},
+				{
+					"name": "aggregatePartitionPruning"
+				},
+				{
+					"name": "unionPartitionPruning"
+				},
+				{
+					"name": "collectPartitionPruning"
 				}
 			],
 			"scriptLines": [
@@ -70,11 +102,26 @@
 				"     timestampFormats: ['yyyy-MM-dd\\'T\\'HH:mm:ss.SSS\\'Z\\'','yyyy-MM-dd\\'T\\'HH:mm:ss\\'Z\\''],",
 				"     preferredIntegralType: 'long',",
 				"     preferredFractionalType: 'decimal') ~> RawDataset",
+				"source(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     ignoreNoFilesFound: false,",
+				"     fileList: true,",
+				"     documentForm: 'documentPerLine') ~> PartitionPruning",
+				"source(output(",
+				"          PARTITION as string,",
+				"          CONSTANT as string,",
+				"          AGGREGATE as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     query: 'select \\'dummy\\' as PARTITION,\\n\\'CONSTANT\\' as CONSTANT, \\'dummy\\' as AGGREGATE',",
+				"     format: 'query',",
+				"     staged: false) ~> dummyPartitionPruning",
 				"RawDataset foldDown(unroll((byName('value'))),",
 				"     mapColumn(",
-				"          fileName,",
-				"          every((byName('value')),match(locate('@',name)==0),",
-				"               $0 = $$)",
+				"          every(match(locate('@',name)==0),",
+				"               replace($0, 'value.', '') = $$)",
 				"     ),",
 				"     skipDuplicateMapInputs: false,",
 				"     skipDuplicateMapOutputs: false) ~> flattenKey",
@@ -101,6 +148,28 @@
 				"     ),",
 				"     skipDuplicateMapInputs: false,",
 				"     skipDuplicateMapOutputs: false) ~> flattenRel",
+				"PartitionPruning foldDown(unroll((byName('value'))),",
+				"     mapColumn(",
+				"          every(match(locate('@',name)==0),",
+				"               replace($0, 'value.', '') = $$)",
+				"     ),",
+				"     skipDuplicateMapInputs: false,",
+				"     skipDuplicateMapOutputs: false) ~> flattenKeyPartition",
+				"flattenKeyPartition foldDown(unroll((byName($c_relation_column_name))),",
+				"     mapColumn(",
+				"          each(match(name==$c_key_column_name||name==$c_relation_column_name),",
+				"               replace($$,'.','') = $$),",
+				"          each(match(name!=$c_key_column_name && name!=$c_relation_column_name && name!='fileName'),",
+				"               $0 = $$)",
+				"     ),",
+				"     skipDuplicateMapInputs: false,",
+				"     skipDuplicateMapOutputs: false) ~> flattenRelPartition",
+				"flattenRelPartition aggregate(groupBy(PARTITION = expr($p_partition_formula),",
+				"          CONSTANT = 'CONSTANT'),",
+				"     AGGREGATE = first(expr($p_partition_formula))) ~> aggregatePartitionPruning",
+				"aggregatePartitionPruning, dummyPartitionPruning union(byName: true)~> unionPartitionPruning",
+				"unionPartitionPruning aggregate(groupBy(CONSTANT),",
+				"     PARTITION = distinct(collect(AGGREGATE))) ~> collectPartitionPruning",
 				"alterRow sink(allowSchemaDrift: true,",
 				"     validateSchema: false,",
 				"     format: 'delta',",
@@ -122,7 +191,17 @@
 				"     postCommands: [],",
 				"     skipDuplicateMapInputs: true,",
 				"     skipDuplicateMapOutputs: true,",
-				"     saveOrder: 1) ~> EnrichedDeltaLake"
+				"     saveOrder: 1) ~> EnrichedDeltaLake",
+				"collectPartitionPruning sink(validateSchema: false,",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     store: 'cache',",
+				"     format: 'inline',",
+				"     output: false,",
+				"     saveOrder: 1,",
+				"     mapColumn(",
+				"          PARTITION",
+				"     )) ~> sinkPartitionPruning"
 			]
 		}
 	}
