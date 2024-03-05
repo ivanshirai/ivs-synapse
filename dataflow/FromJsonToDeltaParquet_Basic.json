@@ -125,7 +125,7 @@
 				"     rowNum = rowNumber()) ~> elicitDuplicates",
 				"flattenRaw derive(keyColumn = toString(byName($c_key_column_name)),",
 				"          each(match(true()), $$ = toString($$)),",
-				"          dssUpdateTime = currentUTC(),",
+				"          dssUpdateTime = $p_dss_update_time,",
 				"          each(match(name=='fileName'), $c_enriched_cdc_column = toTimestamp($p_dss_update_time, \"yyyy-MM-dd'T'HH:mm:ss'Z'\"), $c_raw_cdc_column = replace(reverse(substring(reverse(toString($$)), 0, locate('_', reverse(toString($$))) - 1)), '.json')),",
 				"          DELTA_PARTITION = expr($p_partition_formula)) ~> derivedId",
 				"elicitDuplicates filter(rowNum == 1 && not(isNull(keyColumn))) ~> filterDuplicates",
