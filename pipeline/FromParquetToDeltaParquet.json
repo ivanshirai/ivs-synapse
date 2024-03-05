@@ -99,8 +99,8 @@
 									"referenceName": "GenericServerlessSQL",
 									"type": "DatasetReference",
 									"parameters": {
-										"p_database": "ICP_Data_Store",
-										"p_schema": "dbo",
+										"p_database": "master",
+										"p_schema": "dummy",
 										"p_table": "dummy"
 									}
 								}
@@ -149,10 +149,7 @@
 								"referenceName": "serverless_ARIR",
 								"type": "LinkedServiceReference",
 								"parameters": {
-									"p_database": {
-										"value": "ICP_Data_Store",
-										"type": "Expression"
-									}
+									"p_database": "master"
 								}
 							},
 							"typeProperties": {
