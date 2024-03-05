@@ -277,7 +277,7 @@
 								"type": "LinkedServiceReference",
 								"parameters": {
 									"p_database": {
-										"value": "ICP_Data_Store",
+										"value": "@pipeline().parameters.c_serverless_db",
 										"type": "Expression"
 									}
 								}
