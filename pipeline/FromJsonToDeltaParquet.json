@@ -798,7 +798,8 @@
 								"dataType": "nvarchar(200)"
 							}
 						],
-						"relCol": null
+						"relCol": null,
+						"partitionFormula": "'dummy'"
 					},
 					{
 						"type": "basic",
@@ -811,7 +812,8 @@
 								"dataType": "nvarchar(200)"
 							}
 						],
-						"relCol": null
+						"relCol": null,
+						"partitionFormula": "'dummy'"
 					},
 					{
 						"type": "relationsMM",
@@ -819,7 +821,8 @@
 						"cdcCol": null,
 						"keyCol": "name",
 						"dataTypeReplace": null,
-						"relCol": "properties.typeProperties.sources.dataset.referenceName"
+						"relCol": "properties.typeProperties.sources.dataset.referenceName",
+						"partitionFormula": "'dummy'"
 					}
 				]
 			},
