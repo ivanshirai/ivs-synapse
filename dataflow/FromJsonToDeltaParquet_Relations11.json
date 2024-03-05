@@ -16,10 +16,17 @@
 				},
 				{
 					"dataset": {
-						"referenceName": "GenericRawCSV_NoHeaderNoQuote",
+						"referenceName": "GenericRawJson_NoExtension",
 						"type": "DatasetReference"
 					},
-					"name": "fileList"
+					"name": "PartitionPruning"
+				},
+				{
+					"dataset": {
+						"referenceName": "GenericServerlessSQL",
+						"type": "DatasetReference"
+					},
+					"name": "dummyPartitionPruning"
 				}
 			],
 			"sinks": [
@@ -31,16 +38,12 @@
 					"name": "EnrichedDeltaLake"
 				},
 				{
-					"linkedService": {
-						"referenceName": "templateenrst_ARIR",
-						"type": "LinkedServiceReference"
-					},
-					"name": "EnrichedDLSchemaEvolution"
+					"name": "sinkPartitionPruning"
 				}
 			],
 			"transformations": [
 				{
-					"name": "flatten"
+					"name": "flattenKey"
 				},
 				{
 					"name": "alterRow"
@@ -59,22 +62,29 @@
 					"name": "removeTempColumns"
 				},
 				{
-					"name": "cdcValue"
+					"name": "flattenKeyPartition"
 				},
 				{
-					"name": "lookupCDC"
+					"name": "aggregatePartitionPruning"
 				},
 				{
-					"name": "filterAll"
+					"name": "unionPartitionPruning"
+				},
+				{
+					"name": "collectPartitionPruning"
 				}
 			],
 			"scriptLines": [
 				"parameters{",
 				"     c_target_container as string ('sandpit'),",
-				"     c_target_folder as string ('FromJsonToDeltaParquet_Relations11'),",
+				"     c_target_folder as string ('FromJsonToDeltaParquet_RelationsMM'),",
 				"     c_key_column_name as string ('name'),",
 				"     c_cdc_column_name as string ('fileName'),",
-				"     c_enriched_cdc_column as string ('cdcTimestamp')",
+				"     c_enriched_cdc_column as string ('enrTimestamp'),",
+				"     c_relation_column_name as string ('properties.typeProperties.sources.dataset.referenceName'),",
+				"     p_partition_formula as string (\"'dummy'\"),",
+				"     p_dss_update_time as string ('2023-10-20T00:00:00Z'),",
+				"     c_raw_cdc_column as string ('rawTimestamp')",
 				"}",
 				"source(allowSchemaDrift: true,",
 				"     validateSchema: false,",
@@ -88,34 +98,54 @@
 				"     preferredFractionalType: 'decimal') ~> RawDataset",
 				"source(allowSchemaDrift: true,",
 				"     validateSchema: false,",
-				"     ignoreNoFilesFound: false) ~> fileList",
+				"     ignoreNoFilesFound: false,",
+				"     fileList: true,",
+				"     documentForm: 'documentPerLine') ~> PartitionPruning",
+				"source(output(",
+				"          PARTITION as string,",
+				"          CONSTANT as string,",
+				"          AGGREGATE as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     query: 'select \\'dummy\\' as PARTITION,\\n\\'CONSTANT\\' as CONSTANT, \\'dummy\\' as AGGREGATE',",
+				"     format: 'query',",
+				"     staged: false) ~> dummyPartitionPruning",
 				"RawDataset foldDown(unroll((byName('value'))),",
 				"     mapColumn(",
-				"          fileName,",
-				"          every((byName('value')),match(locate('@',name)==0),",
-				"               iif(instr($0,'.')>0||$0==$c_key_column_name,replace($0,'.',''),$0+$c_key_column_name) = $$)",
+				"          every(match(locate('@',name)==0),",
+				"               replace($0, 'value.', '') = $$)",
 				"     ),",
 				"     skipDuplicateMapInputs: false,",
-				"     skipDuplicateMapOutputs: false) ~> flatten",
+				"     skipDuplicateMapOutputs: false) ~> flattenKey",
 				"removeTempColumns alterRow(upsertIf(true())) ~> alterRow",
 				"derivedColumns window(over(keyColumn),",
 				"     desc(toString(byName($c_cdc_column_name)), true),",
 				"     rowNum = rowNumber()) ~> elicitDuplicates",
-				"lookupCDC derive(keyColumn = toString(byName($c_key_column_name)),",
-				"          dssUpdateTime = currentUTC(),",
-				"          each(match(name=='cdcValue'), $c_enriched_cdc_column = $$)) ~> derivedColumns",
+				"flattenKey derive(keyColumn = toString(byName($c_key_column_name)),",
+				"          each(match(name=='fileName'), $c_enriched_cdc_column = toTimestamp($p_dss_update_time, \"yyyy-MM-dd'T'HH:mm:ss'Z'\"), $c_raw_cdc_column = replace(reverse(substring(reverse(toString($$)), 0, locate('_', reverse(toString($$))) - 1)), '.json')),",
+				"          DELTA_PARTITION = expr($p_partition_formula)) ~> derivedColumns",
 				"elicitDuplicates filter(rowNum == 1 && not(isNull(keyColumn))) ~> filterDuplicates",
 				"filterDuplicates select(mapColumn(",
-				"          each(match(name!='rowNum'&&name!='fileName'&&name!='keyColumn'&&name!='cdcValue'))",
+				"          each(match(name==$c_key_column_name||right(name, length('referenceName'))=='referenceName'||name=='DELTA_PARTITION'||name==$c_raw_cdc_column||name==$c_enriched_cdc_column),",
+				"               replace($$, '.', '') = $$)",
 				"     ),",
 				"     skipDuplicateMapInputs: true,",
 				"     skipDuplicateMapOutputs: true) ~> removeTempColumns",
-				"fileList aggregate(cdcValue = max(replace(reverse(substring(reverse(toString(byPosition(1))), 0, locate('_', reverse(toString(byPosition(1)))) - 1)), '.json'))) ~> cdcValue",
-				"flatten, cdcValue lookup(0 == 0,",
-				"     multiple: false,",
-				"     pickup: 'any',",
-				"     broadcast: 'right')~> lookupCDC",
-				"removeTempColumns filter(false()) ~> filterAll",
+				"PartitionPruning foldDown(unroll((byName('value'))),",
+				"     mapColumn(",
+				"          every(match(locate('@',name)==0),",
+				"               replace($0, 'value.', '') = $$)",
+				"     ),",
+				"     skipDuplicateMapInputs: false,",
+				"     skipDuplicateMapOutputs: false) ~> flattenKeyPartition",
+				"flattenKeyPartition aggregate(groupBy(PARTITION = expr($p_partition_formula),",
+				"          CONSTANT = 'CONSTANT'),",
+				"     AGGREGATE = first(expr($p_partition_formula))) ~> aggregatePartitionPruning",
+				"aggregatePartitionPruning, dummyPartitionPruning union(byName: true)~> unionPartitionPruning",
+				"unionPartitionPruning aggregate(groupBy(CONSTANT),",
+				"     PARTITION = distinct(collect(AGGREGATE))) ~> collectPartitionPruning",
 				"alterRow sink(allowSchemaDrift: true,",
 				"     validateSchema: false,",
 				"     format: 'delta',",
@@ -123,7 +153,7 @@
 				"     compressionLevel: 'Fastest',",
 				"     fileSystem: ($c_target_container),",
 				"     folderPath: ($c_target_folder),",
-				"     mergeSchema: false,",
+				"     mergeSchema: true,",
 				"     autoCompact: true,",
 				"     optimizedWrite: true,",
 				"     vacuum: 1,",
@@ -131,32 +161,23 @@
 				"     insertable: false,",
 				"     updateable: false,",
 				"     upsertable: true,",
-				"     keys:(array($c_key_column_name)),",
+				"     keys:(array($c_key_column_name, replace($c_relation_column_name, '.', ''))),",
 				"     umask: 0022,",
 				"     preCommands: [],",
 				"     postCommands: [],",
 				"     skipDuplicateMapInputs: true,",
 				"     skipDuplicateMapOutputs: true,",
-				"     saveOrder: 2) ~> EnrichedDeltaLake",
-				"filterAll sink(allowSchemaDrift: true,",
-				"     validateSchema: false,",
-				"     format: 'delta',",
-				"     fileSystem: ($c_target_container),",
-				"     folderPath: ($c_target_folder),",
-				"     mergeSchema: true,",
-				"     autoCompact: true,",
-				"     optimizedWrite: true,",
-				"     vacuum: 1,",
-				"     deletable: false,",
-				"     insertable: true,",
-				"     updateable: false,",
-				"     upsertable: false,",
-				"     umask: 0022,",
-				"     preCommands: [],",
-				"     postCommands: [],",
+				"     saveOrder: 1) ~> EnrichedDeltaLake",
+				"collectPartitionPruning sink(validateSchema: false,",
 				"     skipDuplicateMapInputs: true,",
 				"     skipDuplicateMapOutputs: true,",
-				"     saveOrder: 1) ~> EnrichedDLSchemaEvolution"
+				"     store: 'cache',",
+				"     format: 'inline',",
+				"     output: false,",
+				"     saveOrder: 1,",
+				"     mapColumn(",
+				"          PARTITION",
+				"     )) ~> sinkPartitionPruning"
 			]
 		}
 	}
