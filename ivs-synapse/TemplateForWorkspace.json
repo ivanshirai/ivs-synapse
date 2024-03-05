@@ -7424,6 +7424,786 @@
 				"[concat(variables('workspaceId'), '/datasets/GenericServerlessSQL')]",
 				"[concat(variables('workspaceId'), '/linkedServices/templateenrst_ARIR')]"
 			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/FromSQLtoRawParquet')]",
+			"type": "Microsoft.Synapse/workspaces/pipelines",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"activities": [
+					{
+						"name": "ForEach in p_datasets",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "Set v_cdc_timestamp",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "GenericRawParquet linked service",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@pipeline().parameters.p_datasets",
+								"type": "Expression"
+							},
+							"activities": [
+								{
+									"name": "CopyDataset",
+									"type": "Copy",
+									"dependsOn": [
+										{
+											"activity": "ReadMonitoringBlob",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 2,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "SqlDWSource",
+											"sqlReaderQuery": {
+												"value": "select * from @{item().sourceSchema}.@{item().sourceObject}\n@{if(equals(item().processingMode, 'bulk'), '', concat(' where ', item().cdcCol, ' > ''', if(and(empty(pipeline().parameters.p_datetime_from), empty(pipeline().parameters.p_datetime_to)), activity('ReadMonitoringBlob').output.firstRow.CDCTimestamp, if(and(empty(pipeline().parameters.p_datetime_from), not(empty(pipeline().parameters.p_datetime_to))), '1900-01-01', pipeline().parameters.p_datetime_from)), ''''))}\n@{if(equals(item().processingMode, 'bulk'), '', concat(' and ', item().cdcCol, ' <= ''', if(empty(pipeline().parameters.p_datetime_to), '9999-12-31', pipeline().parameters.p_datetime_to), ''''))}\n@{if(equals(length(item().whereStatement), 0), '', concat(if(equals(item().processingMode, 'bulk'), ' where ', ' and '), item().whereStatement))}",
+												"type": "Expression"
+											},
+											"queryTimeout": "02:00:00",
+											"partitionOption": "None"
+										},
+										"sink": {
+											"type": "ParquetSink",
+											"storeSettings": {
+												"type": "AzureBlobFSWriteSettings"
+											},
+											"formatSettings": {
+												"type": "ParquetWriteSettings"
+											}
+										},
+										"enableStaging": false,
+										"translator": {
+											"type": "TabularTranslator",
+											"typeConversion": true,
+											"typeConversionSettings": {
+												"allowDataTruncation": true,
+												"treatBooleanAsNumber": false
+											}
+										}
+									},
+									"inputs": [
+										{
+											"referenceName": "GenericServerlessSQL",
+											"type": "DatasetReference",
+											"parameters": {
+												"p_database": {
+													"value": "@pipeline().parameters.c_sql_db",
+													"type": "Expression"
+												},
+												"p_schema": {
+													"value": "@item().sourceSchema",
+													"type": "Expression"
+												},
+												"p_table": {
+													"value": "@item().sourceObject",
+													"type": "Expression"
+												}
+											}
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "GenericRawParquet",
+											"type": "DatasetReference",
+											"parameters": {
+												"p_container": {
+													"value": "@pipeline().parameters.c_raw_container",
+													"type": "Expression"
+												},
+												"p_folder": {
+													"value": "@concat(pipeline().parameters.c_raw_root_folder, '/', item().sourceObject)",
+													"type": "Expression"
+												},
+												"p_file": {
+													"value": "@concat(if(equals(length(item().target), 0), item().sourceObject, item().target), if(equals(item().processingMode, 'bulk'), '', concat('_', variables('v_cdc_timestamp'))))",
+													"type": "Expression"
+												}
+											}
+										}
+									]
+								},
+								{
+									"name": "CheckMonitoringBlob",
+									"type": "GetMetadata",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 2,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"dataset": {
+											"referenceName": "GenericRawJson",
+											"type": "DatasetReference",
+											"parameters": {
+												"p_container": {
+													"value": "@pipeline().parameters.c_raw_monitoring_container",
+													"type": "Expression"
+												},
+												"p_folder": {
+													"value": "@pipeline().parameters.c_raw_monitoring_folder",
+													"type": "Expression"
+												},
+												"p_file": {
+													"value": "@if(equals(length(item().target), 0), item().sourceObject, item().target)",
+													"type": "Expression"
+												}
+											}
+										},
+										"fieldList": [
+											"exists"
+										],
+										"storeSettings": {
+											"type": "AzureBlobFSReadSettings",
+											"recursive": true,
+											"enablePartitionDiscovery": false
+										},
+										"formatSettings": {
+											"type": "JsonReadSettings"
+										}
+									}
+								},
+								{
+									"name": "IfMonitoringBlobExists",
+									"type": "IfCondition",
+									"dependsOn": [
+										{
+											"activity": "CheckMonitoringBlob",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"expression": {
+											"value": "@activity('CheckMonitoringBlob').output.exists",
+											"type": "Expression"
+										},
+										"ifFalseActivities": [
+											{
+												"name": "CopyDefaultMonitoringBlob",
+												"type": "Copy",
+												"dependsOn": [],
+												"policy": {
+													"timeout": "0.12:00:00",
+													"retry": 2,
+													"retryIntervalInSeconds": 30,
+													"secureOutput": false,
+													"secureInput": false
+												},
+												"userProperties": [],
+												"typeProperties": {
+													"source": {
+														"type": "JsonSource",
+														"additionalColumns": [
+															{
+																"name": "pipelineName",
+																"value": {
+																	"value": "@pipeline().Pipeline",
+																	"type": "Expression"
+																}
+															},
+															{
+																"name": "blobDirectory",
+																"value": {
+																	"value": "@concat(pipeline().parameters.c_raw_root_folder, '/', item().sourceObject)",
+																	"type": "Expression"
+																}
+															},
+															{
+																"name": "datetimeFrom",
+																"value": ""
+															},
+															{
+																"name": "datetimeTo",
+																"value": ""
+															},
+															{
+																"name": "CDCTimestamp",
+																"value": "1900-01-01"
+															},
+															{
+																"name": "currentUTC",
+																"value": {
+																	"value": "@utcNow()",
+																	"type": "Expression"
+																}
+															},
+															{
+																"name": "deltaLink",
+																"value": ""
+															},
+															{
+																"name": "rowCount",
+																"value": ""
+															}
+														],
+														"storeSettings": {
+															"type": "AzureBlobFSReadSettings",
+															"recursive": true,
+															"enablePartitionDiscovery": false
+														},
+														"formatSettings": {
+															"type": "JsonReadSettings"
+														}
+													},
+													"sink": {
+														"type": "JsonSink",
+														"storeSettings": {
+															"type": "AzureBlobFSWriteSettings"
+														},
+														"formatSettings": {
+															"type": "JsonWriteSettings"
+														}
+													},
+													"enableStaging": false
+												},
+												"inputs": [
+													{
+														"referenceName": "DummyJson",
+														"type": "DatasetReference",
+														"parameters": {}
+													}
+												],
+												"outputs": [
+													{
+														"referenceName": "GenericRawJson",
+														"type": "DatasetReference",
+														"parameters": {
+															"p_container": {
+																"value": "@pipeline().parameters.c_raw_monitoring_container",
+																"type": "Expression"
+															},
+															"p_folder": {
+																"value": "@pipeline().parameters.c_raw_monitoring_folder",
+																"type": "Expression"
+															},
+															"p_file": {
+																"value": "@if(equals(length(item().target), 0), item().sourceObject, item().target)",
+																"type": "Expression"
+															}
+														}
+													}
+												]
+											}
+										]
+									}
+								},
+								{
+									"name": "ReadMonitoringBlob",
+									"type": "Lookup",
+									"dependsOn": [
+										{
+											"activity": "IfMonitoringBlobExists",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 2,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "JsonSource",
+											"storeSettings": {
+												"type": "AzureBlobFSReadSettings",
+												"recursive": true,
+												"enablePartitionDiscovery": false
+											},
+											"formatSettings": {
+												"type": "JsonReadSettings"
+											}
+										},
+										"dataset": {
+											"referenceName": "GenericRawJson",
+											"type": "DatasetReference",
+											"parameters": {
+												"p_container": {
+													"value": "@pipeline().parameters.c_raw_monitoring_container",
+													"type": "Expression"
+												},
+												"p_folder": {
+													"value": "@pipeline().parameters.c_raw_monitoring_folder",
+													"type": "Expression"
+												},
+												"p_file": {
+													"value": "@if(equals(length(item().target), 0), item().sourceObject, item().target)",
+													"type": "Expression"
+												}
+											}
+										}
+									}
+								},
+								{
+									"name": "IfRowsCopiedNotZero",
+									"type": "IfCondition",
+									"dependsOn": [
+										{
+											"activity": "CopyDataset",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"expression": {
+											"value": "@greater(activity('CopyDataset').output.rowsCopied, 0)",
+											"type": "Expression"
+										},
+										"ifFalseActivities": [
+											{
+												"name": "DeleteBlob",
+												"type": "Delete",
+												"dependsOn": [],
+												"policy": {
+													"timeout": "0.12:00:00",
+													"retry": 2,
+													"retryIntervalInSeconds": 30,
+													"secureOutput": false,
+													"secureInput": false
+												},
+												"userProperties": [],
+												"typeProperties": {
+													"dataset": {
+														"referenceName": "GenericRawParquet",
+														"type": "DatasetReference",
+														"parameters": {
+															"p_container": {
+																"value": "@pipeline().parameters.c_raw_container",
+																"type": "Expression"
+															},
+															"p_folder": {
+																"value": "@concat(pipeline().parameters.c_raw_root_folder, '/', item().sourceObject)",
+																"type": "Expression"
+															},
+															"p_file": {
+																"value": "@concat(if(equals(length(item().target), 0), item().sourceObject, item().target), if(equals(item().processingMode, 'bulk'), '', concat('_', variables('v_cdc_timestamp'))))",
+																"type": "Expression"
+															}
+														}
+													},
+													"enableLogging": false,
+													"storeSettings": {
+														"type": "AzureBlobFSReadSettings",
+														"recursive": true,
+														"enablePartitionDiscovery": false
+													}
+												}
+											}
+										],
+										"ifTrueActivities": [
+											{
+												"name": "GetCDCTimeStamp",
+												"type": "Script",
+												"dependsOn": [],
+												"policy": {
+													"timeout": "0.12:00:00",
+													"retry": 2,
+													"retryIntervalInSeconds": 30,
+													"secureOutput": false,
+													"secureInput": false
+												},
+												"userProperties": [],
+												"linkedServiceName": {
+													"referenceName": "serverless_ARIR",
+													"type": "LinkedServiceReference",
+													"parameters": {
+														"p_database": "master"
+													}
+												},
+												"typeProperties": {
+													"scripts": [
+														{
+															"type": "Query",
+															"text": {
+																"value": "@if(or(equals(item().processingMode, 'bulk'), not(empty(pipeline().parameters.p_datetime_to))), concat('select ''', activity('ReadMonitoringBlob').output.firstRow.CDCTimestamp, ''' CDCTimestamp'), concat('select max(', item().cdcCol, ') CDCTimestamp from OPENROWSET(BULK ''', activity('GenericRawParquet linked service').output.properties.typeProperties.url, pipeline().parameters.c_raw_container, '/', pipeline().parameters.c_raw_root_folder, '/', item().sourceObject, '/', if(equals(length(item().target), 0), item().sourceObject, item().target), if(equals(item().processingMode, 'bulk'), '', concat('_', variables('v_cdc_timestamp'))), '.parquet'', FORMAT = ''PARQUET'') as r'))",
+																"type": "Expression"
+															}
+														}
+													],
+													"scriptBlockExecutionTimeout": "02:00:00"
+												}
+											},
+											{
+												"name": "CopyMonitoringBlob",
+												"type": "Copy",
+												"dependsOn": [
+													{
+														"activity": "GetCDCTimeStamp",
+														"dependencyConditions": [
+															"Succeeded"
+														]
+													}
+												],
+												"policy": {
+													"timeout": "0.12:00:00",
+													"retry": 2,
+													"retryIntervalInSeconds": 30,
+													"secureOutput": false,
+													"secureInput": false
+												},
+												"userProperties": [],
+												"typeProperties": {
+													"source": {
+														"type": "JsonSource",
+														"additionalColumns": [
+															{
+																"name": "pipelineName",
+																"value": {
+																	"value": "@pipeline().Pipeline",
+																	"type": "Expression"
+																}
+															},
+															{
+																"name": "blobDirectory",
+																"value": {
+																	"value": "@concat(pipeline().parameters.c_raw_root_folder, '/', item().sourceObject)",
+																	"type": "Expression"
+																}
+															},
+															{
+																"name": "datetimeFrom",
+																"value": {
+																	"value": "@pipeline().parameters.p_datetime_from",
+																	"type": "Expression"
+																}
+															},
+															{
+																"name": "datetimeTo",
+																"value": {
+																	"value": "@pipeline().parameters.p_datetime_to",
+																	"type": "Expression"
+																}
+															},
+															{
+																"name": "CDCTimestamp",
+																"value": {
+																	"value": "@if(empty(pipeline().parameters.p_datetime_to), activity('GetCDCTimeStamp').output.resultSets[0].rows[0].CDCTimestamp, activity('ReadMonitoringBlob').output.firstRow.CDCTimestamp)",
+																	"type": "Expression"
+																}
+															},
+															{
+																"name": "currentUTC",
+																"value": {
+																	"value": "@utcnow()",
+																	"type": "Expression"
+																}
+															},
+															{
+																"name": "deltaLink",
+																"value": ""
+															},
+															{
+																"name": "rowCount",
+																"value": {
+																	"value": "@activity('CopyDataset').output.rowsCopied",
+																	"type": "Expression"
+																}
+															}
+														],
+														"storeSettings": {
+															"type": "AzureBlobFSReadSettings",
+															"recursive": true,
+															"enablePartitionDiscovery": false
+														},
+														"formatSettings": {
+															"type": "JsonReadSettings"
+														}
+													},
+													"sink": {
+														"type": "JsonSink",
+														"storeSettings": {
+															"type": "AzureBlobFSWriteSettings"
+														},
+														"formatSettings": {
+															"type": "JsonWriteSettings"
+														}
+													},
+													"enableStaging": false
+												},
+												"inputs": [
+													{
+														"referenceName": "DummyJson",
+														"type": "DatasetReference",
+														"parameters": {}
+													}
+												],
+												"outputs": [
+													{
+														"referenceName": "GenericRawJson",
+														"type": "DatasetReference",
+														"parameters": {
+															"p_container": {
+																"value": "@pipeline().parameters.c_raw_monitoring_container",
+																"type": "Expression"
+															},
+															"p_folder": {
+																"value": "@pipeline().parameters.c_raw_monitoring_folder",
+																"type": "Expression"
+															},
+															"p_file": {
+																"value": "@if(equals(length(item().target), 0), item().sourceObject, item().target)",
+																"type": "Expression"
+															}
+														}
+													}
+												]
+											}
+										]
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "Set v_cdc_timestamp",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "v_cdc_timestamp",
+							"value": {
+								"value": "@utcNow()",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "GenericRawParquet attributes",
+						"type": "WebActivity",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"method": "GET",
+							"headers": {},
+							"url": {
+								"value": "@concat('https://', pipeline().DataFactory, '.dev.azuresynapse.net/datasets/GenericRawParquet?api-version=2020-12-01')",
+								"type": "Expression"
+							},
+							"connectVia": {
+								"referenceName": "SHIR",
+								"type": "IntegrationRuntimeReference"
+							},
+							"authentication": {
+								"type": "MSI",
+								"resource": "https://dev.azuresynapse.net/"
+							}
+						}
+					},
+					{
+						"name": "GenericRawParquet linked service",
+						"type": "WebActivity",
+						"dependsOn": [
+							{
+								"activity": "GenericRawParquet attributes",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"method": "GET",
+							"headers": {},
+							"url": {
+								"value": "@concat('https://', pipeline().DataFactory, '.dev.azuresynapse.net/linkedservices/', activity('GenericRawParquet attributes').output.properties.linkedServiceName.referenceName, '?api-version=2020-12-01')",
+								"type": "Expression"
+							},
+							"connectVia": {
+								"referenceName": "SHIR",
+								"type": "IntegrationRuntimeReference"
+							},
+							"authentication": {
+								"type": "MSI",
+								"resource": "https://dev.azuresynapse.net/"
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"parameters": {
+					"p_datasets": {
+						"type": "array",
+						"defaultValue": [
+							{
+								"sourceObject": "dataflows",
+								"sourceSchema": "enr",
+								"whereStatement": "",
+								"target": "",
+								"processingMode": "bulk",
+								"cdcCol": ""
+							},
+							{
+								"sourceObject": "datasets",
+								"sourceSchema": "enr",
+								"whereStatement": "lower(name) like '%template%' or lower(name) like '%generic%'",
+								"target": "",
+								"processingMode": "bulk",
+								"cdcCol": ""
+							},
+							{
+								"sourceObject": "datasets_relations11",
+								"sourceSchema": "enr",
+								"whereStatement": "",
+								"target": "",
+								"processingMode": "incremental",
+								"cdcCol": "enrTimestamp"
+							},
+							{
+								"sourceObject": "dataflows_datasets",
+								"sourceSchema": "enr",
+								"whereStatement": "",
+								"target": "",
+								"processingMode": "incremental",
+								"cdcCol": "enrTimestamp"
+							}
+						]
+					},
+					"c_raw_container": {
+						"type": "string",
+						"defaultValue": "template"
+					},
+					"c_raw_root_folder": {
+						"type": "string",
+						"defaultValue": "FromSQLToParquet"
+					},
+					"p_datetime_from": {
+						"type": "string"
+					},
+					"p_datetime_to": {
+						"type": "string"
+					},
+					"c_raw_monitoring_container": {
+						"type": "string",
+						"defaultValue": "template"
+					},
+					"c_raw_monitoring_folder": {
+						"type": "string",
+						"defaultValue": "PipelineMonitoring"
+					},
+					"c_sql_db": {
+						"type": "string",
+						"defaultValue": "template"
+					}
+				},
+				"variables": {
+					"v_cdc_timestamp": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "Templates"
+				},
+				"annotations": [],
+				"lastPublishTime": "2023-10-16T14:40:59Z"
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/integrationRuntimes/SHIR')]",
+				"[concat(variables('workspaceId'), '/datasets/GenericServerlessSQL')]",
+				"[concat(variables('workspaceId'), '/datasets/GenericRawParquet')]",
+				"[concat(variables('workspaceId'), '/datasets/GenericRawJson')]",
+				"[concat(variables('workspaceId'), '/datasets/DummyJson')]",
+				"[concat(variables('workspaceId'), '/linkedServices/serverless_ARIR')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/GenericRawParquet')]",
+			"type": "Microsoft.Synapse/workspaces/datasets",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "templaterawst_ARIR",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"p_container": {
+						"type": "string"
+					},
+					"p_folder": {
+						"type": "string"
+					},
+					"p_file": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"type": "Parquet",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"fileName": {
+							"value": "@concat(dataset().p_file, '.parquet')",
+							"type": "Expression"
+						},
+						"folderPath": {
+							"value": "@dataset().p_folder",
+							"type": "Expression"
+						},
+						"fileSystem": {
+							"value": "@dataset().p_container",
+							"type": "Expression"
+						}
+					},
+					"compressionCodec": "snappy"
+				},
+				"schema": []
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/linkedServices/templaterawst_ARIR')]"
+			]
 		}
 	]
 }
