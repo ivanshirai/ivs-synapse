@@ -1,0 +1,161 @@
+{
+	"name": "FromParquetToDeltaParquet",
+	"properties": {
+		"folder": {
+			"name": "Audit"
+		},
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "GenericRawParquet_NoExtension",
+						"type": "DatasetReference"
+					},
+					"name": "RawDataset"
+				},
+				{
+					"dataset": {
+						"referenceName": "GenericRawParquet_NoExtension",
+						"type": "DatasetReference"
+					},
+					"name": "RawPartitionPruning"
+				},
+				{
+					"dataset": {
+						"referenceName": "GenericServerlessSQL",
+						"type": "DatasetReference"
+					},
+					"name": "dummyPartitionPruning"
+				}
+			],
+			"sinks": [
+				{
+					"linkedService": {
+						"referenceName": "templateenrst_ARIR",
+						"type": "LinkedServiceReference"
+					},
+					"name": "EnrichedDeltaLake"
+				},
+				{
+					"name": "sinkPartitionPruning"
+				}
+			],
+			"transformations": [
+				{
+					"name": "alterRow"
+				},
+				{
+					"name": "elicitDuplicates"
+				},
+				{
+					"name": "derivedId",
+					"description": "Added as Window function cannot interpret byName('Id') as valid for OVER statement"
+				},
+				{
+					"name": "filterDuplicates"
+				},
+				{
+					"name": "removeTempColumns"
+				},
+				{
+					"name": "aggregatePartitionPruning"
+				},
+				{
+					"name": "unionPartitionPruning"
+				},
+				{
+					"name": "collectPartitionPruning"
+				}
+			],
+			"scriptLines": [
+				"parameters{",
+				"     c_target_container as string ('enriched'),",
+				"     c_key_column_name as string ('GLDCT,GLDOC,GLKCO,GLDGJ,GLJELN,GLLT,GLEXTL'),",
+				"     c_raw_cdc_column as string ('rawTimestamp'),",
+				"     p_dss_update_time as string ('2023-10-20T00:00:00Z'),",
+				"     c_enr_cdc_column as string ('enrTimestamp'),",
+				"     p_partition_formula as string (\"left(toString(byName('GLDGJ')), 3)\"),",
+				"     c_target_root_folder as string ('ICP_Data_Store'),",
+				"     p_object as string ('F0911')",
+				"}",
+				"source(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     ignoreNoFilesFound: false,",
+				"     fileList: true,",
+				"     rowUrlColumn: 'fileName',",
+				"     format: 'parquet',",
+				"     dateFormats: ['yyyy-MM-dd'],",
+				"     timestampFormats: ['yyyy-MM-dd\\'T\\'HH:mm:ss.SSS\\'Z\\'','yyyy-MM-dd\\'T\\'HH:mm:ss\\'Z\\''],",
+				"     preferredIntegralType: 'long',",
+				"     preferredFractionalType: 'decimal') ~> RawDataset",
+				"source(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     ignoreNoFilesFound: false,",
+				"     fileList: true,",
+				"     format: 'parquet') ~> RawPartitionPruning",
+				"source(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     query: 'select \\'dummy\\' as PARTITION,\\n\\'CONSTANT\\' as CONSTANT, \\'dummy\\' as AGGREGATE',",
+				"     format: 'query',",
+				"     staged: false) ~> dummyPartitionPruning",
+				"removeTempColumns alterRow(upsertIf(true())) ~> alterRow",
+				"derivedId window(over(keyColumn),",
+				"     desc(toString(byName($c_raw_cdc_column)), true),",
+				"     rowNum = rowNumber()) ~> elicitDuplicates",
+				"RawDataset derive(keyColumn = md5(byNames(split(replace($c_key_column_name, ' ', ''), ','))),",
+				"          each(match(name=='fileName'), $c_raw_cdc_column = replace(reverse(substring(reverse(toString($$)), 0, locate('_', reverse(toString($$))) - 1)), '.parquet'), $c_enr_cdc_column = toTimestamp($p_dss_update_time, \"yyyy-MM-dd'T'HH:mm:ss'Z'\")),",
+				"          DELTA_PARTITION = expr($p_partition_formula)) ~> derivedId",
+				"elicitDuplicates filter(rowNum == 1 && not(isNull(keyColumn))) ~> filterDuplicates",
+				"filterDuplicates select(mapColumn(",
+				"          each(match(name!='rowNum'&&name!='fileName'&&name!='keyColumn'))",
+				"     ),",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true) ~> removeTempColumns",
+				"RawPartitionPruning aggregate(groupBy(PARTITION = expr($p_partition_formula),",
+				"          CONSTANT = 'CONSTANT'),",
+				"     AGGREGATE = first(expr($p_partition_formula))) ~> aggregatePartitionPruning",
+				"aggregatePartitionPruning, dummyPartitionPruning union(byName: true)~> unionPartitionPruning",
+				"unionPartitionPruning aggregate(groupBy(CONSTANT),",
+				"     PARTITION = collect(AGGREGATE)) ~> collectPartitionPruning",
+				"alterRow sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     format: 'delta',",
+				"     fileSystem: ($c_target_container),",
+				"     folderPath: ($c_target_root_folder + '/' + $p_object),",
+				"     mergeSchema: false,",
+				"     autoCompact: false,",
+				"     optimizedWrite: false,",
+				"     vacuum: 0,",
+				"     deletable: false,",
+				"     insertable: true,",
+				"     updateable: false,",
+				"     upsertable: false,",
+				"     umask: 0022,",
+				"     preCommands: [],",
+				"     postCommands: [],",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     saveOrder: 2,",
+				"     partitionBy('key',",
+				"          0,",
+				"          DELTA_PARTITION",
+				"     ),",
+				"     compressionType: 'snappy',",
+				"     compressionLevel: 'Fastest',",
+				"     pruneCondition: ['DELTA_PARTITION' -> (sinkPartitionPruning#outputs().PARTITION_PRUNING)]) ~> EnrichedDeltaLake",
+				"collectPartitionPruning sink(validateSchema: false,",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     store: 'cache',",
+				"     format: 'inline',",
+				"     output: false,",
+				"     saveOrder: 1,",
+				"     mapColumn(",
+				"          PARTITION_PRUNING = PARTITION",
+				"     )) ~> sinkPartitionPruning"
+			]
+		}
+	}
+}
