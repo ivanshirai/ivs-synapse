@@ -35,10 +35,6 @@
 			"type": "string",
 			"defaultValue": "https://ivsdatastorage.dfs.core.windows.net"
 		},
-		"template_REST_properties_typeProperties_url": {
-			"type": "string",
-			"defaultValue": "https://gorest.co.in/public/v2/"
-		},
 		"template_kv_properties_typeProperties_baseUrl": {
 			"type": "string",
 			"defaultValue": "https://ivs-dwh-kv.vault.azure.net/"
@@ -830,6 +826,18 @@
 							{
 								"source": "datasets",
 								"target": "datasets",
+								"path": "/",
+								"delta": false,
+								"crossApplyField": "value",
+								"select": null,
+								"filter": "api-version=2020-12-01",
+								"cdcCol": null,
+								"keyCol": "name",
+								"relCol": null
+							},
+							{
+								"source": "datasets",
+								"target": "datasets_relations11",
 								"path": "/",
 								"delta": false,
 								"crossApplyField": "value",
@@ -1833,34 +1841,6 @@
 			]
 		},
 		{
-			"name": "[concat(parameters('workspaceName'), '/TemplateREST')]",
-			"type": "Microsoft.Synapse/workspaces/datasets",
-			"apiVersion": "2019-06-01-preview",
-			"properties": {
-				"linkedServiceName": {
-					"referenceName": "template_REST",
-					"type": "LinkedServiceReference"
-				},
-				"parameters": {
-					"p_relative_url": {
-						"type": "string"
-					}
-				},
-				"annotations": [],
-				"type": "RestResource",
-				"typeProperties": {
-					"relativeUrl": {
-						"value": "@dataset().p_relative_url",
-						"type": "Expression"
-					}
-				},
-				"schema": []
-			},
-			"dependsOn": [
-				"[concat(variables('workspaceId'), '/linkedServices/template_REST')]"
-			]
-		},
-		{
 			"name": "[concat(parameters('workspaceName'), '/serverlessview')]",
 			"type": "Microsoft.Synapse/workspaces/datasets",
 			"apiVersion": "2019-06-01-preview",
@@ -2010,28 +1990,6 @@
 			},
 			"dependsOn": [
 				"[concat(variables('workspaceId'), '/integrationRuntimes/AutoResolveIntegrationRuntime')]"
-			]
-		},
-		{
-			"name": "[concat(parameters('workspaceName'), '/template_REST')]",
-			"type": "Microsoft.Synapse/workspaces/linkedServices",
-			"apiVersion": "2019-06-01-preview",
-			"properties": {
-				"description": "https://gorest.co.in/",
-				"annotations": [],
-				"type": "RestService",
-				"typeProperties": {
-					"url": "[parameters('template_REST_properties_typeProperties_url')]",
-					"enableServerCertificateValidation": false,
-					"authenticationType": "Anonymous"
-				},
-				"connectVia": {
-					"referenceName": "SHIR",
-					"type": "IntegrationRuntimeReference"
-				}
-			},
-			"dependsOn": [
-				"[concat(variables('workspaceId'), '/integrationRuntimes/SHIR')]"
 			]
 		},
 		{
@@ -5610,10 +5568,17 @@
 						},
 						{
 							"dataset": {
-								"referenceName": "GenericRawCSV_NoHeaderNoQuote",
+								"referenceName": "GenericRawJson_NoExtension",
 								"type": "DatasetReference"
 							},
-							"name": "fileList"
+							"name": "PartitionPruning"
+						},
+						{
+							"dataset": {
+								"referenceName": "GenericServerlessSQL",
+								"type": "DatasetReference"
+							},
+							"name": "dummyPartitionPruning"
 						}
 					],
 					"sinks": [
@@ -5625,16 +5590,12 @@
 							"name": "EnrichedDeltaLake"
 						},
 						{
-							"linkedService": {
-								"referenceName": "templateenrst_ARIR",
-								"type": "LinkedServiceReference"
-							},
-							"name": "EnrichedDLSchemaEvolution"
+							"name": "sinkPartitionPruning"
 						}
 					],
 					"transformations": [
 						{
-							"name": "flatten"
+							"name": "flattenRaw"
 						},
 						{
 							"name": "alterRow"
@@ -5653,13 +5614,16 @@
 							"name": "removeTempColumns"
 						},
 						{
-							"name": "filterAll"
+							"name": "aggregatePartitionPruning"
 						},
 						{
-							"name": "cdcValue"
+							"name": "unionPartitionPruning"
 						},
 						{
-							"name": "lookupCDC"
+							"name": "collectPartitionPruning"
+						},
+						{
+							"name": "flattenPartition"
 						}
 					],
 					"scriptLines": [
@@ -5668,7 +5632,10 @@
 						"     c_target_folder as string ('FromJsonToDeltaParquet_Basic'),",
 						"     c_key_column_name as string ('name'),",
 						"     c_cdc_column_name as string ('fileName'),",
-						"     c_enriched_cdc_column as string ('cdcTimestamp')",
+						"     c_enriched_cdc_column as string ('enrTimestamp'),",
+						"     p_partition_formula as string (\"'dummy'\"),",
+						"     p_dss_update_time as string ('2023-10-20T00:00:00Z'),",
+						"     c_raw_cdc_column as string ('rawTimestamp')",
 						"}",
 						"source(allowSchemaDrift: true,",
 						"     validateSchema: false,",
@@ -5682,58 +5649,55 @@
 						"     preferredFractionalType: 'decimal') ~> RawDataset",
 						"source(allowSchemaDrift: true,",
 						"     validateSchema: false,",
-						"     ignoreNoFilesFound: false) ~> fileList",
+						"     ignoreNoFilesFound: false,",
+						"     fileList: true,",
+						"     documentForm: 'documentPerLine') ~> PartitionPruning",
+						"source(output(",
+						"          PARTITION as string,",
+						"          CONSTANT as string,",
+						"          AGGREGATE as string",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     isolationLevel: 'READ_UNCOMMITTED',",
+						"     query: 'select \\'dummy\\' as PARTITION,\\n\\'CONSTANT\\' as CONSTANT, \\'dummy\\' as AGGREGATE',",
+						"     format: 'query',",
+						"     staged: false) ~> dummyPartitionPruning",
 						"RawDataset foldDown(unroll((byName('value'))),",
 						"     mapColumn(",
-						"          fileName,",
-						"          every((byName('value')),match(locate('@',name)==0),",
-						"               $0 = $$)",
+						"          every(match(locate('@',name)==0),",
+						"               replace($0, 'value.', '') = $$)",
 						"     ),",
 						"     skipDuplicateMapInputs: false,",
-						"     skipDuplicateMapOutputs: false) ~> flatten",
+						"     skipDuplicateMapOutputs: false) ~> flattenRaw",
 						"removeTempColumns alterRow(upsertIf(true())) ~> alterRow",
 						"derivedId window(over(keyColumn),",
 						"     desc(toString(byName($c_cdc_column_name)), true),",
 						"     rowNum = rowNumber()) ~> elicitDuplicates",
-						"lookupCDC derive(keyColumn = toString(byName($c_key_column_name)),",
-						"          dssUpdateTime = currentUTC(),",
-						"          each(match(name=='cdcValue'), $c_enriched_cdc_column = $$),",
-						"          each(match(true()), $$ = toString($$))) ~> derivedId",
+						"flattenRaw derive(keyColumn = toString(byName($c_key_column_name)),",
+						"          each(match(true()), $$ = toString($$)),",
+						"          each(match(name=='fileName'), $c_enriched_cdc_column = toTimestamp($p_dss_update_time, \"yyyy-MM-dd'T'HH:mm:ss'Z'\"), $c_raw_cdc_column = replace(reverse(substring(reverse(toString($$)), 0, locate('_', reverse(toString($$))) - 1)), '.json')),",
+						"          DELTA_PARTITION = expr($p_partition_formula)) ~> derivedId",
 						"elicitDuplicates filter(rowNum == 1 && not(isNull(keyColumn))) ~> filterDuplicates",
 						"filterDuplicates select(mapColumn(",
 						"          each(match(name!='rowNum'&&name!='fileName'&&name!='keyColumn'&&name!='cdcValue'&&left(name,length('properties.'))!='properties.'))",
 						"     ),",
 						"     skipDuplicateMapInputs: true,",
 						"     skipDuplicateMapOutputs: true) ~> removeTempColumns",
-						"removeTempColumns filter(false()) ~> filterAll",
-						"fileList aggregate(cdcValue = max(replace(reverse(substring(reverse(toString(byPosition(1))), 0, locate('_', reverse(toString(byPosition(1)))) - 1)), '.json'))) ~> cdcValue",
-						"flatten, cdcValue lookup(0 == 0,",
-						"     multiple: false,",
-						"     pickup: 'any',",
-						"     broadcast: 'right')~> lookupCDC",
+						"flattenPartition aggregate(groupBy(PARTITION = expr($p_partition_formula),",
+						"          CONSTANT = 'CONSTANT'),",
+						"     AGGREGATE = first(expr($p_partition_formula))) ~> aggregatePartitionPruning",
+						"aggregatePartitionPruning, dummyPartitionPruning union(byName: true)~> unionPartitionPruning",
+						"unionPartitionPruning aggregate(groupBy(CONSTANT),",
+						"     PARTITION = distinct(collect(AGGREGATE))) ~> collectPartitionPruning",
+						"PartitionPruning foldDown(unroll((byName('value'))),",
+						"     mapColumn(",
+						"          every(match(locate('@',name)==0),",
+						"               replace($0, 'value.', '') = $$)",
+						"     ),",
+						"     skipDuplicateMapInputs: false,",
+						"     skipDuplicateMapOutputs: false) ~> flattenPartition",
 						"alterRow sink(allowSchemaDrift: true,",
-						"     validateSchema: false,",
-						"     format: 'delta',",
-						"     compressionType: 'snappy',",
-						"     compressionLevel: 'Fastest',",
-						"     fileSystem: ($c_target_container),",
-						"     folderPath: ($c_target_folder),",
-						"     mergeSchema: false,",
-						"     autoCompact: true,",
-						"     optimizedWrite: true,",
-						"     vacuum: 1,",
-						"     deletable: false,",
-						"     insertable: false,",
-						"     updateable: false,",
-						"     upsertable: true,",
-						"     keys:(array($c_key_column_name)),",
-						"     umask: 0022,",
-						"     preCommands: [],",
-						"     postCommands: [],",
-						"     skipDuplicateMapInputs: true,",
-						"     skipDuplicateMapOutputs: true,",
-						"     saveOrder: 2) ~> EnrichedDeltaLake",
-						"filterAll sink(allowSchemaDrift: true,",
 						"     validateSchema: false,",
 						"     format: 'delta',",
 						"     compressionType: 'snappy',",
@@ -5745,21 +5709,37 @@
 						"     optimizedWrite: true,",
 						"     vacuum: 1,",
 						"     deletable: false,",
-						"     insertable: true,",
+						"     insertable: false,",
 						"     updateable: false,",
-						"     upsertable: false,",
+						"     upsertable: true,",
+						"     keys:(array($c_key_column_name)),",
+						"     pruneCondition: ['DELTA_PARTITION' -> (sinkPartitionPruning#outputs().PARTITION_PRUNING)],",
 						"     umask: 0022,",
 						"     preCommands: [],",
 						"     postCommands: [],",
 						"     skipDuplicateMapInputs: true,",
 						"     skipDuplicateMapOutputs: true,",
-						"     saveOrder: 1) ~> EnrichedDLSchemaEvolution"
+						"     saveOrder: 2,",
+						"     partitionBy('key',",
+						"          1,",
+						"          DELTA_PARTITION",
+						"     )) ~> EnrichedDeltaLake",
+						"collectPartitionPruning sink(validateSchema: false,",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true,",
+						"     store: 'cache',",
+						"     format: 'inline',",
+						"     output: false,",
+						"     saveOrder: 1,",
+						"     mapColumn(",
+						"          PARTITION_PRUNING = PARTITION",
+						"     )) ~> sinkPartitionPruning"
 					]
 				}
 			},
 			"dependsOn": [
 				"[concat(variables('workspaceId'), '/datasets/GenericRawJson_NoExtension')]",
-				"[concat(variables('workspaceId'), '/datasets/GenericRawCSV_NoHeaderNoQuote')]",
+				"[concat(variables('workspaceId'), '/datasets/GenericServerlessSQL')]",
 				"[concat(variables('workspaceId'), '/linkedServices/templateenrst_ARIR')]"
 			]
 		},
@@ -5858,176 +5838,6 @@
 			]
 		},
 		{
-			"name": "[concat(parameters('workspaceName'), '/FromJsonToDeltaParquet_Relations11')]",
-			"type": "Microsoft.Synapse/workspaces/dataflows",
-			"apiVersion": "2019-06-01-preview",
-			"properties": {
-				"folder": {
-					"name": "Templates"
-				},
-				"type": "MappingDataFlow",
-				"typeProperties": {
-					"sources": [
-						{
-							"dataset": {
-								"referenceName": "GenericRawJson_NoExtension",
-								"type": "DatasetReference"
-							},
-							"name": "RawDataset"
-						},
-						{
-							"dataset": {
-								"referenceName": "GenericRawCSV_NoHeaderNoQuote",
-								"type": "DatasetReference"
-							},
-							"name": "fileList"
-						}
-					],
-					"sinks": [
-						{
-							"linkedService": {
-								"referenceName": "templateenrst_ARIR",
-								"type": "LinkedServiceReference"
-							},
-							"name": "EnrichedDeltaLake"
-						},
-						{
-							"linkedService": {
-								"referenceName": "templateenrst_ARIR",
-								"type": "LinkedServiceReference"
-							},
-							"name": "EnrichedDLSchemaEvolution"
-						}
-					],
-					"transformations": [
-						{
-							"name": "flatten"
-						},
-						{
-							"name": "alterRow"
-						},
-						{
-							"name": "elicitDuplicates"
-						},
-						{
-							"name": "derivedColumns",
-							"description": "Added as Window function cannot interpret byName('Id') as valid for OVER statement"
-						},
-						{
-							"name": "filterDuplicates"
-						},
-						{
-							"name": "removeTempColumns"
-						},
-						{
-							"name": "cdcValue"
-						},
-						{
-							"name": "lookupCDC"
-						},
-						{
-							"name": "filterAll"
-						}
-					],
-					"scriptLines": [
-						"parameters{",
-						"     c_target_container as string ('sandpit'),",
-						"     c_target_folder as string ('FromJsonToDeltaParquet_Relations11'),",
-						"     c_key_column_name as string ('name'),",
-						"     c_cdc_column_name as string ('fileName'),",
-						"     c_enriched_cdc_column as string ('cdcTimestamp')",
-						"}",
-						"source(allowSchemaDrift: true,",
-						"     validateSchema: false,",
-						"     ignoreNoFilesFound: false,",
-						"     fileList: true,",
-						"     rowUrlColumn: 'fileName',",
-						"     documentForm: 'documentPerLine',",
-						"     dateFormats: ['yyyy-MM-dd'],",
-						"     timestampFormats: ['yyyy-MM-dd\\'T\\'HH:mm:ss.SSS\\'Z\\'','yyyy-MM-dd\\'T\\'HH:mm:ss\\'Z\\''],",
-						"     preferredIntegralType: 'long',",
-						"     preferredFractionalType: 'decimal') ~> RawDataset",
-						"source(allowSchemaDrift: true,",
-						"     validateSchema: false,",
-						"     ignoreNoFilesFound: false) ~> fileList",
-						"RawDataset foldDown(unroll((byName('value'))),",
-						"     mapColumn(",
-						"          fileName,",
-						"          every((byName('value')),match(locate('@',name)==0),",
-						"               iif(instr($0,'.')>0||$0==$c_key_column_name,replace($0,'.',''),$0+$c_key_column_name) = $$)",
-						"     ),",
-						"     skipDuplicateMapInputs: false,",
-						"     skipDuplicateMapOutputs: false) ~> flatten",
-						"removeTempColumns alterRow(upsertIf(true())) ~> alterRow",
-						"derivedColumns window(over(keyColumn),",
-						"     desc(toString(byName($c_cdc_column_name)), true),",
-						"     rowNum = rowNumber()) ~> elicitDuplicates",
-						"lookupCDC derive(keyColumn = toString(byName($c_key_column_name)),",
-						"          dssUpdateTime = currentUTC(),",
-						"          each(match(name=='cdcValue'), $c_enriched_cdc_column = $$)) ~> derivedColumns",
-						"elicitDuplicates filter(rowNum == 1 && not(isNull(keyColumn))) ~> filterDuplicates",
-						"filterDuplicates select(mapColumn(",
-						"          each(match(name!='rowNum'&&name!='fileName'&&name!='keyColumn'&&name!='cdcValue'))",
-						"     ),",
-						"     skipDuplicateMapInputs: true,",
-						"     skipDuplicateMapOutputs: true) ~> removeTempColumns",
-						"fileList aggregate(cdcValue = max(replace(reverse(substring(reverse(toString(byPosition(1))), 0, locate('_', reverse(toString(byPosition(1)))) - 1)), '.json'))) ~> cdcValue",
-						"flatten, cdcValue lookup(0 == 0,",
-						"     multiple: false,",
-						"     pickup: 'any',",
-						"     broadcast: 'right')~> lookupCDC",
-						"removeTempColumns filter(false()) ~> filterAll",
-						"alterRow sink(allowSchemaDrift: true,",
-						"     validateSchema: false,",
-						"     format: 'delta',",
-						"     compressionType: 'snappy',",
-						"     compressionLevel: 'Fastest',",
-						"     fileSystem: ($c_target_container),",
-						"     folderPath: ($c_target_folder),",
-						"     mergeSchema: false,",
-						"     autoCompact: true,",
-						"     optimizedWrite: true,",
-						"     vacuum: 1,",
-						"     deletable: false,",
-						"     insertable: false,",
-						"     updateable: false,",
-						"     upsertable: true,",
-						"     keys:(array($c_key_column_name)),",
-						"     umask: 0022,",
-						"     preCommands: [],",
-						"     postCommands: [],",
-						"     skipDuplicateMapInputs: true,",
-						"     skipDuplicateMapOutputs: true,",
-						"     saveOrder: 2) ~> EnrichedDeltaLake",
-						"filterAll sink(allowSchemaDrift: true,",
-						"     validateSchema: false,",
-						"     format: 'delta',",
-						"     fileSystem: ($c_target_container),",
-						"     folderPath: ($c_target_folder),",
-						"     mergeSchema: true,",
-						"     autoCompact: true,",
-						"     optimizedWrite: true,",
-						"     vacuum: 1,",
-						"     deletable: false,",
-						"     insertable: true,",
-						"     updateable: false,",
-						"     upsertable: false,",
-						"     umask: 0022,",
-						"     preCommands: [],",
-						"     postCommands: [],",
-						"     skipDuplicateMapInputs: true,",
-						"     skipDuplicateMapOutputs: true,",
-						"     saveOrder: 1) ~> EnrichedDLSchemaEvolution"
-					]
-				}
-			},
-			"dependsOn": [
-				"[concat(variables('workspaceId'), '/datasets/GenericRawJson_NoExtension')]",
-				"[concat(variables('workspaceId'), '/datasets/GenericRawCSV_NoHeaderNoQuote')]",
-				"[concat(variables('workspaceId'), '/linkedServices/templateenrst_ARIR')]"
-			]
-		},
-		{
 			"name": "[concat(parameters('workspaceName'), '/FromJsonToDeltaParquet_RelationsMM')]",
 			"type": "Microsoft.Synapse/workspaces/dataflows",
 			"apiVersion": "2019-06-01-preview",
@@ -6047,10 +5857,17 @@
 						},
 						{
 							"dataset": {
-								"referenceName": "GenericRawCSV_NoHeaderNoQuote",
+								"referenceName": "GenericRawJson_NoExtension",
 								"type": "DatasetReference"
 							},
-							"name": "fileList"
+							"name": "PartitionPruning"
+						},
+						{
+							"dataset": {
+								"referenceName": "GenericServerlessSQL",
+								"type": "DatasetReference"
+							},
+							"name": "dummyPartitionPruning"
 						}
 					],
 					"sinks": [
@@ -6062,11 +5879,7 @@
 							"name": "EnrichedDeltaLake"
 						},
 						{
-							"linkedService": {
-								"referenceName": "templateenrst_ARIR",
-								"type": "LinkedServiceReference"
-							},
-							"name": "EnrichedDLSchemaEvolution"
+							"name": "sinkPartitionPruning"
 						}
 					],
 					"transformations": [
@@ -6090,16 +5903,22 @@
 							"name": "removeTempColumns"
 						},
 						{
-							"name": "cdcValue"
-						},
-						{
-							"name": "lookupCDC"
-						},
-						{
-							"name": "filterAll"
-						},
-						{
 							"name": "flattenRel"
+						},
+						{
+							"name": "flattenKeyPartition"
+						},
+						{
+							"name": "flattenRelPartition"
+						},
+						{
+							"name": "aggregatePartitionPruning"
+						},
+						{
+							"name": "unionPartitionPruning"
+						},
+						{
+							"name": "collectPartitionPruning"
 						}
 					],
 					"scriptLines": [
@@ -6108,8 +5927,11 @@
 						"     c_target_folder as string ('FromJsonToDeltaParquet_RelationsMM'),",
 						"     c_key_column_name as string ('name'),",
 						"     c_cdc_column_name as string ('fileName'),",
-						"     c_enriched_cdc_column as string ('cdcTimestamp'),",
-						"     c_relation_column_name as string ('properties.typeProperties.sources.dataset.referenceName')",
+						"     c_enriched_cdc_column as string ('enrTimestamp'),",
+						"     c_relation_column_name as string ('properties.typeProperties.sources.dataset.referenceName'),",
+						"     p_partition_formula as string (\"'dummy'\"),",
+						"     p_dss_update_time as string ('2023-10-20T00:00:00Z'),",
+						"     c_raw_cdc_column as string ('rawTimestamp')",
 						"}",
 						"source(allowSchemaDrift: true,",
 						"     validateSchema: false,",
@@ -6123,12 +5945,24 @@
 						"     preferredFractionalType: 'decimal') ~> RawDataset",
 						"source(allowSchemaDrift: true,",
 						"     validateSchema: false,",
-						"     ignoreNoFilesFound: false) ~> fileList",
+						"     ignoreNoFilesFound: false,",
+						"     fileList: true,",
+						"     documentForm: 'documentPerLine') ~> PartitionPruning",
+						"source(output(",
+						"          PARTITION as string,",
+						"          CONSTANT as string,",
+						"          AGGREGATE as string",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     isolationLevel: 'READ_UNCOMMITTED',",
+						"     query: 'select \\'dummy\\' as PARTITION,\\n\\'CONSTANT\\' as CONSTANT, \\'dummy\\' as AGGREGATE',",
+						"     format: 'query',",
+						"     staged: false) ~> dummyPartitionPruning",
 						"RawDataset foldDown(unroll((byName('value'))),",
 						"     mapColumn(",
-						"          fileName,",
-						"          every((byName('value')),match(locate('@',name)==0),",
-						"               $0 = $$)",
+						"          every(match(locate('@',name)==0),",
+						"               replace($0, 'value.', '') = $$)",
 						"     ),",
 						"     skipDuplicateMapInputs: false,",
 						"     skipDuplicateMapOutputs: false) ~> flattenKey",
@@ -6136,29 +5970,47 @@
 						"derivedColumns window(over(keyColumn),",
 						"     desc(toString(byName($c_cdc_column_name)), true),",
 						"     rowNum = rowNumber()) ~> elicitDuplicates",
-						"lookupCDC derive(keyColumn = toString(byName($c_key_column_name)) + '-' + toString(byName(replace($c_relation_column_name, '.', ''))),",
-						"          dssUpdateTime = currentUTC(),",
-						"          each(match(name=='cdcValue'), $c_enriched_cdc_column = $$)) ~> derivedColumns",
+						"flattenRel derive(keyColumn = toString(byName($c_key_column_name)) + '-' + toString(byName(replace($c_relation_column_name, '.', ''))),",
+						"          each(match(name=='fileName'), $c_enriched_cdc_column = toTimestamp($p_dss_update_time, \"yyyy-MM-dd'T'HH:mm:ss'Z'\"), $c_raw_cdc_column = replace(reverse(substring(reverse(toString($$)), 0, locate('_', reverse(toString($$))) - 1)), '.json')),",
+						"          DELTA_PARTITION = expr($p_partition_formula)) ~> derivedColumns",
 						"elicitDuplicates filter(rowNum == 1 && not(isNull(keyColumn))) ~> filterDuplicates",
 						"filterDuplicates select(mapColumn(",
-						"          each(match(name!='rowNum'&&name!='fileName'&&name!='keyColumn'&&name!='cdcValue'))",
+						"          each(match(name==replace($c_key_column_name,'.','')||name==replace($c_relation_column_name,'.','')||name=='DELTA_PARTITION'||name==$c_raw_cdc_column||name==$c_enriched_cdc_column))",
 						"     ),",
 						"     skipDuplicateMapInputs: true,",
 						"     skipDuplicateMapOutputs: true) ~> removeTempColumns",
-						"fileList aggregate(cdcValue = max(replace(reverse(substring(reverse(toString(byPosition(1))), 0, locate('_', reverse(toString(byPosition(1)))) - 1)), '.json'))) ~> cdcValue",
-						"flattenRel, cdcValue lookup(0 == 0,",
-						"     multiple: false,",
-						"     pickup: 'any',",
-						"     broadcast: 'right')~> lookupCDC",
-						"removeTempColumns filter(false()) ~> filterAll",
 						"flattenKey foldDown(unroll((byName($c_relation_column_name))),",
 						"     mapColumn(",
 						"          fileName,",
 						"          each(match(name==$c_key_column_name||name==$c_relation_column_name),",
-						"               replace($$,'.','') = $$)",
+						"               replace($$,'.','') = $$),",
+						"          each(match(name!=$c_key_column_name && name!=$c_relation_column_name && name!='fileName'),",
+						"               $0 = $$)",
 						"     ),",
 						"     skipDuplicateMapInputs: false,",
 						"     skipDuplicateMapOutputs: false) ~> flattenRel",
+						"PartitionPruning foldDown(unroll((byName('value'))),",
+						"     mapColumn(",
+						"          every(match(locate('@',name)==0),",
+						"               replace($0, 'value.', '') = $$)",
+						"     ),",
+						"     skipDuplicateMapInputs: false,",
+						"     skipDuplicateMapOutputs: false) ~> flattenKeyPartition",
+						"flattenKeyPartition foldDown(unroll((byName($c_relation_column_name))),",
+						"     mapColumn(",
+						"          each(match(name==$c_key_column_name||name==$c_relation_column_name),",
+						"               replace($$,'.','') = $$),",
+						"          each(match(name!=$c_key_column_name && name!=$c_relation_column_name && name!='fileName'),",
+						"               $0 = $$)",
+						"     ),",
+						"     skipDuplicateMapInputs: false,",
+						"     skipDuplicateMapOutputs: false) ~> flattenRelPartition",
+						"flattenRelPartition aggregate(groupBy(PARTITION = expr($p_partition_formula),",
+						"          CONSTANT = 'CONSTANT'),",
+						"     AGGREGATE = first(expr($p_partition_formula))) ~> aggregatePartitionPruning",
+						"aggregatePartitionPruning, dummyPartitionPruning union(byName: true)~> unionPartitionPruning",
+						"unionPartitionPruning aggregate(groupBy(CONSTANT),",
+						"     PARTITION = distinct(collect(AGGREGATE))) ~> collectPartitionPruning",
 						"alterRow sink(allowSchemaDrift: true,",
 						"     validateSchema: false,",
 						"     format: 'delta',",
@@ -6166,7 +6018,7 @@
 						"     compressionLevel: 'Fastest',",
 						"     fileSystem: ($c_target_container),",
 						"     folderPath: ($c_target_folder),",
-						"     mergeSchema: false,",
+						"     mergeSchema: true,",
 						"     autoCompact: true,",
 						"     optimizedWrite: true,",
 						"     vacuum: 1,",
@@ -6175,37 +6027,33 @@
 						"     updateable: false,",
 						"     upsertable: true,",
 						"     keys:(array($c_key_column_name, replace($c_relation_column_name, '.', ''))),",
+						"     pruneCondition: ['DELTA_PARTITION' -> (sinkPartitionPruning#outputs().PARTITION_PRUNING)],",
 						"     umask: 0022,",
 						"     preCommands: [],",
 						"     postCommands: [],",
 						"     skipDuplicateMapInputs: true,",
 						"     skipDuplicateMapOutputs: true,",
-						"     saveOrder: 2) ~> EnrichedDeltaLake",
-						"filterAll sink(allowSchemaDrift: true,",
-						"     validateSchema: false,",
-						"     format: 'delta',",
-						"     fileSystem: ($c_target_container),",
-						"     folderPath: ($c_target_folder),",
-						"     mergeSchema: true,",
-						"     autoCompact: true,",
-						"     optimizedWrite: true,",
-						"     vacuum: 1,",
-						"     deletable: false,",
-						"     insertable: true,",
-						"     updateable: false,",
-						"     upsertable: false,",
-						"     umask: 0022,",
-						"     preCommands: [],",
-						"     postCommands: [],",
+						"     saveOrder: 2,",
+						"     partitionBy('key',",
+						"          1,",
+						"          DELTA_PARTITION",
+						"     )) ~> EnrichedDeltaLake",
+						"collectPartitionPruning sink(validateSchema: false,",
 						"     skipDuplicateMapInputs: true,",
 						"     skipDuplicateMapOutputs: true,",
-						"     saveOrder: 1) ~> EnrichedDLSchemaEvolution"
+						"     store: 'cache',",
+						"     format: 'inline',",
+						"     output: false,",
+						"     saveOrder: 1,",
+						"     mapColumn(",
+						"          PARTITION_PRUNING = PARTITION",
+						"     )) ~> sinkPartitionPruning"
 					]
 				}
 			},
 			"dependsOn": [
 				"[concat(variables('workspaceId'), '/datasets/GenericRawJson_NoExtension')]",
-				"[concat(variables('workspaceId'), '/datasets/GenericRawCSV_NoHeaderNoQuote')]",
+				"[concat(variables('workspaceId'), '/datasets/GenericServerlessSQL')]",
 				"[concat(variables('workspaceId'), '/linkedServices/templateenrst_ARIR')]"
 			]
 		},
@@ -6227,6 +6075,12 @@
 							},
 							{
 								"activity": "GenericEnrichedParquet linked service",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "Set v_dss_update_time",
 								"dependencyConditions": [
 									"Succeeded"
 								]
@@ -6263,7 +6117,7 @@
 										"source": {
 											"type": "SqlDWSource",
 											"sqlReaderQuery": {
-												"value": "@concat('SELECT STRING_AGG(cast(jsonName as varchar(max)), char(10)) ListOfFiles ',\n        'FROM ( SELECT right(result.filepath(), ',\n        'len(result.filepath()) - charindex(''', \n        pipeline().parameters.c_raw_root_folder, \n        ''', result.filepath()) + 1) jsonName, max(',\n        item().keyCol, ') ', item().keyCol, ' FROM OPENROWSET(',\n        'BULK ''', activity('GenericRawJson linked service').output.properties.typeProperties.url, '/',\n        pipeline().parameters.c_raw_container, '/', \n        pipeline().parameters.c_raw_root_folder, '/',\n        item().target, '/*.json'',  FORMAT = ''CSV'', FIELDQUOTE = ''0x0b'', ',\n        'FIELDTERMINATOR =''0x0b'', ROWTERMINATOR = ''\\n'') ',\n        'WITH (jsonContent nvarchar(MAX)) ',\n        'AS [result] CROSS apply ',\n        'openjson(JSON_QUERY(jsonContent, ''$.value'')) ',\n        'WITH (', item().keyCol, ' nvarchar(1000) ''$.\"',\n        item().keyCol, '\"'') WHERE reverse(substring(reverse(result.filepath()), 1, charindex(''/'', reverse(result.filepath())) - 1))',\n        if(\n                not(empty(pipeline().parameters.p_datetime_to)), \n                ' between ',\n                ' >= '\n        ),\n        '''', item().target, '_', \n        activity('DatetimeFrom').output.resultSets[0].rows[0].CDCTimestamp, '.json''',\n        if(not(empty(pipeline().parameters.p_datetime_to)), \n            concat(' and ''', item().target, '_', \n                replace(replace(replace(replace(replace(\n                    formatDateTime(\n                        pipeline().parameters.p_datetime_to, \n                        'yyyy-MM-ddTHH:mm:ss.fffffffZ'\n                    ), \n                    '0000Z', 'Z'), '000Z', 'Z'), '00Z', 'Z'), '0Z', 'Z'), '.Z', 'Z'\n                ), \n                '.json'''\n            ), \n            ''\n        ), \n        ' GROUP BY result.filepath()) q'\n)",
+												"value": "@concat('SELECT STRING_AGG(cast(jsonName as varchar(max)), char(10)) ListOfFiles ',\n        'FROM ( SELECT right(result.filepath(), ',\n        'len(result.filepath()) - charindex(''', \n        pipeline().parameters.c_raw_root_folder, \n        ''', result.filepath()) + 1) jsonName, max(',\n        item().keyCol, ') ', item().keyCol, ' FROM OPENROWSET(',\n        'BULK ''', activity('GenericRawJson linked service').output.properties.typeProperties.url, \n        pipeline().parameters.c_raw_container, '/', \n        pipeline().parameters.c_raw_root_folder, '/',\n        item().target, '/*.json'',  FORMAT = ''CSV'', FIELDQUOTE = ''0x0b'', ',\n        'FIELDTERMINATOR =''0x0b'', ROWTERMINATOR = ''\\n'') ',\n        'WITH (jsonContent nvarchar(MAX)) ',\n        'AS [result] CROSS apply ',\n        'openjson(JSON_QUERY(jsonContent, ''$.value'')) ',\n        'WITH (', item().keyCol, ' nvarchar(1000) ''$.\"',\n        item().keyCol, '\"'') WHERE reverse(substring(reverse(result.filepath()), 1, charindex(''/'', reverse(result.filepath())) - 1))',\n        if(\n                not(empty(pipeline().parameters.p_datetime_to)), \n                ' between ',\n                ' >= '\n        ),\n        '''', item().target, '_', \n        activity('DatetimeFrom').output.resultSets[0].rows[0].CDCTimestamp, '.json''',\n        if(not(empty(pipeline().parameters.p_datetime_to)), \n            concat(' and ''', item().target, '_', \n                replace(replace(replace(replace(replace(\n                    formatDateTime(\n                        pipeline().parameters.p_datetime_to, \n                        'yyyy-MM-ddTHH:mm:ss.fffffffZ'\n                    ), \n                    '0000Z', 'Z'), '000Z', 'Z'), '00Z', 'Z'), '0Z', 'Z'), '.Z', 'Z'\n                ), \n                '.json'''\n            ), \n            ''\n        ), \n        ' GROUP BY result.filepath()) q'\n)",
 												"type": "Expression"
 											},
 											"queryTimeout": "02:00:00",
@@ -6367,7 +6221,7 @@
 											{
 												"type": "Query",
 												"text": {
-													"value": "@concat('select count(*) countRows FROM OPENROWSET(',\n        'BULK ''', activity('GenericRawJson linked service').output.properties.typeProperties.url, '/',\n        pipeline().parameters.c_raw_container, '/', \n        pipeline().parameters.c_raw_root_folder, '/',\n        item().target, '/*.json'',  FORMAT = ''CSV'', FIELDQUOTE = ''0x0b'', ',\n        'FIELDTERMINATOR =''0x0b'', ROWTERMINATOR = ''\\n'') ',\n        'WITH (jsonContent nvarchar(MAX)) ',\n        'AS [result] CROSS apply ',\n        'openjson(JSON_QUERY(jsonContent, ''$.value'')) ',\n        'WITH (', item().keyCol, ' nvarchar(1000) ''$.\"',\n        item().keyCol, '\"'')  WHERE reverse(substring(reverse(result.filepath()), 1, charindex(''/'', reverse(result.filepath())) - 1))',\n        if(not(empty(pipeline().parameters.p_datetime_to)), \n           ' between ',\n           ' >= '),\n        '''', item().target, '_', \n        activity('DatetimeFrom').output.resultSets[0].rows[0].CDCTimestamp, '.json''',\n        if(not(empty(pipeline().parameters.p_datetime_to)), \n            concat(' and ''', item().target, '_', \n                replace(replace(replace(replace(replace(\n                    formatDateTime(\n                        pipeline().parameters.p_datetime_to, \n                        'yyyy-MM-ddTHH:mm:ss.fffffffZ'\n                    ), \n                    '0000Z', 'Z'), '000Z', 'Z'), '00Z', 'Z'), '0Z', 'Z'), '.Z', 'Z'\n                ), \n                '.json'''\n            ), \n            ''\n        )\n)",
+													"value": "@concat('select count(*) countRows FROM OPENROWSET(',\n        'BULK ''', activity('GenericRawJson linked service').output.properties.typeProperties.url, \n        pipeline().parameters.c_raw_container, '/', \n        pipeline().parameters.c_raw_root_folder, '/',\n        item().target, '/*.json'',  FORMAT = ''CSV'', FIELDQUOTE = ''0x0b'', ',\n        'FIELDTERMINATOR =''0x0b'', ROWTERMINATOR = ''\\n'') ',\n        'WITH (jsonContent nvarchar(MAX)) ',\n        'AS [result] CROSS apply ',\n        'openjson(JSON_QUERY(jsonContent, ''$.value'')) ',\n        'WITH (', item().keyCol, ' nvarchar(1000) ''$.\"',\n        item().keyCol, '\"'')  WHERE reverse(substring(reverse(result.filepath()), 1, charindex(''/'', reverse(result.filepath())) - 1))',\n        if(not(empty(pipeline().parameters.p_datetime_to)), \n           ' between ',\n           ' >= '),\n        '''', item().target, '_', \n        activity('DatetimeFrom').output.resultSets[0].rows[0].CDCTimestamp, '.json''',\n        if(not(empty(pipeline().parameters.p_datetime_to)), \n            concat(' and ''', item().target, '_', \n                replace(replace(replace(replace(replace(\n                    formatDateTime(\n                        pipeline().parameters.p_datetime_to, \n                        'yyyy-MM-ddTHH:mm:ss.fffffffZ'\n                    ), \n                    '0000Z', 'Z'), '000Z', 'Z'), '00Z', 'Z'), '0Z', 'Z'), '.Z', 'Z'\n                ), \n                '.json'''\n            ), \n            ''\n        )\n)",
 													"type": "Expression"
 												}
 											}
@@ -6442,6 +6296,18 @@
 																	"c_relation_column_name": {
 																		"value": "'@{item().relCol}'",
 																		"type": "Expression"
+																	},
+																	"p_partition_formula": {
+																		"value": "@concat('\"', item().partitionFormula, '\"')",
+																		"type": "Expression"
+																	},
+																	"p_dss_update_time": {
+																		"value": "'@{formatDateTime(variables('v_dss_update_time'), 'yyyy-MM-ddTHH:mm:ssZ')}'",
+																		"type": "Expression"
+																	},
+																	"c_raw_cdc_column": {
+																		"value": "'@{pipeline().parameters.c_raw_cdc_column}'",
+																		"type": "Expression"
 																	}
 																},
 																"datasetParameters": {
@@ -6459,7 +6325,7 @@
 																			"type": "Expression"
 																		}
 																	},
-																	"fileList": {
+																	"PartitionPruning": {
 																		"p_container": {
 																			"value": "@pipeline().parameters.c_raw_monitoring_container",
 																			"type": "Expression"
@@ -6469,13 +6335,19 @@
 																			"type": "Expression"
 																		},
 																		"p_file": {
-																			"value": "@pipeline().parameters.c_file_list_blob",
+																			"value": "@concat(pipeline().parameters.c_file_list_blob, '.csv')",
 																			"type": "Expression"
 																		}
 																	},
+																	"dummyPartitionPruning": {
+																		"p_database": "master",
+																		"p_schema": "dummy",
+																		"p_table": "dummy"
+																	},
 																	"EnrichedDeltaLake": {},
-																	"EnrichedDLSchemaEvolution": {}
-																}
+																	"sinkPartitionPruning": {}
+																},
+																"linkedServiceParameters": {}
 															},
 															"staging": {},
 															"compute": {
@@ -6524,7 +6396,19 @@
 																		"type": "Expression"
 																	},
 																	"c_enriched_cdc_column": {
-																		"value": "'@{item().relCol}'",
+																		"value": "'@{pipeline().parameters.c_enriched_cdc_column}'",
+																		"type": "Expression"
+																	},
+																	"p_partition_formula": {
+																		"value": "@concat('\"', item().partitionFormula, '\"')",
+																		"type": "Expression"
+																	},
+																	"p_dss_update_time": {
+																		"value": "'@{formatDateTime(variables('v_dss_update_time'), 'yyyy-MM-ddTHH:mm:ssZ')}'",
+																		"type": "Expression"
+																	},
+																	"c_raw_cdc_column": {
+																		"value": "'@{pipeline().parameters.c_raw_cdc_column}'",
 																		"type": "Expression"
 																	}
 																},
@@ -6543,23 +6427,29 @@
 																			"type": "Expression"
 																		}
 																	},
-																	"fileList": {
+																	"PartitionPruning": {
 																		"p_container": {
 																			"value": "@pipeline().parameters.c_raw_monitoring_container",
 																			"type": "Expression"
 																		},
 																		"p_folder": {
-																			"value": "@pipeline().parameters.c_raw_monitoring_folder",
+																			"value": "@concat(pipeline().parameters.c_raw_monitoring_folder, '/', \npipeline().parameters.c_raw_root_folder, '/',\nitem().target)",
 																			"type": "Expression"
 																		},
 																		"p_file": {
-																			"value": "@pipeline().parameters.c_file_list_blob",
+																			"value": "@concat(pipeline().parameters.c_file_list_blob, '.csv')",
 																			"type": "Expression"
 																		}
 																	},
+																	"dummyPartitionPruning": {
+																		"p_database": "master",
+																		"p_schema": "dummy",
+																		"p_table": "dummy"
+																	},
 																	"EnrichedDeltaLake": {},
-																	"EnrichedDLSchemaEvolution": {}
-																}
+																	"sinkPartitionPruning": {}
+																},
+																"linkedServiceParameters": {}
 															},
 															"staging": {},
 															"compute": {
@@ -6610,6 +6500,18 @@
 																	"c_enriched_cdc_column": {
 																		"value": "'@{pipeline().parameters.c_enriched_cdc_column}'",
 																		"type": "Expression"
+																	},
+																	"p_partition_formula": {
+																		"value": "@concat('\"', item().partitionFormula, '\"')",
+																		"type": "Expression"
+																	},
+																	"p_dss_update_time": {
+																		"value": "'@{formatDateTime(variables('v_dss_update_time'), 'yyyy-MM-ddTHH:mm:ssZ')}'",
+																		"type": "Expression"
+																	},
+																	"c_raw_cdc_column": {
+																		"value": "'@{pipeline().parameters.c_raw_cdc_column}'",
+																		"type": "Expression"
 																	}
 																},
 																"datasetParameters": {
@@ -6627,23 +6529,29 @@
 																			"type": "Expression"
 																		}
 																	},
-																	"fileList": {
+																	"PartitionPruning": {
 																		"p_container": {
 																			"value": "@pipeline().parameters.c_raw_monitoring_container",
 																			"type": "Expression"
 																		},
 																		"p_folder": {
-																			"value": "@concat(pipeline().parameters.c_raw_monitoring_folder, '/', \npipeline().parameters.c_raw_root_folder, '/',\nitem().target)",
+																			"value": "@concat(pipeline().parameters.c_raw_monitoring_folder, '/',\n    pipeline().parameters.c_raw_root_folder, '/', \n    item().target)",
 																			"type": "Expression"
 																		},
 																		"p_file": {
-																			"value": "@pipeline().parameters.c_file_list_blob",
+																			"value": "@concat(pipeline().parameters.c_file_list_blob, '.csv')",
 																			"type": "Expression"
 																		}
 																	},
+																	"dummyPartitionPruning": {
+																		"p_database": "master",
+																		"p_schema": "dummy",
+																		"p_table": "dummy"
+																	},
 																	"EnrichedDeltaLake": {},
-																	"EnrichedDLSchemaEvolution": {}
-																}
+																	"sinkPartitionPruning": {}
+																},
+																"linkedServiceParameters": {}
 															},
 															"staging": {},
 															"compute": {
@@ -6692,7 +6600,10 @@
 													"referenceName": "serverless_ARIR",
 													"type": "LinkedServiceReference",
 													"parameters": {
-														"p_database": "master"
+														"p_database": {
+															"value": "@pipeline().parameters.c_serverless_db",
+															"type": "Expression"
+														}
 													}
 												},
 												"typeProperties": {
@@ -6700,7 +6611,7 @@
 														{
 															"type": "Query",
 															"text": {
-																"value": "select 'create or alter view  \n@{concat(if(empty(pipeline().parameters.c_enriched_schema), '', concat(pipeline().parameters.c_enriched_schema, '.')), item().target)}\nas select * from OPENROWSET(BULK ''@{item().target}'', \t\n\tDATA_SOURCE = ''@{pipeline().parameters.c_external_data_source}'', \t\n\tFORMAT = ''Delta''\n) WITH (' +\nSTRING_AGG('[' + \ncast(colName as varchar(max)) + '] ' + \ndataType, ',' + char(10)) \nWITHIN GROUP (ORDER BY column_id ASC) +\n') as r' as SQL\nfrom (select \nc.name colName, coalesce(r.dataType,\nCASE \n      WHEN t.[name] IN ('varchar', 'char', 'varbinary') THEN t.[name] + '(' + IIF(c.max_length = -1, 'max', CAST(c.max_length AS VARCHAR(25))) + ')' \n      WHEN t.[name] IN ('nvarchar','nchar') THEN t.[name] + '(' + IIF(c.max_length = -1, 'max', CAST(c.max_length / 2 AS VARCHAR(25)))+ ')'      \n      WHEN t.[name] IN ('decimal', 'numeric') THEN t.[name] + '(' + CAST(c.[precision] AS VARCHAR(25)) + ', ' + CAST(c.[scale] AS VARCHAR(25)) + ')'\n      WHEN t.[name] IN ('datetime2') THEN t.[name] + '(' + CAST(c.[scale] AS VARCHAR(25)) + ')'\n      ELSE t.[name]\nEND) AS dataType,\nc.column_id\nfrom sys.columns c\njoin sys.views v on v.object_id = c.object_id\njoin sys.schemas s on s.schema_id = v.schema_id\njoin sys.types t on c.user_type_id = t.user_type_id \nleft outer join (select * from OpenJson(N'@{item().dataTypeReplace}')\nWITH (col varchar(255), dataType varchar(255)) as r) r\non r.col = c.name\nwhere s.name = '@{pipeline().parameters.c_enriched_schema}' and v.name = '@{item().target}') q",
+																"value": "select 'create or alter view  \n@{concat(if(empty(pipeline().parameters.c_enriched_schema), '', concat(pipeline().parameters.c_enriched_schema, '.')), item().target)}\nas select * from OPENROWSET(\n      BULK ''@{activity('GenericEnrichedParquet linked service').output.properties.typeProperties.url}@{pipeline().parameters.c_enriched_container}/@{pipeline().parameters.c_enriched_root_folder}/@{item().target}'',\t\n\tFORMAT = ''Delta''\n) WITH (' +\nSTRING_AGG('[' + \ncast(colName as varchar(max)) + '] ' + \ndataType, ',' + char(10)) \nWITHIN GROUP (ORDER BY column_id ASC) +\n') as r' as SQL\nfrom (select \nc.name colName, coalesce(r.dataType,\nCASE \n      WHEN t.[name] IN ('varchar', 'char', 'varbinary') THEN t.[name] + '(' + IIF(c.max_length = -1, 'max', CAST(c.max_length AS VARCHAR(25))) + ')' \n      WHEN t.[name] IN ('nvarchar','nchar') THEN t.[name] + '(' + IIF(c.max_length = -1, 'max', CAST(c.max_length / 2 AS VARCHAR(25)))+ ')'      \n      WHEN t.[name] IN ('decimal', 'numeric') THEN t.[name] + '(' + CAST(c.[precision] AS VARCHAR(25)) + ', ' + CAST(c.[scale] AS VARCHAR(25)) + ')'\n      WHEN t.[name] IN ('datetime2') THEN t.[name] + '(' + CAST(c.[scale] AS VARCHAR(25)) + ')'\n      ELSE t.[name]\nEND) AS dataType,\nc.column_id\nfrom sys.columns c\njoin sys.views v on v.object_id = c.object_id\njoin sys.schemas s on s.schema_id = v.schema_id\njoin sys.types t on c.user_type_id = t.user_type_id \nleft outer join (select * from OpenJson(N'@{item().dataTypeReplace}')\nWITH (col varchar(255), dataType varchar(255)) as r) r\non r.col = c.name\nwhere s.name = '@{pipeline().parameters.c_enriched_schema}' and v.name = '@{item().target}') q",
 																"type": "Expression"
 															}
 														}
@@ -6731,7 +6642,10 @@
 													"referenceName": "serverless_ARIR",
 													"type": "LinkedServiceReference",
 													"parameters": {
-														"p_database": "master"
+														"p_database": {
+															"value": "@pipeline().parameters.c_serverless_db",
+															"type": "Expression"
+														}
 													}
 												},
 												"typeProperties": {
@@ -6766,7 +6680,10 @@
 										"referenceName": "serverless_ARIR",
 										"type": "LinkedServiceReference",
 										"parameters": {
-											"p_database": "master"
+											"p_database": {
+												"value": "@pipeline().parameters.c_serverless_db",
+												"type": "Expression"
+											}
 										}
 									},
 									"typeProperties": {
@@ -6774,7 +6691,7 @@
 											{
 												"type": "Query",
 												"text": {
-													"value": "@if(and(empty(pipeline().parameters.p_datetime_from),\n        not(empty(pipeline().parameters.c_enriched_cdc_column))\n    ),\n    concat('if exists (select 1 from sys.columns c join sys.views v on v.object_id = c.object_id join sys.schemas s on s.schema_id = v.schema_id where s.name = ''', pipeline().parameters.c_enriched_schema, ''' and v.name = ''', item().target, ''' and c.name = ''', pipeline().parameters.c_enriched_cdc_column, ''') ',\n        'exec(''select dateadd(mcs, 1, cast(max(', pipeline().parameters.c_enriched_cdc_column, ') as datetime2)) CDCTimestamp from ',\n        if(empty(pipeline().parameters.c_enriched_schema), '', concat(pipeline().parameters.c_enriched_schema, '.')), item().target,\n        ''') else select ''1900-01-01'' as CDCTimestamp'\n    ),\n    concat('select ''', replace(replace(replace(replace(replace(\n                    formatDateTime(\n                        pipeline().parameters.p_datetime_from, \n                        'yyyy-MM-ddTHH:mm:ss.fffffffZ'\n                    ), \n                    '0000Z', 'Z'), '000Z', 'Z'), '00Z', 'Z'), '0Z', 'Z'), '.Z', 'Z'\n                ),\n        ''' as CDCTimestamp'\n    )\n)",
+													"value": "@if(and(empty(pipeline().parameters.p_datetime_from),\n        not(empty(pipeline().parameters.c_raw_cdc_column))\n    ),\n    concat('if exists (select 1 from sys.columns c join sys.views v on v.object_id = c.object_id join sys.schemas s on s.schema_id = v.schema_id where s.name = ''', pipeline().parameters.c_enriched_schema, ''' and v.name = ''', item().target, ''' and c.name = ''', pipeline().parameters.c_raw_cdc_column, ''') ',\n        'exec(''select dateadd(mcs, 1, cast(max(', pipeline().parameters.c_raw_cdc_column, ') as datetime2)) CDCTimestamp from ',\n        if(empty(pipeline().parameters.c_enriched_schema), '', concat(pipeline().parameters.c_enriched_schema, '.')), item().target,\n        ''') else select ''1900-01-01'' as CDCTimestamp'\n    ),\n    concat('select ''', replace(replace(replace(replace(replace(\n                    formatDateTime(\n                        pipeline().parameters.p_datetime_from, \n                        'yyyy-MM-ddTHH:mm:ss.fffffffZ'\n                    ), \n                    '0000Z', 'Z'), '000Z', 'Z'), '00Z', 'Z'), '0Z', 'Z'), '.Z', 'Z'\n                ),\n        ''' as CDCTimestamp'\n    )\n)",
 													"type": "Expression"
 												}
 											}
@@ -6816,7 +6733,10 @@
 													"referenceName": "serverless_ARIR",
 													"type": "LinkedServiceReference",
 													"parameters": {
-														"p_database": "master"
+														"p_database": {
+															"value": "@pipeline().parameters.c_serverless_db",
+															"type": "Expression"
+														}
 													}
 												},
 												"typeProperties": {
@@ -6824,7 +6744,7 @@
 														{
 															"type": "Query",
 															"text": {
-																"value": "create or alter view \n@{if(empty(pipeline().parameters.c_enriched_schema), item().target, concat(pipeline().parameters.c_enriched_schema, '.', item().target))}\nas select * from OPENROWSET(\n\tBULK '@{item().target}', \t\n\tDATA_SOURCE = '@{pipeline().parameters.c_external_data_source}', \t\n\tFORMAT = 'Delta'\n) as r",
+																"value": "create or alter view \n@{if(empty(pipeline().parameters.c_enriched_schema), item().target, concat(pipeline().parameters.c_enriched_schema, '.', item().target))}\nas select * from OPENROWSET(\n\tBULK '@{activity('GenericEnrichedParquet linked service').output.properties.typeProperties.url}@{pipeline().parameters.c_enriched_container}/@{pipeline().parameters.c_enriched_root_folder}/@{item().target}',\n\tFORMAT = 'Delta'\n) as r",
 																"type": "Expression"
 															}
 														}
@@ -6967,6 +6887,23 @@
 								"resource": "https://dev.azuresynapse.net/"
 							}
 						}
+					},
+					{
+						"name": "Set v_dss_update_time",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "v_dss_update_time",
+							"value": {
+								"value": "@utcNow()",
+								"type": "Expression"
+							}
+						}
 					}
 				],
 				"policy": {
@@ -6987,7 +6924,8 @@
 										"dataType": "nvarchar(200)"
 									}
 								],
-								"relCol": null
+								"relCol": null,
+								"partitionFormula": "'dummy'"
 							},
 							{
 								"type": "basic",
@@ -7000,7 +6938,8 @@
 										"dataType": "nvarchar(200)"
 									}
 								],
-								"relCol": null
+								"relCol": null,
+								"partitionFormula": "'dummy'"
 							},
 							{
 								"type": "relationsMM",
@@ -7008,7 +6947,17 @@
 								"cdcCol": null,
 								"keyCol": "name",
 								"dataTypeReplace": null,
-								"relCol": "properties.typeProperties.sources.dataset.referenceName"
+								"relCol": "properties.typeProperties.sources.dataset.referenceName",
+								"partitionFormula": "'dummy'"
+							},
+							{
+								"type": "relations11",
+								"target": "datasets_relations11",
+								"cdcCol": null,
+								"keyCol": "name",
+								"dataTypeReplace": null,
+								"relCol": null,
+								"partitionFormula": "'dummy'"
 							}
 						]
 					},
@@ -7020,15 +6969,15 @@
 					},
 					"c_raw_root_folder": {
 						"type": "string",
-						"defaultValue": "template"
+						"defaultValue": "FromRESTAPIToJson"
 					},
 					"c_raw_container": {
 						"type": "string",
-						"defaultValue": "sandpit"
+						"defaultValue": "template"
 					},
 					"c_enriched_container": {
 						"type": "string",
-						"defaultValue": "sandpit"
+						"defaultValue": "template"
 					},
 					"c_enriched_root_folder": {
 						"type": "string",
@@ -7040,7 +6989,7 @@
 					},
 					"c_serverless_db": {
 						"type": "string",
-						"defaultValue": "template"
+						"defaultValue": "templateDB"
 					},
 					"c_raw_monitoring_folder": {
 						"type": "string",
@@ -7056,11 +7005,15 @@
 					},
 					"c_enriched_cdc_column": {
 						"type": "string",
-						"defaultValue": "cdcTimestamp"
+						"defaultValue": "enrTimestamp"
 					},
 					"c_raw_monitoring_container": {
 						"type": "string",
-						"defaultValue": "sandpit"
+						"defaultValue": "template"
+					},
+					"c_raw_cdc_column": {
+						"type": "string",
+						"defaultValue": "rawTimestamp"
 					}
 				},
 				"variables": {
@@ -7078,6 +7031,9 @@
 					},
 					"v_string": {
 						"type": "String"
+					},
+					"v_dss_update_time": {
+						"type": "String"
 					}
 				},
 				"folder": {
@@ -7092,6 +7048,7 @@
 				"[concat(variables('workspaceId'), '/datasets/GenericRawCSV_NoHeaderNoQuote')]",
 				"[concat(variables('workspaceId'), '/linkedServices/serverless_ARIR')]",
 				"[concat(variables('workspaceId'), '/dataflows/FromJsonToDeltaParquet_RelationsMM')]",
+				"[concat(variables('workspaceId'), '/integrationRuntimes/AutoResolveIntegrationRuntime')]",
 				"[concat(variables('workspaceId'), '/dataflows/FromJsonToDeltaParquet_Relations11')]",
 				"[concat(variables('workspaceId'), '/dataflows/FromJsonToDeltaParquet_Basic')]"
 			]
@@ -7247,6 +7204,224 @@
 				"schema": []
 			},
 			"dependsOn": [
+				"[concat(variables('workspaceId'), '/linkedServices/templateenrst_ARIR')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/Template_enr_schema')]",
+			"type": "Microsoft.Synapse/workspaces/sqlscripts",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"folder": {
+					"name": "Serverless Deploy"
+				},
+				"content": {
+					"query": "IF NOT EXISTS (SELECT * FROM sys.schemas WHERE name = 'enr') \nEXEC('CREATE SCHEMA [enr]')",
+					"metadata": {
+						"language": "sql"
+					},
+					"currentConnection": {
+						"databaseName": "templateDB",
+						"poolName": "Built-in"
+					},
+					"resultLimit": 5000
+				},
+				"type": "SqlQuery"
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/FromJsonToDeltaParquet_Relations11')]",
+			"type": "Microsoft.Synapse/workspaces/dataflows",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"folder": {
+					"name": "Templates"
+				},
+				"type": "MappingDataFlow",
+				"typeProperties": {
+					"sources": [
+						{
+							"dataset": {
+								"referenceName": "GenericRawJson_NoExtension",
+								"type": "DatasetReference"
+							},
+							"name": "RawDataset"
+						},
+						{
+							"dataset": {
+								"referenceName": "GenericRawJson_NoExtension",
+								"type": "DatasetReference"
+							},
+							"name": "PartitionPruning"
+						},
+						{
+							"dataset": {
+								"referenceName": "GenericServerlessSQL",
+								"type": "DatasetReference"
+							},
+							"name": "dummyPartitionPruning"
+						}
+					],
+					"sinks": [
+						{
+							"linkedService": {
+								"referenceName": "templateenrst_ARIR",
+								"type": "LinkedServiceReference"
+							},
+							"name": "EnrichedDeltaLake"
+						},
+						{
+							"name": "sinkPartitionPruning"
+						}
+					],
+					"transformations": [
+						{
+							"name": "flattenKey"
+						},
+						{
+							"name": "alterRow"
+						},
+						{
+							"name": "elicitDuplicates"
+						},
+						{
+							"name": "derivedColumns",
+							"description": "Added as Window function cannot interpret byName('Id') as valid for OVER statement"
+						},
+						{
+							"name": "filterDuplicates"
+						},
+						{
+							"name": "removeTempColumns"
+						},
+						{
+							"name": "flattenKeyPartition"
+						},
+						{
+							"name": "aggregatePartitionPruning"
+						},
+						{
+							"name": "unionPartitionPruning"
+						},
+						{
+							"name": "collectPartitionPruning"
+						}
+					],
+					"scriptLines": [
+						"parameters{",
+						"     c_target_container as string ('sandpit'),",
+						"     c_target_folder as string ('FromJsonToDeltaParquet_RelationsMM'),",
+						"     c_key_column_name as string ('name'),",
+						"     c_cdc_column_name as string ('fileName'),",
+						"     c_enriched_cdc_column as string ('enrTimestamp'),",
+						"     p_partition_formula as string (\"'dummy'\"),",
+						"     p_dss_update_time as string ('2023-10-20T00:00:00Z'),",
+						"     c_raw_cdc_column as string ('rawTimestamp')",
+						"}",
+						"source(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     ignoreNoFilesFound: false,",
+						"     fileList: true,",
+						"     rowUrlColumn: 'fileName',",
+						"     documentForm: 'documentPerLine',",
+						"     dateFormats: ['yyyy-MM-dd'],",
+						"     timestampFormats: ['yyyy-MM-dd\\'T\\'HH:mm:ss.SSS\\'Z\\'','yyyy-MM-dd\\'T\\'HH:mm:ss\\'Z\\''],",
+						"     preferredIntegralType: 'long',",
+						"     preferredFractionalType: 'decimal') ~> RawDataset",
+						"source(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     ignoreNoFilesFound: false,",
+						"     fileList: true,",
+						"     documentForm: 'documentPerLine') ~> PartitionPruning",
+						"source(output(",
+						"          PARTITION as string,",
+						"          CONSTANT as string,",
+						"          AGGREGATE as string",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     isolationLevel: 'READ_UNCOMMITTED',",
+						"     query: 'select \\'dummy\\' as PARTITION,\\n\\'CONSTANT\\' as CONSTANT, \\'dummy\\' as AGGREGATE',",
+						"     format: 'query',",
+						"     staged: false) ~> dummyPartitionPruning",
+						"RawDataset foldDown(unroll((byName('value'))),",
+						"     mapColumn(",
+						"          every(match(locate('@',name)==0),",
+						"               replace($0, 'value.', '') = $$)",
+						"     ),",
+						"     skipDuplicateMapInputs: false,",
+						"     skipDuplicateMapOutputs: false) ~> flattenKey",
+						"removeTempColumns alterRow(upsertIf(true())) ~> alterRow",
+						"derivedColumns window(over(keyColumn),",
+						"     desc(toString(byName($c_cdc_column_name)), true),",
+						"     rowNum = rowNumber()) ~> elicitDuplicates",
+						"flattenKey derive(keyColumn = toString(byName($c_key_column_name)),",
+						"          each(match(name=='fileName'), $c_enriched_cdc_column = toTimestamp($p_dss_update_time, \"yyyy-MM-dd'T'HH:mm:ss'Z'\"), $c_raw_cdc_column = replace(reverse(substring(reverse(toString($$)), 0, locate('_', reverse(toString($$))) - 1)), '.json')),",
+						"          DELTA_PARTITION = expr($p_partition_formula)) ~> derivedColumns",
+						"elicitDuplicates filter(rowNum == 1 && not(isNull(keyColumn))) ~> filterDuplicates",
+						"filterDuplicates select(mapColumn(",
+						"          each(match(name==$c_key_column_name||right(name, length('referenceName'))=='referenceName'||name=='DELTA_PARTITION'||name==$c_raw_cdc_column||name==$c_enriched_cdc_column),",
+						"               replace($$, '.', '') = $$)",
+						"     ),",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true) ~> removeTempColumns",
+						"PartitionPruning foldDown(unroll((byName('value'))),",
+						"     mapColumn(",
+						"          every(match(locate('@',name)==0),",
+						"               replace($0, 'value.', '') = $$)",
+						"     ),",
+						"     skipDuplicateMapInputs: false,",
+						"     skipDuplicateMapOutputs: false) ~> flattenKeyPartition",
+						"flattenKeyPartition aggregate(groupBy(PARTITION = expr($p_partition_formula),",
+						"          CONSTANT = 'CONSTANT'),",
+						"     AGGREGATE = first(expr($p_partition_formula))) ~> aggregatePartitionPruning",
+						"aggregatePartitionPruning, dummyPartitionPruning union(byName: true)~> unionPartitionPruning",
+						"unionPartitionPruning aggregate(groupBy(CONSTANT),",
+						"     PARTITION = distinct(collect(AGGREGATE))) ~> collectPartitionPruning",
+						"alterRow sink(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     format: 'delta',",
+						"     compressionType: 'snappy',",
+						"     compressionLevel: 'Fastest',",
+						"     fileSystem: ($c_target_container),",
+						"     folderPath: ($c_target_folder),",
+						"     mergeSchema: true,",
+						"     autoCompact: true,",
+						"     optimizedWrite: true,",
+						"     vacuum: 1,",
+						"     deletable: false,",
+						"     insertable: false,",
+						"     updateable: false,",
+						"     upsertable: true,",
+						"     keys:(array($c_key_column_name)),",
+						"     pruneCondition: ['DELTA_PARTITION' -> (sinkPartitionPruning#outputs().PARTITION_PRUNING)],",
+						"     umask: 0022,",
+						"     preCommands: [],",
+						"     postCommands: [],",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true,",
+						"     saveOrder: 2,",
+						"     partitionBy('key',",
+						"          1,",
+						"          DELTA_PARTITION",
+						"     )) ~> EnrichedDeltaLake",
+						"collectPartitionPruning sink(validateSchema: false,",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true,",
+						"     store: 'cache',",
+						"     format: 'inline',",
+						"     output: false,",
+						"     saveOrder: 1,",
+						"     mapColumn(",
+						"          PARTITION_PRUNING = PARTITION",
+						"     )) ~> sinkPartitionPruning"
+					]
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/datasets/GenericRawJson_NoExtension')]",
+				"[concat(variables('workspaceId'), '/datasets/GenericServerlessSQL')]",
 				"[concat(variables('workspaceId'), '/linkedServices/templateenrst_ARIR')]"
 			]
 		}

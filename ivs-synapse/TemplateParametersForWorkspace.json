@@ -23,9 +23,6 @@
 		"ivs-synapse-WorkspaceDefaultStorage_properties_typeProperties_url": {
 			"value": "https://ivsdatastorage.dfs.core.windows.net"
 		},
-		"template_REST_properties_typeProperties_url": {
-			"value": "https://gorest.co.in/public/v2/"
-		},
 		"template_kv_properties_typeProperties_baseUrl": {
 			"value": "https://ivs-dwh-kv.vault.azure.net/"
 		},
