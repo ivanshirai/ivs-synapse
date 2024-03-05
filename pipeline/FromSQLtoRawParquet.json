@@ -271,7 +271,7 @@
 														"type": "Expression"
 													},
 													"p_folder": {
-														"value": "@pipeline().parameters.c_raw_monitoring_folder",
+														"value": "@concat(pipeline().parameters.c_raw_monitoring_folder, '/',\n    pipeline().parameters.c_raw_root_folder, '/', \n    if(equals(length(item().target), 0), item().sourceObject, item().target))",
 														"type": "Expression"
 													},
 													"p_file": {
@@ -325,7 +325,7 @@
 											"type": "Expression"
 										},
 										"p_folder": {
-											"value": "@pipeline().parameters.c_raw_monitoring_folder",
+											"value": "@concat(pipeline().parameters.c_raw_monitoring_folder, '/',\n    pipeline().parameters.c_raw_root_folder, '/', \n    if(equals(length(item().target), 0), item().sourceObject, item().target))",
 											"type": "Expression"
 										},
 										"p_file": {
@@ -540,7 +540,7 @@
 														"type": "Expression"
 													},
 													"p_folder": {
-														"value": "@pipeline().parameters.c_raw_monitoring_folder",
+														"value": "@concat(pipeline().parameters.c_raw_monitoring_folder, '/',\n    pipeline().parameters.c_raw_root_folder, '/', \n    if(equals(length(item().target), 0), item().sourceObject, item().target))",
 														"type": "Expression"
 													},
 													"p_file": {
