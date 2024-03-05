@@ -167,7 +167,7 @@
 				"     postCommands: [],",
 				"     skipDuplicateMapInputs: true,",
 				"     skipDuplicateMapOutputs: true,",
-				"     saveOrder: 1) ~> EnrichedDeltaLake",
+				"     saveOrder: 2) ~> EnrichedDeltaLake",
 				"collectPartitionPruning sink(validateSchema: false,",
 				"     skipDuplicateMapInputs: true,",
 				"     skipDuplicateMapOutputs: true,",
