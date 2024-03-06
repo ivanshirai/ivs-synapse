@@ -56,7 +56,7 @@
 								"source": {
 									"type": "SqlDWSource",
 									"sqlReaderQuery": {
-										"value": "@concat('SELECT STRING_AGG(cast(parquetName as varchar(max)), char(10)) ListOfFiles ',\n        'FROM ( SELECT right(result.filepath(), ',\n        'len(result.filepath()) - charindex(''', \n        pipeline().parameters.c_raw_root_folder, \n        ''', result.filepath()) + 1) parquetName, max(',\n        first(item().keyCol), ') ', first(item().keyCol), ' FROM OPENROWSET(',\n        'BULK ''', activity('GenericRawParquet linked service').output.properties.typeProperties.url, \n        pipeline().parameters.c_raw_container, '/', \n        pipeline().parameters.c_raw_root_folder, '/',\n        item().target, '/*.parquet'',  FORMAT = ''PARQUET'') ',\n        'AS [result] WHERE reverse(substring(reverse(result.filepath()), 1, charindex(''/'', reverse(result.filepath())) - 1))',\n        if(\n                not(empty(pipeline().parameters.p_datetime_to)), \n                ' between ',\n                ' >= '\n        ),\n        '''', item().target, if(empty(item().cdcCol), '', concat('_', activity('DatetimeFrom').output.resultSets[0].rows[0].CDCTimestamp)), '.parquet''',\n        if(not(empty(pipeline().parameters.p_datetime_to)), \n            concat(' and ''', item().target, '_', \n                replace(replace(replace(replace(replace(\n                    formatDateTime(\n                        pipeline().parameters.p_datetime_to, \n                        'yyyy-MM-ddTHH:mm:ss.fffffffZ'\n                    ), \n                    '0000Z', 'Z'), '000Z', 'Z'), '00Z', 'Z'), '0Z', 'Z'), '.Z', 'Z'\n                ), \n                '.parquet'''\n            ), \n            ''\n        ), \n        ' GROUP BY result.filepath()) q'\n)",
+										"value": "@concat('SELECT STRING_AGG(cast(parquetName as varchar(max)), char(10)) ListOfFiles ',\n        'FROM ( SELECT right(result.filepath(), ',\n        'len(result.filepath()) - charindex(''', \n        pipeline().parameters.c_raw_root_folder, \n        ''', result.filepath()) + 1) parquetName, max(',\n        first(item().keyCol), ') ', first(item().keyCol), ' FROM OPENROWSET(',\n        'BULK ''', activity('GenericRawParquet linked service').output.properties.typeProperties.url, \n        pipeline().parameters.c_raw_container, '/', \n        pipeline().parameters.c_raw_root_folder, '/',\n        if(equals(length(item().target), 0), item().sourceObject, item().target), '/*.parquet'',  FORMAT = ''PARQUET'') ',\n        'AS [result] WHERE reverse(substring(reverse(result.filepath()), 1, charindex(''/'', reverse(result.filepath())) - 1))',\n        if(\n                not(empty(pipeline().parameters.p_datetime_to)), \n                ' between ',\n                ' >= '\n        ),\n        '''', if(equals(length(item().target), 0), item().sourceObject, item().target), if(empty(item().cdcCol), '', concat('_', activity('DatetimeFrom').output.resultSets[0].rows[0].CDCTimestamp)), '.parquet''',\n        if(not(empty(pipeline().parameters.p_datetime_to)), \n            concat(' and ''', if(equals(length(item().target), 0), item().sourceObject, item().target), '_', \n                replace(replace(replace(replace(replace(\n                    formatDateTime(\n                        pipeline().parameters.p_datetime_to, \n                        'yyyy-MM-ddTHH:mm:ss.fffffffZ'\n                    ), \n                    '0000Z', 'Z'), '000Z', 'Z'), '00Z', 'Z'), '0Z', 'Z'), '.Z', 'Z'\n                ), \n                '.parquet'''\n            ), \n            ''\n        ), \n        ' GROUP BY result.filepath()) q'\n)",
 										"type": "Expression"
 									},
 									"queryTimeout": "02:00:00",
@@ -157,7 +157,7 @@
 									{
 										"type": "Query",
 										"text": {
-											"value": "@concat('select count(*) countRows FROM OPENROWSET(',\n        'BULK ''', activity('GenericRawParquet linked service').output.properties.typeProperties.url, \n        pipeline().parameters.c_raw_container, '/', \n        pipeline().parameters.c_raw_root_folder, '/',\n        item().target, '/*.parquet'',  FORMAT = ''PARQUET'') ', 'AS [result] WHERE reverse(substring(reverse(result.filepath()), 1, charindex(''/'', reverse(result.filepath())) - 1))',\n        if(not(empty(pipeline().parameters.p_datetime_to)), \n           ' between ',\n           ' >= '),\n        '''', item().target, if(empty(item().cdcCol), '', concat('_', activity('DatetimeFrom').output.resultSets[0].rows[0].CDCTimestamp)), '.parquet''',\n        if(not(empty(pipeline().parameters.p_datetime_to)), \n            concat(' and ''', item().target, '_', \n                replace(replace(replace(replace(replace(\n                    formatDateTime(\n                        pipeline().parameters.p_datetime_to, \n                        'yyyy-MM-ddTHH:mm:ss.fffffffZ'\n                    ), \n                    '0000Z', 'Z'), '000Z', 'Z'), '00Z', 'Z'), '0Z', 'Z'), '.Z', 'Z'\n                ), \n                '.parquet'''\n            ), \n            ''\n        )\n)",
+											"value": "@concat('select count(*) countRows FROM OPENROWSET(',\n        'BULK ''', activity('GenericRawParquet linked service').output.properties.typeProperties.url, \n        pipeline().parameters.c_raw_container, '/', \n        pipeline().parameters.c_raw_root_folder, '/',\n        if(equals(length(item().target), 0), item().sourceObject, item().target), '/*.parquet'',  FORMAT = ''PARQUET'') ', 'AS [result] WHERE reverse(substring(reverse(result.filepath()), 1, charindex(''/'', reverse(result.filepath())) - 1))',\n        if(not(empty(pipeline().parameters.p_datetime_to)), \n           ' between ',\n           ' >= '),\n        '''', if(equals(length(item().target), 0), item().sourceObject, item().target), if(empty(item().cdcCol), '', concat('_', activity('DatetimeFrom').output.resultSets[0].rows[0].CDCTimestamp)), '.parquet''',\n        if(not(empty(pipeline().parameters.p_datetime_to)), \n            concat(' and ''', if(equals(length(item().target), 0), item().sourceObject, item().target), '_', \n                replace(replace(replace(replace(replace(\n                    formatDateTime(\n                        pipeline().parameters.p_datetime_to, \n                        'yyyy-MM-ddTHH:mm:ss.fffffffZ'\n                    ), \n                    '0000Z', 'Z'), '000Z', 'Z'), '00Z', 'Z'), '0Z', 'Z'), '.Z', 'Z'\n                ), \n                '.parquet'''\n            ), \n            ''\n        )\n)",
 											"type": "Expression"
 										}
 									}
@@ -606,10 +606,10 @@
 				"type": "array",
 				"defaultValue": [
 					{
-						"sourceObject": "dataflows",
+						"sourceObject": "dataflows_REST_API",
 						"sourceSchema": "enr",
 						"whereStatement": "",
-						"target": "dataflows",
+						"target": "dataflows_SQL",
 						"processingMode": "bulk",
 						"cdcCol": "",
 						"keyCol": [
@@ -619,10 +619,10 @@
 						"partitionFormula": "'dummy'"
 					},
 					{
-						"sourceObject": "datasets",
+						"sourceObject": "datasets_REST_API",
 						"sourceSchema": "enr",
 						"whereStatement": "",
-						"target": "datasets",
+						"target": "datasets_SQL",
 						"processingMode": "bulk",
 						"cdcCol": "",
 						"keyCol": [
@@ -632,10 +632,10 @@
 						"partitionFormula": "'dummy'"
 					},
 					{
-						"sourceObject": "datasets_relations11",
+						"sourceObject": "datasets_relations11_REST_API",
 						"sourceSchema": "enr",
 						"whereStatement": "",
-						"target": "datasets_relations11",
+						"target": "datasets_relations11_SQL",
 						"processingMode": "incremental",
 						"cdcCol": "enrTimestamp",
 						"keyCol": [
@@ -645,10 +645,10 @@
 						"partitionFormula": "'dummy'"
 					},
 					{
-						"sourceObject": "dataflows_datasets",
+						"sourceObject": "dataflows_datasets_REST_API",
 						"sourceSchema": "enr",
 						"whereStatement": "",
-						"target": "dataflows_datasets",
+						"target": "dataflows_datasets_SQL",
 						"processingMode": "incremental",
 						"cdcCol": "enrTimestamp",
 						"keyCol": [
@@ -732,7 +732,7 @@
 			}
 		},
 		"folder": {
-			"name": "ICP_Store"
+			"name": "Templates"
 		},
 		"annotations": [],
 		"lastPublishTime": "2023-10-16T14:40:58Z"
