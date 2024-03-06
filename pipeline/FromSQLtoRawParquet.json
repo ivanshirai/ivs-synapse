@@ -137,7 +137,7 @@
 											"type": "Expression"
 										},
 										"p_folder": {
-											"value": "@pipeline().parameters.c_raw_monitoring_folder",
+											"value": "@concat(pipeline().parameters.c_raw_monitoring_folder, '/',\n    pipeline().parameters.c_raw_root_folder, '/', \n    if(equals(length(item().target), 0), item().sourceObject, item().target))",
 											"type": "Expression"
 										},
 										"p_file": {
@@ -419,7 +419,7 @@
 												{
 													"type": "Query",
 													"text": {
-														"value": "@if(or(equals(item().processingMode, 'bulk'), not(empty(pipeline().parameters.p_datetime_to))), concat('select ''', activity('ReadMonitoringBlob').output.firstRow.CDCTimestamp, ''' CDCTimestamp'), concat('select max(', item().cdcCol, ') CDCTimestamp from OPENROWSET(BULK ''', activity('GenericRawParquet linked service').output.properties.typeProperties.url, pipeline().parameters.c_raw_container, '/', pipeline().parameters.c_raw_root_folder, '/', item().sourceObject, '/', if(equals(length(item().target), 0), item().sourceObject, item().target), if(equals(item().processingMode, 'bulk'), '', concat('_', variables('v_cdc_timestamp'))), '.parquet'', FORMAT = ''PARQUET'') as r'))",
+														"value": "@if(or(equals(item().processingMode, 'bulk'), not(empty(pipeline().parameters.p_datetime_to))), concat('select ''', activity('ReadMonitoringBlob').output.firstRow.CDCTimestamp, ''' CDCTimestamp'), concat('select max(', item().cdcCol, ') CDCTimestamp from OPENROWSET(BULK ''', activity('GenericRawParquet linked service').output.properties.typeProperties.url, pipeline().parameters.c_raw_container, '/', pipeline().parameters.c_raw_root_folder, '/', if(equals(length(item().target), 0), item().sourceObject, item().target), '/', if(equals(length(item().target), 0), item().sourceObject, item().target), if(equals(item().processingMode, 'bulk'), '', concat('_', variables('v_cdc_timestamp'))), '.parquet'', FORMAT = ''PARQUET'') as r'))",
 														"type": "Expression"
 													}
 												}
