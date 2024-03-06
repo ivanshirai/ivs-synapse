@@ -406,6 +406,10 @@
 													"p_object": {
 														"value": "'@{item().target}'",
 														"type": "Expression"
+													},
+													"p_processing_mode": {
+														"value": "'@{item().processingMode}'",
+														"type": "Expression"
 													}
 												},
 												"datasetParameters": {
