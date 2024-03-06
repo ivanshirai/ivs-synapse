@@ -835,7 +835,7 @@
 				"defaultValue": [
 					{
 						"type": "basic",
-						"target": "dataflows",
+						"target": "dataflows_REST_API",
 						"cdcCol": null,
 						"keyCol": "name",
 						"dataTypeReplace": [
@@ -849,7 +849,7 @@
 					},
 					{
 						"type": "basic",
-						"target": "datasets",
+						"target": "datasets_REST_API",
 						"cdcCol": null,
 						"keyCol": "name",
 						"dataTypeReplace": [
@@ -863,7 +863,7 @@
 					},
 					{
 						"type": "relationsMM",
-						"target": "dataflows_datasets",
+						"target": "dataflows_datasets_REST_API",
 						"cdcCol": null,
 						"keyCol": "name",
 						"dataTypeReplace": null,
@@ -872,7 +872,7 @@
 					},
 					{
 						"type": "relations11",
-						"target": "datasets_relations11",
+						"target": "datasets_relations11_REST_API",
 						"cdcCol": null,
 						"keyCol": "name",
 						"dataTypeReplace": null,
