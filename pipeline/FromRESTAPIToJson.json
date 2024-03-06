@@ -738,7 +738,7 @@
 				"defaultValue": [
 					{
 						"source": "dataflows",
-						"target": "dataflows",
+						"target": "dataflows_REST_API",
 						"path": "/",
 						"delta": false,
 						"crossApplyField": "value",
@@ -750,7 +750,7 @@
 					},
 					{
 						"source": "datasets",
-						"target": "datasets",
+						"target": "datasets_REST_API",
 						"path": "/",
 						"delta": false,
 						"crossApplyField": "value",
@@ -762,7 +762,7 @@
 					},
 					{
 						"source": "datasets",
-						"target": "datasets_relations11",
+						"target": "datasets_relations11_REST_API",
 						"path": "/",
 						"delta": false,
 						"crossApplyField": "value",
@@ -774,7 +774,7 @@
 					},
 					{
 						"source": "dataflows",
-						"target": "dataflows_datasets",
+						"target": "dataflows_datasets_REST_API",
 						"path": "/",
 						"delta": false,
 						"crossApplyField": "value",
