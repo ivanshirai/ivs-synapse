@@ -643,34 +643,34 @@
 				"type": "array",
 				"defaultValue": [
 					{
-						"sourceObject": "dataflows",
+						"sourceObject": "dataflows_REST_API",
 						"sourceSchema": "enr",
 						"whereStatement": "",
-						"target": "",
+						"target": "dataflows_SQL",
 						"processingMode": "bulk",
 						"cdcCol": ""
 					},
 					{
-						"sourceObject": "datasets",
+						"sourceObject": "datasets_REST_API",
 						"sourceSchema": "enr",
 						"whereStatement": "lower(name) like '%template%' or lower(name) like '%generic%'",
-						"target": "",
+						"target": "datasets_SQL",
 						"processingMode": "bulk",
 						"cdcCol": ""
 					},
 					{
-						"sourceObject": "datasets_relations11",
+						"sourceObject": "datasets_relations11_REST_API",
 						"sourceSchema": "enr",
 						"whereStatement": "",
-						"target": "",
+						"target": "datasets_relations11_SQL",
 						"processingMode": "incremental",
 						"cdcCol": "enrTimestamp"
 					},
 					{
-						"sourceObject": "dataflows_datasets",
+						"sourceObject": "dataflows_datasets_REST_API",
 						"sourceSchema": "enr",
 						"whereStatement": "",
-						"target": "",
+						"target": "dataflows_datasets_SQL",
 						"processingMode": "incremental",
 						"cdcCol": "enrTimestamp"
 					}
