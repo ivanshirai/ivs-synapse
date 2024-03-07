@@ -330,10 +330,10 @@
 				"defaultValue": [
 					{
 						"iteration": 0,
-						"object": "F0911",
+						"object": "dataflows_datasets_REST_API",
 						"schema": "enr",
-						"alias": "F0911",
-						"trgKeyCol": "GLDCT,GLDOC,GLKCO,GLDGJ,GLJELN,GLLT,GLEXTL",
+						"alias": "dataflows_datasets",
+						"trgKeyCol": "name,propertiestypePropertiessourcesdatasetreferenceName",
 						"cdcCol": "enrTimestamp",
 						"selectCols": "*",
 						"joinCondition": null,
@@ -342,39 +342,27 @@
 					},
 					{
 						"iteration": 0,
-						"object": "F4211",
+						"object": "dataflows_REST_API",
 						"schema": "enr",
-						"alias": "F4211",
+						"alias": "dataflows",
 						"trgKeyCol": null,
 						"cdcCol": "enrTimestamp",
-						"selectCols": "SDDOCO, SDDCTO, SDRORN, SDRCTO, SDDOC, SDKCOO, SDDCT, SDLNID",
-						"joinCondition": "F0911.GLDOC = F4211.SDDOC and F0911.GLKCO = F4211.SDKCOO and F0911.GLDCT = F4211.SDDCT and F0911.GLLNID = F4211.SDLNID",
+						"selectCols": "*",
+						"joinCondition": "dataflows.name = dataflows_datasets.name",
 						"joinType": "left outer",
 						"joinOrder": 1
 					},
 					{
 						"iteration": 0,
-						"object": "F0006",
+						"object": "datasets_REST_API",
 						"schema": "enr",
-						"alias": "F0006",
+						"alias": "datasets",
 						"trgKeyCol": null,
 						"cdcCol": "enrTimestamp",
-						"selectCols": "MCRP10, MCRP11, MCRP04, MCMCU, MCRP12",
-						"joinCondition": "F0911.GLMCU = F0006.MCMCU",
+						"selectCols": "*",
+						"joinCondition": "datasets.name = dataflows_datasets.propertiestypePropertiessourcesdatasetreferenceName",
 						"joinType": "left outer",
 						"joinOrder": 2
-					},
-					{
-						"iteration": 0,
-						"object": "F0901",
-						"schema": "enr",
-						"alias": "F0901",
-						"trgKeyCol": null,
-						"cdcCol": "enrTimestamp",
-						"selectCols": "GMR021, GMR018, GMDL01, GMR009, GMAID",
-						"joinCondition": "F0911.GLAID = F0901.GMAID",
-						"joinType": "left outer",
-						"joinOrder": 3
 					}
 				]
 			},
@@ -383,27 +371,27 @@
 			},
 			"c_trg_object": {
 				"type": "string",
-				"defaultValue": "S_General_Ledger_Details"
+				"defaultValue": "dataflows_datasets_WIDE"
 			},
 			"c_trg_container": {
 				"type": "string",
-				"defaultValue": "enriched"
+				"defaultValue": "template"
 			},
 			"c_trg_root_folder": {
 				"type": "string",
-				"defaultValue": "ICP_Staging"
+				"defaultValue": "FromDeltaToWideDelta"
 			},
 			"c_serverless_db": {
 				"type": "string",
-				"defaultValue": "ICP_Data_Store"
+				"defaultValue": "templateDB"
 			},
 			"c_trg_schema": {
 				"type": "string",
-				"defaultValue": "stg"
+				"defaultValue": "enr"
 			},
 			"c_partition_formula": {
 				"type": "string",
-				"defaultValue": "F0911.DELTA_PARTITION"
+				"defaultValue": "dataflows_datasets_REST_API.DELTA_PARTITION"
 			},
 			"c_trg_partition_col": {
 				"type": "string",
@@ -419,7 +407,7 @@
 			},
 			"c_trg_linked_service": {
 				"type": "string",
-				"defaultValue": "icpanalyticsenrst_ARIR"
+				"defaultValue": "templateenrst_ARIR"
 			}
 		},
 		"variables": {
