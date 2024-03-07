@@ -1,0 +1,99 @@
+{
+	"name": "StarSchemaDimension",
+	"properties": {
+		"activities": [
+			{
+				"name": "StarSchemaDimension",
+				"type": "ExecuteDataFlow",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataflow": {
+						"referenceName": "StarSchemaDimension",
+						"type": "DataFlowReference",
+						"parameters": {
+							"p_src_key_cols": [
+								"name"
+							],
+							"p_src_cdc_col": "'rawTimestamp'",
+							"p_surrogate_key_col": "'dataflows_key'",
+							"c_trg_dss_update_col": "'dss_update_time'",
+							"c_trg_dss_create_col": "'dss_create_time'",
+							"p_partition_formula": "\"'dummy'\"",
+							"c_trg_partition_col": "'DIM_PARTITION'",
+							"p_src_schema": "'enr'",
+							"p_src_object": "'dataflows_REST_API'",
+							"p_datetime_from": {
+								"value": "'@{pipeline().parameters.p_datetime_from}'",
+								"type": "Expression"
+							},
+							"p_trg_table": "'DimDataflows'",
+							"p_init_load": "true()",
+							"c_target_container": "'template'",
+							"c_target_root_folder": "'StarSchemaObjects'"
+						},
+						"datasetParameters": {
+							"DataSource": {
+								"p_database": {
+									"value": "@pipeline().parameters.c_serverless_db",
+									"type": "Expression"
+								},
+								"p_schema": "dummy",
+								"p_table": "dummy"
+							},
+							"Dimension": {
+								"p_database": {
+									"value": "@pipeline().parameters.c_serverless_db",
+									"type": "Expression"
+								},
+								"p_schema": "dummy",
+								"p_table": "dummy"
+							},
+							"DimensionMaxKey": {
+								"p_database": {
+									"value": "@pipeline().parameters.c_serverless_db",
+									"type": "Expression"
+								},
+								"p_schema": "dummy",
+								"p_table": "dummy"
+							},
+							"DimensionZeroRow": {
+								"p_database": {
+									"value": "@pipeline().parameters.c_serverless_db",
+									"type": "Expression"
+								},
+								"p_schema": "dummy",
+								"p_table": "dummy"
+							}
+						}
+					},
+					"compute": {
+						"coreCount": 8,
+						"computeType": "General"
+					},
+					"traceLevel": "Fine"
+				}
+			}
+		],
+		"parameters": {
+			"c_serverless_db": {
+				"type": "string",
+				"defaultValue": "templateDB"
+			},
+			"p_datetime_from": {
+				"type": "string"
+			}
+		},
+		"folder": {
+			"name": "Templates"
+		},
+		"annotations": []
+	}
+}
