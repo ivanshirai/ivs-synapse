@@ -203,7 +203,7 @@
 					"isSequential": true,
 					"activities": [
 						{
-							"name": "GenericWideTab_Enr",
+							"name": "FromDeltaToWideDelta",
 							"type": "ExecuteDataFlow",
 							"dependsOn": [],
 							"policy": {
@@ -283,7 +283,7 @@
 							"type": "Script",
 							"dependsOn": [
 								{
-									"activity": "GenericWideTab_Enr",
+									"activity": "FromDeltaToWideDelta",
 									"dependencyConditions": [
 										"Succeeded"
 									]
