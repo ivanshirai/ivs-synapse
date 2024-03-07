@@ -191,7 +191,7 @@
 				"DimensionZeroRow alterRow(upsertIf(true())) ~> alteZeroRow",
 				"DataSource derive(lookupKey = md5(byNames($p_src_key_cols))) ~> sourceLookupKey",
 				"Dimension derive(lookupKey = md5(byNames($p_src_key_cols))) ~> dimLookupKey",
-				"DimensionMaxKey derive(surrogateKey = toLong(byName($p_surrogate_key_col))) ~> derivedColumn1",
+				"DimensionMaxKey derive(surrogateKey = toInteger(byName($p_surrogate_key_col))) ~> derivedColumn1",
 				"derivedColumn1 sink(validateSchema: false,",
 				"     skipDuplicateMapInputs: true,",
 				"     skipDuplicateMapOutputs: true,",
