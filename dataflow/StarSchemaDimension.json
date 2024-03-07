@@ -1,0 +1,256 @@
+{
+	"name": "StarSchemaDimension",
+	"properties": {
+		"folder": {
+			"name": "Templates"
+		},
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "GenericServerlessSQL",
+						"type": "DatasetReference"
+					},
+					"name": "DataSource"
+				},
+				{
+					"dataset": {
+						"referenceName": "GenericServerlessSQL",
+						"type": "DatasetReference"
+					},
+					"name": "Dimension"
+				},
+				{
+					"dataset": {
+						"referenceName": "GenericServerlessSQL",
+						"type": "DatasetReference"
+					},
+					"name": "DimensionMaxKey"
+				},
+				{
+					"dataset": {
+						"referenceName": "GenericServerlessSQL",
+						"type": "DatasetReference"
+					},
+					"name": "DimensionZeroRow"
+				}
+			],
+			"sinks": [
+				{
+					"name": "CacheMaxKey"
+				},
+				{
+					"linkedService": {
+						"referenceName": "templatecurst_ARIR",
+						"type": "LinkedServiceReference"
+					},
+					"name": "sinkZeroRecord"
+				},
+				{
+					"linkedService": {
+						"referenceName": "templatecurst_ARIR",
+						"type": "LinkedServiceReference"
+					},
+					"name": "sinkDimension"
+				}
+			],
+			"transformations": [
+				{
+					"name": "lookupDimension"
+				},
+				{
+					"name": "selectDimension"
+				},
+				{
+					"name": "derivedNewKey"
+				},
+				{
+					"name": "surrogateKey"
+				},
+				{
+					"name": "split1"
+				},
+				{
+					"name": "derivedColumns"
+				},
+				{
+					"name": "derivedExistingKey"
+				},
+				{
+					"name": "union"
+				},
+				{
+					"name": "selectBeforeSink"
+				},
+				{
+					"name": "alterRow"
+				},
+				{
+					"name": "alteZeroRow"
+				},
+				{
+					"name": "sourceLookupKey"
+				},
+				{
+					"name": "dimLookupKey"
+				},
+				{
+					"name": "derivedColumn1"
+				}
+			],
+			"scriptLines": [
+				"parameters{",
+				"     p_src_key_cols as string[] ([\"name\"]),",
+				"     p_src_cdc_col as string ('rawTimestamp'),",
+				"     p_surrogate_key_col as string ('dataflows_key'),",
+				"     c_trg_dss_update_col as string ('dss_update_time'),",
+				"     c_trg_dss_create_col as string ('dss_create_time'),",
+				"     p_partition_formula as string (\"'dummy'\"),",
+				"     c_trg_partition_col as string ('DIM_PARTITION'),",
+				"     p_src_schema as string ('enr'),",
+				"     p_src_object as string ('dataflows_REST_API'),",
+				"     p_datetime_from as string (''),",
+				"     p_trg_table as string ('DimDataflows'),",
+				"     p_init_load as boolean (true()),",
+				"     c_target_container as string ('template'),",
+				"     c_target_root_folder as string ('StarSchemaObjects')",
+				"}",
+				"source(output(",
+				"          etag as string,",
+				"          id as string,",
+				"          name as string,",
+				"          type as string,",
+				"          enrTimestamp as timestamp,",
+				"          rawTimestamp as string,",
+				"          DELTA_PARTITION as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     query: (\"select * from \" + $p_src_schema + \".\" + $p_src_object + iif(length(coalesce($p_src_cdc_col, \"\")) == 0, \"\", \" where \" + $p_src_cdc_col + \" > '\" + iif(length(coalesce($p_datetime_from, \"\")) == 0, \"1900-01-01\", $p_datetime_from) + \"'\")),",
+				"     format: 'query',",
+				"     staged: false) ~> DataSource",
+				"source(output(",
+				"          dataflows_key as integer,",
+				"          name as string,",
+				"          dss_create_time as timestamp",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     query: (iif(not($p_init_load), \"select \" + $p_surrogate_key_col + reduce($p_src_key_cols, \"\", #acc + \", \" + #item, #result) + iif(length(coalesce($c_trg_dss_create_col, \"\")) == 0, \"\", \", \" + $c_trg_dss_create_col) + \" from \" + $p_trg_table, \"select 0 as \" + $p_surrogate_key_col + reduce($p_src_key_cols, \"\", #acc + \", '' as \" + #item, #result) + iif(length(coalesce($c_trg_dss_create_col, \"\")) == 0, \"\", \", cast('1900-01-01' as datetime) as \" + $c_trg_dss_create_col)) + \" where 1 = 0\"),",
+				"     format: 'query',",
+				"     staged: true) ~> Dimension",
+				"source(output(",
+				"          dataflows_key as integer",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     query: (iif(not($p_init_load), \"select max(\" + $p_surrogate_key_col + \") as \" + $p_surrogate_key_col + \" from \" + $p_trg_table, \"select 0 as \" + $p_surrogate_key_col)),",
+				"     format: 'query',",
+				"     staged: false) ~> DimensionMaxKey",
+				"source(output(",
+				"          dataflows_key as integer,",
+				"          name as string,",
+				"          DIM_PARTITION as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     query: (\"select 0 as \" + $p_surrogate_key_col + reduce($p_src_key_cols, \"\", #acc + \", '' as \" + #item, #result) + \", 'dummy' as \" + $c_trg_partition_col),",
+				"     format: 'query',",
+				"     staged: false) ~> DimensionZeroRow",
+				"sourceLookupKey, selectDimension lookup(lookupKey == PREFIX_lookupKey,",
+				"     multiple: false,",
+				"     pickup: 'any',",
+				"     broadcast: 'auto')~> lookupDimension",
+				"dimLookupKey select(mapColumn(",
+				"          each(match(true()),",
+				"               'PREFIX_'+$$ = $$)",
+				"     ),",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true) ~> selectDimension",
+				"surrogateKey derive(each(match(name == 'surrogateKey'), $p_surrogate_key_col = surrogateKey + coalesce(CacheMaxKey#outputs()[0].surrogateKey, 0))) ~> derivedNewKey",
+				"split1@NullKey keyGenerate(output(surrogateKey as long),",
+				"     startAt: 1L,",
+				"     stepValue: 1L) ~> surrogateKey",
+				"derivedColumns split(isNull(toLong(byName('PREFIX_' + $p_surrogate_key_col))),",
+				"     disjoint: false) ~> split1@(NullKey, NotNullKey)",
+				"lookupDimension derive(each(match(name == 'PREFIX_' + $c_trg_dss_create_col), $c_trg_dss_create_col = coalesce($$, currentTimestamp())),",
+				"          each(match(name == 'PREFIX_' + $p_surrogate_key_col), $c_trg_dss_update_col = currentTimestamp(), $c_trg_partition_col = expr($p_partition_formula))) ~> derivedColumns",
+				"split1@NotNullKey derive(each(match(name == 'PREFIX_' + $p_surrogate_key_col), $p_surrogate_key_col = $$)) ~> derivedExistingKey",
+				"derivedNewKey, derivedExistingKey union(byName: true)~> union",
+				"union select(mapColumn(",
+				"          each(match(left(name,length('PREFIX_'))!='PREFIX_'&&name!='surrogateKey'&&name!='lookupKey'))",
+				"     ),",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true) ~> selectBeforeSink",
+				"selectBeforeSink alterRow(upsertIf(true())) ~> alterRow",
+				"DimensionZeroRow alterRow(upsertIf(true())) ~> alteZeroRow",
+				"DataSource derive(lookupKey = md5(byNames($p_src_key_cols))) ~> sourceLookupKey",
+				"Dimension derive(lookupKey = md5(byNames($p_src_key_cols))) ~> dimLookupKey",
+				"DimensionMaxKey derive(surrogateKey = toLong(byName($p_surrogate_key_col))) ~> derivedColumn1",
+				"derivedColumn1 sink(validateSchema: false,",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     store: 'cache',",
+				"     format: 'inline',",
+				"     output: false,",
+				"     saveOrder: 0,",
+				"     mapColumn(",
+				"          surrogateKey",
+				"     )) ~> CacheMaxKey",
+				"alteZeroRow sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     format: 'delta',",
+				"     fileSystem: ($c_target_container),",
+				"     folderPath: ($c_target_root_folder + \"/\" + $p_trg_table),",
+				"     mergeSchema: true,",
+				"     autoCompact: true,",
+				"     optimizedWrite: true,",
+				"     vacuum: 0,",
+				"     deletable: false,",
+				"     insertable: false,",
+				"     updateable: false,",
+				"     upsertable: true,",
+				"     keys:($p_src_key_cols),",
+				"     pruneCondition: [($c_trg_partition_col) -> ([\"dummy\"])],",
+				"     umask: 0022,",
+				"     preCommands: [],",
+				"     postCommands: [],",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     partitionBy('key',",
+				"          1,",
+				"          byName($c_trg_partition_col)",
+				"     )) ~> sinkZeroRecord",
+				"alterRow sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     format: 'delta',",
+				"     fileSystem: ($c_target_container),",
+				"     folderPath: ($c_target_root_folder + \"/\" + $p_trg_table),",
+				"     mergeSchema: true,",
+				"     autoCompact: true,",
+				"     optimizedWrite: true,",
+				"     vacuum: 0,",
+				"     deletable: false,",
+				"     insertable: false,",
+				"     updateable: false,",
+				"     upsertable: true,",
+				"     keys:($p_src_key_cols),",
+				"     pruneCondition: [($c_trg_partition_col) -> ([\"dummy\"])],",
+				"     umask: 0022,",
+				"     preCommands: [],",
+				"     postCommands: [],",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     partitionBy('key',",
+				"          1,",
+				"          byName($c_trg_partition_col)",
+				"     )) ~> sinkDimension"
+			]
+		}
+	}
+}
