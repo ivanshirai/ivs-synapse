@@ -1,0 +1,19 @@
+{
+	"name": "serverless_test",
+	"properties": {
+		"parameters": {
+			"p_database": {
+				"type": "string"
+			}
+		},
+		"annotations": [],
+		"type": "AzureSqlDatabase",
+		"typeProperties": {
+			"connectionString": "Integrated Security=False;Encrypt=True;Connection Timeout=30;Data Source=ivs-synapse-ondemand.sql.azuresynapse.net;Initial Catalog=@{linkedService().p_database}"
+		},
+		"connectVia": {
+			"referenceName": "AutoResolveIntegrationRuntime",
+			"type": "IntegrationRuntimeReference"
+		}
+	}
+}
