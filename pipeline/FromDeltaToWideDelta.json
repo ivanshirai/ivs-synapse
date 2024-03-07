@@ -1,0 +1,443 @@
+{
+	"name": "FromDeltaToWideDelta",
+	"properties": {
+		"activities": [
+			{
+				"name": "GetTargetDeltaMetadata",
+				"type": "GetMetadata",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataset": {
+						"referenceName": "GenericEnrichedJsonFolder",
+						"type": "DatasetReference",
+						"parameters": {
+							"p_container": {
+								"value": "@pipeline().parameters.c_trg_container",
+								"type": "Expression"
+							},
+							"p_folder": {
+								"value": "@concat(pipeline().parameters.c_trg_root_folder, '/', pipeline().parameters.c_trg_object)",
+								"type": "Expression"
+							}
+						}
+					},
+					"fieldList": [
+						"exists"
+					],
+					"storeSettings": {
+						"type": "AzureBlobFSReadSettings",
+						"recursive": true,
+						"enablePartitionDiscovery": false
+					},
+					"formatSettings": {
+						"type": "JsonReadSettings"
+					}
+				}
+			},
+			{
+				"name": "EnrichedLakeSettings",
+				"type": "WebActivity",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"method": "GET",
+					"url": {
+						"value": "@concat('https://', pipeline().DataFactory, '.dev.azuresynapse.net/linkedservices/', pipeline().parameters.c_trg_linked_service, '?api-version=2020-12-01')",
+						"type": "Expression"
+					},
+					"connectVia": {
+						"referenceName": "SHIR",
+						"type": "IntegrationRuntimeReference"
+					},
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://dev.azuresynapse.net/"
+					}
+				}
+			},
+			{
+				"name": "SourceQueryParts",
+				"type": "Script",
+				"dependsOn": [
+					{
+						"activity": "GetTargetDeltaMetadata",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "Set v_cdc",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"linkedServiceName": {
+					"referenceName": "serverless_ARIR",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"p_database": {
+							"value": "@pipeline().parameters.c_serverless_db",
+							"type": "Expression"
+						}
+					}
+				},
+				"typeProperties": {
+					"scripts": [
+						{
+							"type": "Query",
+							"text": {
+								"value": "declare @SQLScript nvarchar(max)\n\nwith src as (\nselect *\n   FROM OPENJSON('@{replace(string(pipeline().parameters.p_src_objects), '''', '''''')}') \n   WITH (\n    iteration integer '$.iteration',\n    object NVARCHAR(max) '$.object',\n    dbschema NVARCHAR(max) '$.schema',\n    alias NVARCHAR(max) '$.alias',\n    trgKeyCol NVARCHAR(max) '$.trgKeyCol',\n    cdcCol NVARCHAR(max) '$.cdcCol',\n    selectCols NVARCHAR(max) '$.selectCols',\n    joinCondition NVARCHAR(max) '$.joinCondition',\n    joinType NVARCHAR(max) '$.joinType',\n    joinOrder integer '$.joinOrder')\n),\nkcl as (    select src.*, k.keyCols from src left outer join(select iteration, string_agg(coalesce(alias, object) + '_' + replace(replace(trgKeyCol, ' ', ''), ',', ', ' + coalesce(alias, object) + '_'), ', ') keyCols\n   FROM OPENJSON('@{replace(string(pipeline().parameters.p_src_objects), '''', '''''')}') \n   WITH (\n    iteration integer '$.iteration',\n    object NVARCHAR(max) '$.object',\n    dbschema NVARCHAR(max) '$.schema',\n    alias NVARCHAR(max) '$.alias',\n    trgKeyCol NVARCHAR(max) '$.trgKeyCol',\n    cdcCol NVARCHAR(max) '$.cdcCol',\n    selectCols NVARCHAR(max) '$.selectCols',\n    joinCondition NVARCHAR(max) '$.joinCondition',\n    joinType NVARCHAR(max) '$.joinType',\n    joinOrder integer '$.joinOrder')\n\twhere iteration = 0 group by iteration) k \non 1 = 1),\nrpl as (select kcl.*, r.replace_start, r.replace_end from kcl join\n(select iteration, string_agg('replace(', '') replace_start, \nstring_agg(', ''' + case when left(trim(object), 1) = '(' and right(trim(object), 1) = ')' \nthen alias + '.' else object + '.' end + ''', ''' + coalesce(alias, object) + '.'')', '') replace_end\n   FROM OPENJSON('@{replace(string(pipeline().parameters.p_src_objects), '''', '''''')}') \n   WITH (\n    iteration integer '$.iteration',\n    object NVARCHAR(max) '$.object',\n    dbschema NVARCHAR(max) '$.schema',\n    alias NVARCHAR(max) '$.alias',\n    trgKeyCol NVARCHAR(max) '$.trgKeyCol',\n    cdcCol NVARCHAR(max) '$.cdcCol',\n    selectCols NVARCHAR(max) '$.selectCols',\n    joinCondition NVARCHAR(max) '$.joinCondition',\n    joinType NVARCHAR(max) '$.joinType',\n    joinOrder integer '$.joinOrder')\n\tgroup by iteration) r\n\ton r.iteration = kcl.iteration)\nselect @SQLScript = STRING_AGG(cast(SQLScript as nvarchar(max)), ' union ') from (\nselect 'select ' + cast(rpl.iteration as varchar(10)) + ' as iteration, ' +\ncoalesce('''' + replace(rpl.object, char(39), char(39) + char(39)) + '''', 'null') + ' as object, ' +\ncoalesce('''' + replace(rpl.dbschema, char(39), char(39) + char(39)) + '''', 'null') + ' as dbschema, ' +\ncoalesce('''' + replace(rpl.alias, char(39), char(39) + char(39)) + '''', 'null') + ' as alias, ' +\ncoalesce('''' + replace(rpl.trgKeyCol, char(39), char(39) + char(39)) + '''', 'null') + ' as trgKeyCol, ' +\ncoalesce('''' + replace(rpl.cdcCol, char(39), char(39) + char(39)) + '''', 'null') + ' as cdcCol, ' +\ncoalesce('''' + replace(rpl.selectCols, char(39), char(39) + char(39)) + '''', 'null') + ' as selectCols, ' +\ncoalesce('''' + replace(rpl.joinCondition, char(39), char(39) + char(39)) + '''', 'null') + ' as joinCondition, ' +\ncoalesce('''' + replace(rpl.joinType, char(39), char(39) + char(39)) + '''', 'null') + ' as joinType, ' +\ncast(rpl.joinOrder as varchar(10)) + ' as joinOrder, ' +\ncoalesce('''' + replace(rpl.replace_start, char(39), char(39) + char(39)) + '''', 'null') + ' as replaceStart, ' +\ncoalesce('''' + replace(rpl.replace_end, char(39), char(39) + char(39)) + '''', 'null') + ' as replaceEnd, ' +\ncoalesce('''' + replace(rpl.keyCols, char(39), char(39) + char(39)) + '''', 'null') + ' as keyColsStatement, ' +\ncoalesce('''' + replace(CASE trim(rpl.selectCols)\n\t\t\t\tWHEN '*' THEN (select string_agg(cast('<obj>.' + c.name + ' as <obj>_' + c.name as nvarchar(max)), ', ') \n\t\t\t\t\tfrom sys.columns c \n\t\t\t\t\tjoin sys.views v on c.object_id = v.object_id\n\t\t\t\t\tjoin sys.schemas s on s.schema_id = v.schema_id\n\t\t\t\t\twhere v.name = rpl.object and s.name = rpl.dbschema)\n\t\t\t\tELSE (select string_agg(cast('<obj>.' + value + ' as <obj>_' + value as nvarchar(max)), ', ') \n\t\t\t\t\tfrom string_split(replace(replace(rpl.selectCols, char(39), char(39) + char(39)), ' ', ''), ',')\n\t\t\t\t\twhere lower(value) <> rpl.cdcCol) + coalesce(', ' + cast('<obj>.' + rpl.cdcCol + ' as <obj>_' + rpl.cdcCol as nvarchar(max)), '') END, '<obj>', coalesce(rpl.alias, rpl.object)) + '''', 'null') + ' as selectStatement, ' +\ncoalesce('''' + CASE WHEN left(trim(object), 1) = '(' and right(trim(object), 1) = ')' \n\t\t\t\tTHEN replace(replace(object, char(39), char(39) + char(39)), '<schema>', rpl.dbschema) + ' ' + alias\n\t\t\t\tELSE replace(rpl.object, rpl.object, rpl.dbschema + '.' + rpl.object + ' as ' + coalesce(rpl.alias, rpl.object)) \n\t\t\t\tEND + '''', 'null') + ' as fromStatement, ' + \ncoalesce('' + rpl.replace_start + char(39) + \nreplace(CASE WHEN rpl.iteration = 0 THEN rpl.joinCondition ELSE replace(rpl.joinCondition, '<trgtab>', '_stg') END, char(39), char(39) + char(39)) + char(39) + rpl.replace_end, 'null') + ' as joinStatement, ' + \ncoalesce('''' + coalesce(alias, object) +'.' + rpl.cdcCol + ' > '''''' + ' + coalesce('cast(max(' + @{if(empty(pipeline().parameters.p_datetime_from), if(activity('GetTargetDeltaMetadata').output.exists, 'dbSys.colName', '''''''1900-01-01'''''''), concat('''', pipeline().parameters.p_datetime_from, ''''))} + ') as varchar(50)) ', '''1900-01-01''') + ' + ''''''''', 'null') + ' as whereStatement' +\ncase when dbSys.colName is null or @{if(activity('GetTargetDeltaMetadata').output.exists, '1=0', '1=1')} then '' else ' from @{pipeline().parameters.c_trg_schema}.@{pipeline().parameters.c_trg_object}' end as SQLScript\nfrom rpl\nleft outer join \n(select c.name as colName, v.name as viewName, s.name as schemaName\nfrom sys.columns c\njoin sys.views v on c.object_id = v.object_id \njoin sys.schemas s on v.schema_id = s.schema_id) dbSys \non dbSys.ColName = coalesce(rpl.alias, rpl.object) + '_' + cdcCol\nand dbSys.schemaName = '@{pipeline().parameters.c_trg_schema}'\nand dbSys.viewName = '@{pipeline().parameters.c_trg_object}') q\n\nexec('select * from (' + @SQLScript + ') q order by iteration, joinOrder')",
+								"type": "Expression"
+							}
+						}
+					],
+					"scriptBlockExecutionTimeout": "02:00:00"
+				}
+			},
+			{
+				"name": "SourceQuery",
+				"type": "Script",
+				"dependsOn": [
+					{
+						"activity": "SourceQueryParts",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"linkedServiceName": {
+					"referenceName": "serverless_ARIR",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"p_database": {
+							"value": "@pipeline().parameters.c_serverless_db",
+							"type": "Expression"
+						}
+					}
+				},
+				"typeProperties": {
+					"scripts": [
+						{
+							"type": "Query",
+							"text": {
+								"value": "declare @SQLScript nvarchar(max)\n\nSELECT @SQLScript = STRING_AGG('select ' + cast(iteration as nvarchar(max)) + ' as iteration, ''' \n+ keyCols + ''' as keyCols, ' + sourceQuery + ' as sourceQuery, ' + pruningQuery + ' as pruningQuery', ' union ') FROM (\nSELECT iteration, min(keyColsStatement) as keyCols, '''select '''\n+ coalesce(' + ''@{pipeline().parameters.c_trg_alias}.' + replace(replace(replace(min(case iteration when 0 then null else keyColsStatement end), ' ', ''), ',', ', @{pipeline().parameters.c_trg_alias}.'), char(39), char(39) + char(39)) + ', ''', '')\n+ (' + ''' + replace(STRING_AGG(selectStatement, ', '), char(39), char(39) + char(39)) + '''')\n+ coalesce(' + '', '' + ' + CASE WHEN iteration = 0 THEN min(replaceStart) + ''''\n+ replace('@{replace(pipeline().parameters.c_partition_formula, '''', '''''')}', char(39), char(39) + char(39)) + '''' + min(replaceEnd) ELSE '''@{pipeline().parameters.c_trg_alias}.@{pipeline().parameters.c_trg_partition_col}''' END + ' + '' as @{pipeline().parameters.c_trg_partition_col}''', '')\n+ @{if(empty(pipeline().parameters.c_trg_cdc_col), '', concat(''' + '''', cast(''''''''', variables('v_cdc'), ''''''''' as datetime2) as ', pipeline().parameters.c_trg_cdc_col, ''''''''))}\n+ coalesce(' + '' from ' + CASE WHEN iteration = 0 THEN '' ELSE '@{concat(pipeline().parameters.c_trg_schema, '.', pipeline().parameters.c_trg_object, ' as ', pipeline().parameters.c_trg_alias)} ' END + replace(STRING_AGG(coalesce(coalesce(joinType + ' join ', '') + fromStatement, '')\n+ coalesce(' on ' +  joinStatement, ''), ' '), char(39), char(39) + char(39)) + '''', '')\n+ coalesce(' + '' where (' + replace(STRING_AGG(whereStatement, ' or ') + CASE WHEN iteration = 0 THEN '' ELSE ' or @{pipeline().parameters.c_trg_alias}.@{pipeline().parameters.c_trg_cdc_col} = ''@{variables('v_cdc')}''' END, char(39), char(39) + char(39)) + ')''', '') as sourceQuery,\n'''select distinct(''' + coalesce(' + ' + CASE WHEN iteration = 0 THEN min(replaceStart) + '''' + replace('@{replace(pipeline().parameters.c_partition_formula, '''', '''''')}', char(39), char(39) + char(39)) + '''' + min(replaceEnd) ELSE '''_stg._PARTITION''' END + ' + '') as _PARTITION''', '') \n+ coalesce(' + '' from ' + CASE WHEN iteration = 0 THEN '' ELSE '@{concat(pipeline().parameters.c_trg_schema, '.', pipeline().parameters.c_trg_object, ' as ', pipeline().parameters.c_trg_alias)} ' END + replace(STRING_AGG(coalesce(coalesce(joinType + ' join ', '') + fromStatement, '')\n+ coalesce(' on ' +  joinStatement, ''), ' '), char(39), char(39) + char(39)) + '''', '')\n+ coalesce(' + '' where (' + replace(STRING_AGG(whereStatement, ' or ') + CASE WHEN iteration = 0 THEN '' ELSE ' or @{pipeline().parameters.c_trg_alias}.@{pipeline().parameters.c_trg_cdc_col} = ''@{variables('v_cdc')}''' END, char(39), char(39) + char(39)) + ')''', '') as pruningQuery\nFROM OPENJSON('@{replace(string(activity('SourceQueryParts').output.resultSets[0].rows), '''', '''''')}')\nWITH (\n    iteration integer '$.iteration',\n    object NVARCHAR(max) '$.object',\n    alias NVARCHAR(max) '$.alias',\n    trgKeyCol NVARCHAR(max) '$.trgKeyCol',\n    cdcCol NVARCHAR(max) '$.cdcCol',\n    selectCols NVARCHAR(max) '$.selectCols',\n    joinCondition NVARCHAR(max) '$.joinCondition',\n    joinType NVARCHAR(max) '$.joinType',\n    joinOrder integer '$.joinOrder',\n    replaceStart NVARCHAR(max) '$.replaceStart',\n    replaceEnd NVARCHAR(max) '$.replaceEnd',\n    keyColsStatement NVARCHAR(max) '$.keyColsStatement',\n    selectStatement NVARCHAR(max) '$.selectStatement',\n    fromStatement NVARCHAR(max) '$.fromStatement',\n    joinStatement NVARCHAR(max) '$.joinStatement',\n    whereStatement NVARCHAR(max) '$.whereStatement')\ngroup by iteration\n) q\n\nexec(@SQLScript)",
+								"type": "Expression"
+							}
+						}
+					],
+					"scriptBlockExecutionTimeout": "02:00:00"
+				}
+			},
+			{
+				"name": "Set v_cdc",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "v_cdc",
+					"value": {
+						"value": "@utcNow()",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "ForEachIteration",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "SourceQuery",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "EnrichedLakeSettings",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('SourceQuery').output.resultSets[0].rows",
+						"type": "Expression"
+					},
+					"isSequential": true,
+					"activities": [
+						{
+							"name": "GenericWideTab_Enr",
+							"type": "ExecuteDataFlow",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 2,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"dataflow": {
+									"referenceName": "FromDeltaToWideDelta",
+									"type": "DataFlowReference",
+									"parameters": {
+										"c_trg_object": {
+											"value": "'@{pipeline().parameters.c_trg_object}'",
+											"type": "Expression"
+										},
+										"c_trg_container": {
+											"value": "'@{pipeline().parameters.c_trg_container}'",
+											"type": "Expression"
+										},
+										"c_trg_root_folder": {
+											"value": "'@{pipeline().parameters.c_trg_root_folder}'",
+											"type": "Expression"
+										},
+										"p_keyCols": {
+											"value": "'@{item().keyCols}'",
+											"type": "Expression"
+										},
+										"p_source_query": {
+											"value": "@concat('\"', item().sourceQuery, '\"')",
+											"type": "Expression"
+										},
+										"p_pruning_query": {
+											"value": "@concat('\"', item().pruningQuery, '\"')",
+											"type": "Expression"
+										},
+										"c_trg_partition_col": {
+											"value": "'@{pipeline().parameters.c_trg_partition_col}'",
+											"type": "Expression"
+										},
+										"p_iteration": {
+											"value": "@item().iteration",
+											"type": "Expression"
+										}
+									},
+									"datasetParameters": {
+										"sourceWide": {
+											"p_database": {
+												"value": "@pipeline().parameters.c_serverless_db",
+												"type": "Expression"
+											},
+											"p_schema": "dbo",
+											"p_table": "dummy"
+										},
+										"sourcePartitionPruning": {
+											"p_database": {
+												"value": "@pipeline().parameters.c_serverless_db",
+												"type": "Expression"
+											},
+											"p_schema": "dbo",
+											"p_table": "dummy"
+										}
+									}
+								},
+								"compute": {
+									"coreCount": 8,
+									"computeType": "General"
+								},
+								"traceLevel": "Fine"
+							}
+						},
+						{
+							"name": "CreateTargetView",
+							"type": "Script",
+							"dependsOn": [
+								{
+									"activity": "GenericWideTab_Enr",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 2,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"linkedServiceName": {
+								"referenceName": "serverless_ARIR",
+								"type": "LinkedServiceReference",
+								"parameters": {
+									"p_database": {
+										"value": "@pipeline().parameters.c_serverless_db",
+										"type": "Expression"
+									}
+								}
+							},
+							"typeProperties": {
+								"scripts": [
+									{
+										"type": "Query",
+										"text": {
+											"value": "create or alter view @{pipeline().parameters.c_trg_schema}.@{pipeline().parameters.c_trg_object} as\nselect * from OPENROWSET(\n        BULK '@{activity('EnrichedLakeSettings').output.properties.typeProperties.url}@{if(endswith(activity('EnrichedLakeSettings').output.properties.typeProperties.url, '/'), '', '/')}@{pipeline().parameters.c_trg_container}/@{pipeline().parameters.c_trg_root_folder}/@{pipeline().parameters.c_trg_object}/',\n        FORMAT = 'DELTA'\n    ) AS [result]",
+											"type": "Expression"
+										}
+									}
+								],
+								"scriptBlockExecutionTimeout": "02:00:00"
+							}
+						}
+					]
+				}
+			}
+		],
+		"parameters": {
+			"p_src_objects": {
+				"type": "array",
+				"defaultValue": [
+					{
+						"iteration": 0,
+						"object": "F0911",
+						"schema": "enr",
+						"alias": "F0911",
+						"trgKeyCol": "GLDCT,GLDOC,GLKCO,GLDGJ,GLJELN,GLLT,GLEXTL",
+						"cdcCol": "enrTimestamp",
+						"selectCols": "*",
+						"joinCondition": null,
+						"joinType": null,
+						"joinOrder": 0
+					},
+					{
+						"iteration": 0,
+						"object": "F4211",
+						"schema": "enr",
+						"alias": "F4211",
+						"trgKeyCol": null,
+						"cdcCol": "enrTimestamp",
+						"selectCols": "SDDOCO, SDDCTO, SDRORN, SDRCTO, SDDOC, SDKCOO, SDDCT, SDLNID",
+						"joinCondition": "F0911.GLDOC = F4211.SDDOC and F0911.GLKCO = F4211.SDKCOO and F0911.GLDCT = F4211.SDDCT and F0911.GLLNID = F4211.SDLNID",
+						"joinType": "left outer",
+						"joinOrder": 1
+					},
+					{
+						"iteration": 0,
+						"object": "F0006",
+						"schema": "enr",
+						"alias": "F0006",
+						"trgKeyCol": null,
+						"cdcCol": "enrTimestamp",
+						"selectCols": "MCRP10, MCRP11, MCRP04, MCMCU, MCRP12",
+						"joinCondition": "F0911.GLMCU = F0006.MCMCU",
+						"joinType": "left outer",
+						"joinOrder": 2
+					},
+					{
+						"iteration": 0,
+						"object": "F0901",
+						"schema": "enr",
+						"alias": "F0901",
+						"trgKeyCol": null,
+						"cdcCol": "enrTimestamp",
+						"selectCols": "GMR021, GMR018, GMDL01, GMR009, GMAID",
+						"joinCondition": "F0911.GLAID = F0901.GMAID",
+						"joinType": "left outer",
+						"joinOrder": 3
+					}
+				]
+			},
+			"p_datetime_from": {
+				"type": "string"
+			},
+			"c_trg_object": {
+				"type": "string",
+				"defaultValue": "S_General_Ledger_Details"
+			},
+			"c_trg_container": {
+				"type": "string",
+				"defaultValue": "enriched"
+			},
+			"c_trg_root_folder": {
+				"type": "string",
+				"defaultValue": "ICP_Staging"
+			},
+			"c_serverless_db": {
+				"type": "string",
+				"defaultValue": "ICP_Data_Store"
+			},
+			"c_trg_schema": {
+				"type": "string",
+				"defaultValue": "stg"
+			},
+			"c_partition_formula": {
+				"type": "string",
+				"defaultValue": "F0911.DELTA_PARTITION"
+			},
+			"c_trg_partition_col": {
+				"type": "string",
+				"defaultValue": "_PARTITION"
+			},
+			"c_trg_cdc_col": {
+				"type": "string",
+				"defaultValue": "_DSS_UPDATE_TIME"
+			},
+			"c_trg_alias": {
+				"type": "string",
+				"defaultValue": "_stg"
+			},
+			"c_trg_linked_service": {
+				"type": "string",
+				"defaultValue": "icpanalyticsenrst_ARIR"
+			}
+		},
+		"variables": {
+			"v_master_query_parts": {
+				"type": "Array"
+			},
+			"v_slave_row_count": {
+				"type": "Integer"
+			},
+			"v_cdc": {
+				"type": "String"
+			}
+		},
+		"folder": {
+			"name": "Templates"
+		},
+		"annotations": [],
+		"lastPublishTime": "2024-01-24T18:40:41Z"
+	},
+	"type": "Microsoft.Synapse/workspaces/pipelines"
+}
