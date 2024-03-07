@@ -1,0 +1,108 @@
+{
+	"name": "FromDeltaToWideDelta",
+	"properties": {
+		"folder": {
+			"name": "Audit"
+		},
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "GenericServerlessSQL",
+						"type": "DatasetReference"
+					},
+					"name": "sourceWide"
+				},
+				{
+					"dataset": {
+						"referenceName": "GenericServerlessSQL",
+						"type": "DatasetReference"
+					},
+					"name": "sourcePartitionPruning"
+				}
+			],
+			"sinks": [
+				{
+					"linkedService": {
+						"referenceName": "templateenrst_ARIR",
+						"type": "LinkedServiceReference"
+					},
+					"name": "sinkWide"
+				},
+				{
+					"name": "sinkPartitionPruning"
+				}
+			],
+			"transformations": [
+				{
+					"name": "alterRowWide"
+				},
+				{
+					"name": "derivedWide"
+				}
+			],
+			"scriptLines": [
+				"parameters{",
+				"     c_trg_object as string ('StagingItemArrival'),",
+				"     c_trg_container as string ('kbsenriched'),",
+				"     c_trg_root_folder as string ('StagingItemVariant'),",
+				"     p_keyCols as string ('INVT_RECID, IDC_RECID'),",
+				"     p_source_query as string (\"select INVT._SysRowId as INVT__SysRowId, INVT.LSN as INVT_LSN, INVT.LastProcessedChange_DateTime as INVT_LastProcessedChange_DateTime, INVT.DataLakeModified_DateTime as INVT_DataLakeModified_DateTime, INVT.RECID as INVT_RECID, INVT.ItemId as INVT_ItemId, INVT.ABCContributionMargin as INVT_ABCContributionMargin, INVT.ABCRevenue as INVT_ABCRevenue, INVT.ABCTieUp as INVT_ABCTieUp, INVT.ABCValue as INVT_ABCValue, INVT.AlcoholManufacturerId_RU as INVT_AlcoholManufacturerId_RU, INVT.AlcoholProductionTypeId_RU as INVT_AlcoholProductionTypeId_RU, INVT.AlcoholStrength_RU as INVT_AlcoholStrength_RU, INVT.AltConfigId as INVT_AltConfigId, INVT.AltInventColorId as INVT_AltInventColorId, INVT.AltInventSizeId as INVT_AltInventSizeId, INVT.AltInventStyleId as INVT_AltInventStyleId, INVT.AltItemId as INVT_AltItemId, INVT.ApproxTaxValue_BR as INVT_ApproxTaxValue_BR, INVT.AssetGroupId_RU as INVT_AssetGroupId_RU, INVT.AssetId_RU as INVT_AssetId_RU, INVT.AutoReportFinished as INVT_AutoReportFinished, INVT.BatchMergeDateCalculationMethod as INVT_BatchMergeDateCalculationMethod, INVT.BatchNumGroupId as INVT_BatchNumGroupId, INVT.BOMCalcGroupId as INVT_BOMCalcGroupId, INVT.BOMLevel as INVT_BOMLevel, INVT.BOMManualReceipt as INVT_BOMManualReceipt, INVT.BOMUnitId as INVT_BOMUnitId, INVT.CommissionGroupId as INVT_CommissionGroupId, INVT.CostGroupId as INVT_CostGroupId, INVT.CostModel as INVT_CostModel, INVT.CustomsExportTariffCodeTable_IN as INVT_CustomsExportTariffCodeTable_IN, INVT.CustomsImportTariffCodeTable_IN as INVT_CustomsImportTariffCodeTable_IN, INVT.DefaultDimension as INVT_DefaultDimension, INVT.Density as INVT_Density, INVT.Depth as INVT_Depth, INVT.ExceptionCode_BR as INVT_ExceptionCode_BR, INVT.ExciseTariffCodes_IN as INVT_ExciseTariffCodes_IN, INVT.EximProductGroupTable_IN as INVT_EximProductGroupTable_IN, INVT.FiscalLIFOAvoidCalc as INVT_FiscalLIFOAvoidCalc, INVT.FiscalLIFONormalValue as INVT_FiscalLIFONormalValue, INVT.FiscalLIFONormalValueCalc as INVT_FiscalLIFONormalValueCalc, INVT.ForecastDMPInclude as INVT_ForecastDMPInclude, INVT.grossDepth as INVT_grossDepth, INVT.grossHeight as INVT_grossHeight, INVT.grossWidth as INVT_grossWidth, INVT.Height as INVT_Height, INVT.ICMSOnService_BR as INVT_ICMSOnService_BR, INVT.IntrastatCommodity as INVT_IntrastatCommodity, INVT.IntrastatExclude as INVT_IntrastatExclude, INVT.IntrastatProcId_CZ as INVT_IntrastatProcId_CZ, INVT.InventFiscalLIFOGroup as INVT_InventFiscalLIFOGroup, INVT.InventProductType_BR as INVT_InventProductType_BR, INVT.ItemBuyerGroupId as INVT_ItemBuyerGroupId, INVT.ItemDimCostPrice as INVT_ItemDimCostPrice, INVT.ItemPriceToleranceGroupId as INVT_ItemPriceToleranceGroupId, INVT.ItemType as INVT_ItemType, INVT.MarkupCode_RU as INVT_MarkupCode_RU, INVT.MatchingPolicy as INVT_MatchingPolicy, INVT.MINIMUMPALLETQUANTITY as INVT_MINIMUMPALLETQUANTITY, INVT.NameAlias as INVT_NameAlias, INVT.NetWeight as INVT_NetWeight, INVT.NGPCodesTable_FR as INVT_NGPCodesTable_FR, INVT.NRTaxGroup_LV as INVT_NRTaxGroup_LV, INVT.OrigCountryRegionId as INVT_OrigCountryRegionId, INVT.OrigCountyId as INVT_OrigCountyId, INVT.OrigStateId as INVT_OrigStateId, INVT.PackagingGroupId as INVT_PackagingGroupId, INVT.Packing_RU as INVT_Packing_RU, INVT.PDSBaseAttributeId as INVT_PDSBaseAttributeId, INVT.PdsBestBefore as INVT_PdsBestBefore, INVT.PDSCWWMSMINIMUMPALLETQTY as INVT_PDSCWWMSMINIMUMPALLETQTY, INVT.PDSCWWMSQTYPERLAYER as INVT_PDSCWWMSQTYPERLAYER, INVT.PDSCWWMSSTANDARDPALLETQTY as INVT_PDSCWWMSSTANDARDPALLETQTY, INVT.PdsFreightAllocationGroupId as INVT_PdsFreightAllocationGroupId, INVT.PdsItemRebateGroupId as INVT_PdsItemRebateGroupId, INVT.PDSPotencyAttribRecording as INVT_PDSPotencyAttribRecording, INVT.PdsShelfAdvice as INVT_PdsShelfAdvice, INVT.PdsShelfLife as INVT_PdsShelfLife, INVT.PDSTargetFactor as INVT_PDSTargetFactor, INVT.PdsVendorCheckItem as INVT_PdsVendorCheckItem, INVT.Phantom as INVT_Phantom, INVT.PKWiUCode_PL as INVT_PKWiUCode_PL, INVT.PmfPlanningItemId as INVT_PmfPlanningItemId, INVT.PmfProductType as INVT_PmfProductType, INVT.PmfYieldPct as INVT_PmfYieldPct, INVT.PrimaryVendorId as INVT_PrimaryVendorId, INVT.ProdFlushingPrincip as INVT_ProdFlushingPrincip, INVT.ProdGroupId as INVT_ProdGroupId, INVT.ProdPoolId as INVT_ProdPoolId, INVT.Product as INVT_Product, INVT.projCategoryId as INVT_projCategoryId, INVT.PropertyId as INVT_PropertyId, INVT.PurchModel as INVT_PurchModel, INVT.QTYPERLAYER as INVT_QTYPERLAYER, INVT.ReqGroupId as INVT_ReqGroupId, INVT.SADRateCode_PL as INVT_SADRateCode_PL, INVT.SalesContributionRatio as INVT_SalesContributionRatio, INVT.SalesModel as INVT_SalesModel, INVT.SalesPercentMarkup as INVT_SalesPercentMarkup, INVT.SalesPriceModelBasic as INVT_SalesPriceModelBasic, INVT.ScrapConst as INVT_ScrapConst, INVT.ScrapVar as INVT_ScrapVar, INVT.SerialNumGroupId as INVT_SerialNumGroupId, INVT.ServiceCodeTable_IN as INVT_ServiceCodeTable_IN, INVT.SkipIntraCompanySync_RU as INVT_SkipIntraCompanySync_RU, INVT.sortCode as INVT_sortCode, INVT.StandardConfigId as INVT_StandardConfigId, INVT.StandardInventColorId as INVT_StandardInventColorId, INVT.StandardInventSizeId as INVT_StandardInventSizeId, INVT.StandardInventStyleId as INVT_StandardInventStyleId, INVT.STANDARDPALLETQUANTITY as INVT_STANDARDPALLETQUANTITY, INVT.StatisticsFactor as INVT_StatisticsFactor, INVT.TaraWeight as INVT_TaraWeight, INVT.TaxationOrigin_BR as INVT_TaxationOrigin_BR, INVT.TaxFiscalClassification_BR as INVT_TaxFiscalClassification_BR, INVT.TaxPackagingQty as INVT_TaxPackagingQty, INVT.TaxServiceCode_BR as INVT_TaxServiceCode_BR, INVT.UnitVolume as INVT_UnitVolume, INVT.UseAltItemId as INVT_UseAltItemId, INVT.Width as INVT_Width, INVT.WMSArrivalHandlingTime as INVT_WMSArrivalHandlingTime, INVT.WMSPALLETTYPEID as INVT_WMSPALLETTYPEID, INVT.WMSPICKINGQTYTIME as INVT_WMSPICKINGQTYTIME, INVT.DSA_IN as INVT_DSA_IN, INVT.ExciseRecordType_IN as INVT_ExciseRecordType_IN, INVT.DataAreaId as INVT_DataAreaId, INVT.PARTITION as INVT_PARTITION, INVT.RECVERSION as INVT_RECVERSION, INVT.MODIFIEDDATETIME as INVT_MODIFIEDDATETIME, INVT.MODIFIEDBY as INVT_MODIFIEDBY, INVT.CREATEDDATETIME as INVT_CREATEDDATETIME, INVT.CREATEDBY as INVT_CREATEDBY, INVT.SATCodeId_MX as INVT_SATCodeId_MX, INVT.BrandCodeId_MX as INVT_BrandCodeId_MX, INVT.SATTariffFraction_MX as INVT_SATTariffFraction_MX, INVT.HSNCodeTable_IN as INVT_HSNCodeTable_IN, INVT.ServiceAccountingCodeTable_IN as INVT_ServiceAccountingCodeTable_IN, INVT.Exempt_IN as INVT_Exempt_IN, INVT.ProductLifecycleStateId as INVT_ProductLifecycleStateId, INVT.ScaleIndicator_BR as INVT_ScaleIndicator_BR, INVT.CNPJ_BR as INVT_CNPJ_BR, INVT.NonGST_IN as INVT_NonGST_IN, INVT.TaxRateType as INVT_TaxRateType, INVT.SAB_ShipArrivalGroupId as INVT_SAB_ShipArrivalGroupId, INVT.SAB_ShipCommodityCodeId as INVT_SAB_ShipCommodityCodeId, INVT.SAB_ShipCustomsDescId as INVT_SAB_ShipCustomsDescId, INVT.SAB_ShipOverUnderToleranceGroupId as INVT_SAB_ShipOverUnderToleranceGroupId, INVT.SAB_ShipCostTypeGroupId as INVT_SAB_ShipCostTypeGroupId, INVT.SAB_ShipCostTransferGroupId as INVT_SAB_ShipCostTransferGroupId, INVT.KBSAltItemInStoreOnly as INVT_KBSAltItemInStoreOnly, INVT.KBSDateTimeSent as INVT_KBSDateTimeSent, INVT.KBSDATETIMESENTTZID as INVT_KBSDATETIMESENTTZID, INVT.KBSSPCProduct as INVT_KBSSPCProduct, INVT.KBSSyncToDC as INVT_KBSSyncToDC, INVT.KBSSecondaryVendorId as INVT_KBSSecondaryVendorId, INVT.RevRecDefaultRevenueRecognitionSchedule as INVT_RevRecDefaultRevenueRecognitionSchedule, INVT.RevRecExcludeFromCarveOut as INVT_RevRecExcludeFromCarveOut, INVT.RevRecMedianPrice as INVT_RevRecMedianPrice, INVT.RevRecMedianPriceMaximumTolerance as INVT_RevRecMedianPriceMaximumTolerance, INVT.RevRecMedianPriceMinimumTolerance as INVT_RevRecMedianPriceMinimumTolerance, INVT.RevRecRevenueRecognitionEnabled as INVT_RevRecRevenueRecognitionEnabled, INVT.RevRecRevenueType as INVT_RevRecRevenueType, INVT.RevRecBundle as INVT_RevRecBundle, INVT.IntrastatChargePerKg as INVT_IntrastatChargePerKg, INVT.FreeNotesGroup_IT as INVT_FreeNotesGroup_IT, INVT.HMIMIndicator as INVT_HMIMIndicator, INVT.COODualUseProduct as INVT_COODualUseProduct, INVT.COODualUseCode as INVT_COODualUseCode, INVT.AltInventVersionId as INVT_AltInventVersionId, INVT.StandardInventVersionId as INVT_StandardInventVersionId, INVT.CostBOMLevel as INVT_CostBOMLevel, INVT.KBSAirMilesCoupon as INVT_KBSAirMilesCoupon, INVT.KBSProductionItemId as INVT_KBSProductionItemId, INVT.KBSProductClearance as INVT_KBSProductClearance, INVT.ITMArrivalGroupId as INVT_ITMArrivalGroupId, INVT.ITMCommodityCodeId as INVT_ITMCommodityCodeId, INVT.ITMCustomsDescId as INVT_ITMCustomsDescId, INVT.ITMOverUnderToleranceGroupId as INVT_ITMOverUnderToleranceGroupId, INVT.ITMCostTypeGroupId as INVT_ITMCostTypeGroupId, INVT.ITMCostTransferGroupId as INVT_ITMCostTransferGroupId, INVT.KBSPartNumberMandatory as INVT_KBSPartNumberMandatory, INVT.KBSSPCCustomerName as INVT_KBSSPCCustomerName, INVT.KBSSPCSalesTaker as INVT_KBSSPCSalesTaker, INVT.KBSExternalItemId as INVT_KBSExternalItemId, INVT.DisplayHazard_MX as INVT_DisplayHazard_MX, INVT.KBSAdvertUOMActive as INVT_KBSAdvertUOMActive, INVT.KBSAdvertUOMSymbol as INVT_KBSAdvertUOMSymbol, INVT.BomWHSReleasePolicy as INVT_BomWHSReleasePolicy, INVT.SYSSHARINGDATAAREAID as INVT_SYSSHARINGDATAAREAID, INVT.KBSAttrSHA3HashHex as INVT_KBSAttrSHA3HashHex, INVT.KBSAttrJson as INVT_KBSAttrJson, INVT.Bundle as INVT_Bundle, INVT.DML_Action as INVT_DML_Action, INVT.DSS_UPDATE_TIME as INVT_DSS_UPDATE_TIME, INVT.Seq_Val as INVT_Seq_Val, INVT.Update_Mask as INVT_Update_Mask, IDC._SysRowId as IDC__SysRowId, IDC.LSN as IDC_LSN, IDC.LastProcessedChange_DateTime as IDC_LastProcessedChange_DateTime, IDC.DataLakeModified_DateTime as IDC_DataLakeModified_DateTime, IDC.RECID as IDC_RECID, IDC.DistinctProductVariant as IDC_DistinctProductVariant, IDC.InventDimId as IDC_InventDimId, IDC.ItemId as IDC_ItemId, IDC.RetailVariantId as IDC_RetailVariantId, IDC.DataAreaId as IDC_DataAreaId, IDC.PARTITION as IDC_PARTITION, IDC.RECVERSION as IDC_RECVERSION, IDC.CREATEDDATETIME as IDC_CREATEDDATETIME, IDC.ProductLifecycleStateId as IDC_ProductLifecycleStateId, IDC.KBSProductClearance as IDC_KBSProductClearance, IDC.KBSDisableOnLine as IDC_KBSDisableOnLine, IDC.DML_Action as IDC_DML_Action, IDC.DSS_UPDATE_TIME as IDC_DSS_UPDATE_TIME, IDC.Seq_Val as IDC_Seq_Val, IDC.Update_Mask as IDC_Update_Mask, ERPT.RECID as ERPT_RECID, ERPT.Description as ERPT_Description, ERPT.Name as ERPT_Name, ERPT.DML_Action as ERPT_DML_Action, ERPT.DSS_UPDATE_TIME as ERPT_DSS_UPDATE_TIME, 'dummy' as _PARTITION, '2024-01-15T18:21:17.9766525Z' as _DSS_UPDATE_TIME from enr.InventTable as INVT left outer join enr.InventDimCombination as IDC on IDC.ItemId = INVT.ItemId and IDC.DataAreaId = INVT.DataAreaId left outer join enr.EcoResProductTranslation as ERPT on ERPT.Product = INVT.Product and ERPT.LanguageId = 'en-CA' where (INVT.DSS_UPDATE_TIME > '1900-01-01' or IDC.DSS_UPDATE_TIME > '1900-01-01' or ERPT.DSS_UPDATE_TIME > '1900-01-01')\"),",
+				"     p_pruning_query as string (\"select distinct('dummy') as _PARTITION from enr.InventTable as INVT left outer join enr.InventDimCombination as IDC on IDC.ItemId = INVT.ItemId and IDC.DataAreaId = INVT.DataAreaId left outer join enr.EcoResProductTranslation as ERPT on ERPT.Product = INVT.Product and ERPT.LanguageId = 'en-CA' where (INVT.DSS_UPDATE_TIME > '1900-01-01' or IDC.DSS_UPDATE_TIME > '1900-01-01' or ERPT.DSS_UPDATE_TIME > '1900-01-01')\"),",
+				"     c_trg_partition_col as string ('_PARTITION'),",
+				"     p_iteration as integer (0)",
+				"}",
+				"source(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     query: ($p_source_query),",
+				"     format: 'query',",
+				"     staged: false) ~> sourceWide",
+				"source(output(",
+				"          PartitionPruning as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     query: (\"select distinct \" + $c_trg_partition_col + \" as PartitionPruning from (select 'dummy' as \" + $c_trg_partition_col + \" union \" + $p_pruning_query + \") q\"),",
+				"     format: 'query',",
+				"     staged: false) ~> sourcePartitionPruning",
+				"derivedWide alterRow(upsertIf($p_iteration==0),",
+				"     updateIf($p_iteration!=0)) ~> alterRowWide",
+				"sourceWide derive({_PARTITION} = byName($c_trg_partition_col)) ~> derivedWide",
+				"alterRowWide sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     format: 'delta',",
+				"     fileSystem: ($c_trg_container),",
+				"     folderPath: ($c_trg_root_folder + \"/\" + $c_trg_object),",
+				"     mergeSchema: false,",
+				"     autoCompact: false,",
+				"     optimizedWrite: false,",
+				"     vacuum: 0,",
+				"     deletable: false,",
+				"     insertable: true,",
+				"     updateable: false,",
+				"     upsertable: false,",
+				"     umask: 0022,",
+				"     preCommands: [],",
+				"     postCommands: [],",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     saveOrder: 2,",
+				"     partitionBy('key',",
+				"          0,",
+				"          {_PARTITION}",
+				"     ),",
+				"     pruneCondition: ['_PARTITION' -> (sinkPartitionPruning#outputs().PartitionPruning)]) ~> sinkWide",
+				"sourcePartitionPruning sink(validateSchema: false,",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     store: 'cache',",
+				"     format: 'inline',",
+				"     output: false,",
+				"     saveOrder: 1) ~> sinkPartitionPruning"
+			]
+		}
+	}
+}
