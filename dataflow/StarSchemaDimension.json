@@ -87,7 +87,7 @@
 					"name": "alterRow"
 				},
 				{
-					"name": "alteZeroRow"
+					"name": "alterZeroRow"
 				},
 				{
 					"name": "sourceLookupKey"
@@ -96,7 +96,7 @@
 					"name": "dimLookupKey"
 				},
 				{
-					"name": "derivedColumn1"
+					"name": "derivedMaxKey"
 				}
 			],
 			"scriptLines": [
@@ -139,7 +139,7 @@
 				"     allowSchemaDrift: true,",
 				"     validateSchema: false,",
 				"     isolationLevel: 'READ_UNCOMMITTED',",
-				"     query: (iif(not($p_init_load), \"select \" + $p_surrogate_key_col + reduce($p_src_key_cols, \"\", #acc + \", \" + #item, #result) + iif(length(coalesce($c_trg_dss_create_col, \"\")) == 0, \"\", \", \" + $c_trg_dss_create_col) + \" from \" + $p_trg_table, \"select 0 as \" + $p_surrogate_key_col + reduce($p_src_key_cols, \"\", #acc + \", '' as \" + #item, #result) + iif(length(coalesce($c_trg_dss_create_col, \"\")) == 0, \"\", \", cast('1900-01-01' as datetime) as \" + $c_trg_dss_create_col)) + \" where 1 = 0\"),",
+				"     query: (iif(not($p_init_load), \"select \" + $p_surrogate_key_col + reduce($p_src_key_cols, \"\", #acc + \", \" + #item, #result) + iif(length(coalesce($c_trg_dss_create_col, \"\")) == 0, \"\", \", \" + $c_trg_dss_create_col) + \" from \" + $p_trg_table, \"select cast(0 as bigint) as \" + $p_surrogate_key_col + reduce($p_src_key_cols, \"\", #acc + \", '' as \" + #item, #result) + iif(length(coalesce($c_trg_dss_create_col, \"\")) == 0, \"\", \", cast('1900-01-01' as datetime) as \" + $c_trg_dss_create_col)) + \" where 1 = 0\"),",
 				"     format: 'query',",
 				"     staged: false) ~> Dimension",
 				"source(output(",
@@ -188,11 +188,11 @@
 				"     skipDuplicateMapInputs: true,",
 				"     skipDuplicateMapOutputs: true) ~> selectBeforeSink",
 				"selectBeforeSink alterRow(upsertIf(true())) ~> alterRow",
-				"DimensionZeroRow alterRow(upsertIf(true())) ~> alteZeroRow",
+				"DimensionZeroRow alterRow(upsertIf(true())) ~> alterZeroRow",
 				"DataSource derive(lookupKey = md5(byNames($p_src_key_cols))) ~> sourceLookupKey",
 				"Dimension derive(lookupKey = md5(byNames($p_src_key_cols))) ~> dimLookupKey",
-				"DimensionMaxKey derive(surrogateKey = toLong(byName($p_surrogate_key_col))) ~> derivedColumn1",
-				"derivedColumn1 sink(validateSchema: false,",
+				"DimensionMaxKey derive(surrogateKey = toLong(byName($p_surrogate_key_col))) ~> derivedMaxKey",
+				"derivedMaxKey sink(validateSchema: false,",
 				"     skipDuplicateMapInputs: true,",
 				"     skipDuplicateMapOutputs: true,",
 				"     store: 'cache',",
@@ -202,7 +202,7 @@
 				"     mapColumn(",
 				"          surrogateKey",
 				"     )) ~> CacheMaxKey",
-				"alteZeroRow sink(allowSchemaDrift: true,",
+				"alterZeroRow sink(allowSchemaDrift: true,",
 				"     validateSchema: false,",
 				"     format: 'delta',",
 				"     fileSystem: ($c_target_container),",
