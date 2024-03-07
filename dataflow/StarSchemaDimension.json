@@ -141,7 +141,7 @@
 				"     isolationLevel: 'READ_UNCOMMITTED',",
 				"     query: (iif(not($p_init_load), \"select \" + $p_surrogate_key_col + reduce($p_src_key_cols, \"\", #acc + \", \" + #item, #result) + iif(length(coalesce($c_trg_dss_create_col, \"\")) == 0, \"\", \", \" + $c_trg_dss_create_col) + \" from \" + $p_trg_table, \"select 0 as \" + $p_surrogate_key_col + reduce($p_src_key_cols, \"\", #acc + \", '' as \" + #item, #result) + iif(length(coalesce($c_trg_dss_create_col, \"\")) == 0, \"\", \", cast('1900-01-01' as datetime) as \" + $c_trg_dss_create_col)) + \" where 1 = 0\"),",
 				"     format: 'query',",
-				"     staged: true) ~> Dimension",
+				"     staged: false) ~> Dimension",
 				"source(output(",
 				"          dataflows_key as integer",
 				"     ),",
