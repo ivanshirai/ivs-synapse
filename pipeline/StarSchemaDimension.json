@@ -42,7 +42,10 @@
 								"type": "Expression"
 							},
 							"p_trg_table": "'DimDataflows'",
-							"p_init_load": "true()",
+							"p_init_load": {
+								"value": "@not(activity('GetTargetDeltaMetadata').output.exists)",
+								"type": "Expression"
+							},
 							"c_trg_container": "'template'",
 							"c_trg_root_folder": "'StarSchemaObjects'"
 						},
@@ -372,7 +375,7 @@
 						{
 							"type": "Query",
 							"text": {
-								"value": "select 'CREATE EXTERNAL TABLE ' +\n'@{pipeline().parameters.p_trg_table} (' + \nchar(10) +\nSTRING_AGG('[' + \ncast(colName as varchar(max)) + '] ' + \ndataType, ',' + char(10)) \nWITHIN GROUP (ORDER BY column_id ASC) + char(10) +\n') WITH (LOCATION = ''@{pipeline().parameters.c_trg_root_folder}/@{pipeline().parameters.p_trg_table}'', DATA_SOURCE = @{pipeline().parameters.p_cur_data_source},  FILE_FORMAT = Delta)' as SQL\nfrom (select \nc.name colName, coalesce(r.dataType,\nCASE \n      WHEN t.[name] IN ('varchar', 'char', 'varbinary') THEN t.[name] + '(' + IIF(c.max_length = -1, 'max', CAST(c.max_length AS VARCHAR(25))) + ')' \n      WHEN t.[name] IN ('nvarchar','nchar') THEN t.[name] + '(' + IIF(c.max_length = -1, 'max', CAST(c.max_length / 2 AS VARCHAR(25)))+ ')'      \n      WHEN t.[name] IN ('decimal', 'numeric') THEN t.[name] + '(' + CAST(c.[precision] AS VARCHAR(25)) + ', ' + CAST(c.[scale] AS VARCHAR(25)) + ')'\n      WHEN t.[name] IN ('datetime2') THEN t.[name] + '(' + CAST(c.[scale] AS VARCHAR(25)) + ')'\n      ELSE t.[name]\nEND) AS dataType,\nc.column_id\nfrom sys.columns c\njoin sys.views v on v.object_id = c.object_id\njoin sys.schemas s on s.schema_id = v.schema_id\njoin sys.types t on c.user_type_id = t.user_type_id \nleft outer join \n@{if(empty(pipeline().parameters.p_data_type_replace), \n'(select null col, null dataType) r',\nconcat('(select * from OpenJson(N''',\nstring(pipeline().parameters.p_data_type_replace),\n''') WITH (col varchar(255), dataType varchar(255)) as r) r'))}\non r.col = c.name\nwhere s.name = 'dbo' and c.name <> '@{pipeline().parameters.c_trg_partition_col}' and v.name = \n'@{pipeline().parameters.p_trg_table}_tmp') q",
+								"value": "select 'CREATE EXTERNAL TABLE ' +\n'@{pipeline().parameters.p_trg_table} (' + \nchar(10) +\nSTRING_AGG('[' + \ncast(colName as varchar(max)) + '] ' + \ndataType, ',' + char(10)) \nWITHIN GROUP (ORDER BY column_id ASC) + char(10) +\n') WITH (LOCATION = ''@{pipeline().parameters.c_trg_root_folder}/@{pipeline().parameters.p_trg_table}'', DATA_SOURCE = @{pipeline().parameters.c_cur_data_source},  FILE_FORMAT = Delta)' as SQL\nfrom (select \nc.name colName, coalesce(r.dataType,\nCASE \n      WHEN t.[name] IN ('varchar', 'char', 'varbinary') THEN t.[name] + '(' + IIF(c.max_length = -1, 'max', CAST(c.max_length AS VARCHAR(25))) + ')' \n      WHEN t.[name] IN ('nvarchar','nchar') THEN t.[name] + '(' + IIF(c.max_length = -1, 'max', CAST(c.max_length / 2 AS VARCHAR(25)))+ ')'      \n      WHEN t.[name] IN ('decimal', 'numeric') THEN t.[name] + '(' + CAST(c.[precision] AS VARCHAR(25)) + ', ' + CAST(c.[scale] AS VARCHAR(25)) + ')'\n      WHEN t.[name] IN ('datetime2') THEN t.[name] + '(' + CAST(c.[scale] AS VARCHAR(25)) + ')'\n      ELSE t.[name]\nEND) AS dataType,\nc.column_id\nfrom sys.columns c\njoin sys.views v on v.object_id = c.object_id\njoin sys.schemas s on s.schema_id = v.schema_id\njoin sys.types t on c.user_type_id = t.user_type_id \nleft outer join \n@{if(empty(pipeline().parameters.p_data_type_replace), \n'(select null col, null dataType) r',\nconcat('(select * from OpenJson(N''',\nstring(pipeline().parameters.p_data_type_replace),\n''') WITH (col varchar(255), dataType varchar(255)) as r) r'))}\non r.col = c.name\nwhere s.name = 'dbo' and c.name <> '@{pipeline().parameters.c_trg_partition_col}' and v.name = \n'@{pipeline().parameters.p_trg_table}_tmp') q",
 								"type": "Expression"
 							}
 						}
@@ -424,32 +427,34 @@
 			}
 		],
 		"parameters": {
-			"c_serverless_db": {
-				"type": "string",
-				"defaultValue": "templateDB"
-			},
-			"p_datetime_from": {
-				"type": "string"
-			},
 			"p_trg_table": {
 				"type": "string",
 				"defaultValue": "DimDataflows"
 			},
-			"c_trg_container": {
-				"type": "string",
-				"defaultValue": "template"
+			"p_datetime_from": {
+				"type": "string"
 			},
-			"c_trg_root_folder": {
+			"p_surrogate_key_col": {
 				"type": "string",
-				"defaultValue": "StarSchemaObjects"
+				"defaultValue": "dataflows_key"
+			},
+			"p_src_schema": {
+				"type": "string",
+				"defaultValue": "enr"
+			},
+			"p_src_object": {
+				"type": "string",
+				"defaultValue": "dataflows_REST_API"
+			},
+			"p_src_key_cols": {
+				"type": "array",
+				"defaultValue": [
+					"name"
+				]
 			},
 			"p_src_cdc_col": {
 				"type": "string",
 				"defaultValue": "enrTimestamp"
-			},
-			"p_cur_data_source": {
-				"type": "string",
-				"defaultValue": "TemplateCuratedSource"
 			},
 			"p_data_type_replace": {
 				"type": "array",
@@ -460,9 +465,37 @@
 					}
 				]
 			},
+			"p_partition_formula": {
+				"type": "string",
+				"defaultValue": "'dummy'"
+			},
+			"c_serverless_db": {
+				"type": "string",
+				"defaultValue": "templateDB"
+			},
+			"c_trg_container": {
+				"type": "string",
+				"defaultValue": "template"
+			},
+			"c_trg_root_folder": {
+				"type": "string",
+				"defaultValue": "StarSchemaObjects"
+			},
+			"c_cur_data_source": {
+				"type": "string",
+				"defaultValue": "TemplateCuratedSource"
+			},
 			"c_trg_partition_col": {
 				"type": "string",
 				"defaultValue": "DIM_PARTITION"
+			},
+			"c_trg_dss_update_col": {
+				"type": "string",
+				"defaultValue": "dss_update_time"
+			},
+			"c_trg_dss_create_col": {
+				"type": "string",
+				"defaultValue": "dss_create_time"
 			}
 		},
 		"variables": {
