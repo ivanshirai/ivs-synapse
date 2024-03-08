@@ -152,7 +152,7 @@
 				"     format: 'query',",
 				"     staged: false) ~> DimensionMaxKey",
 				"source(output(",
-				"          dataflows_key as integer,",
+				"          dataflows_key as long,",
 				"          name as string,",
 				"          DIM_PARTITION as string",
 				"     ),",
