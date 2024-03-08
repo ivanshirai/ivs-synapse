@@ -381,6 +381,48 @@
 					],
 					"scriptBlockExecutionTimeout": "02:00:00"
 				}
+			},
+			{
+				"name": "CreateExternalTable",
+				"type": "Script",
+				"dependsOn": [
+					{
+						"activity": "ExternalTableSQL",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"linkedServiceName": {
+					"referenceName": "serverless_ARIR",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"p_database": {
+							"value": "@pipeline().parameters.c_serverless_db",
+							"type": "Expression"
+						}
+					}
+				},
+				"typeProperties": {
+					"scripts": [
+						{
+							"type": "Query",
+							"text": {
+								"value": "begin transaction\n\nif exists (select * from sys.external_tables t join sys.schemas s on s.schema_id = t.schema_id where s.name = 'dbo' and t.name = '@{pipeline().parameters.p_trg_table}')\ndrop external table @{pipeline().parameters.p_trg_table};\n\n@{activity('ExternalTableSQL').output.resultSets[0].rows[0].SQL};\n\ndrop view @{pipeline().parameters.p_trg_table}_tmp\n",
+								"type": "Expression"
+							}
+						}
+					],
+					"scriptBlockExecutionTimeout": "02:00:00"
+				}
 			}
 		],
 		"parameters": {
