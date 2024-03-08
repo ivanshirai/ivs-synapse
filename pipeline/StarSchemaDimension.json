@@ -5,7 +5,14 @@
 			{
 				"name": "StarSchemaDimension",
 				"type": "ExecuteDataFlow",
-				"dependsOn": [],
+				"dependsOn": [
+					{
+						"activity": "If Target Delta Exists",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
 				"policy": {
 					"timeout": "0.12:00:00",
 					"retry": 0,
@@ -36,8 +43,8 @@
 							},
 							"p_trg_table": "'DimDataflows'",
 							"p_init_load": "true()",
-							"c_target_container": "'template'",
-							"c_target_root_folder": "'StarSchemaObjects'"
+							"c_trg_container": "'template'",
+							"c_trg_root_folder": "'StarSchemaObjects'"
 						},
 						"datasetParameters": {
 							"DataSource": {
@@ -80,6 +87,133 @@
 					},
 					"traceLevel": "Fine"
 				}
+			},
+			{
+				"name": "GetTargetDeltaMetadata",
+				"type": "GetMetadata",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataset": {
+						"referenceName": "GenericCuratedJsonFolder",
+						"type": "DatasetReference",
+						"parameters": {
+							"p_container": {
+								"value": "@pipeline().parameters.c_trg_container",
+								"type": "Expression"
+							},
+							"p_folder": {
+								"value": "@concat(pipeline().parameters.c_trg_root_folder, '/', pipeline().parameters.p_trg_table)",
+								"type": "Expression"
+							}
+						}
+					},
+					"fieldList": [
+						"exists"
+					],
+					"storeSettings": {
+						"type": "AzureBlobFSReadSettings",
+						"enablePartitionDiscovery": false
+					},
+					"formatSettings": {
+						"type": "JsonReadSettings"
+					}
+				}
+			},
+			{
+				"name": "If Target Delta Exists",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "GetTargetDeltaMetadata",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "GenericEnrichedParquet linked service",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@activity('GetTargetDeltaMetadata').output.exists",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "GenericCuratedParquet attributes",
+				"type": "WebActivity",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"method": "GET",
+					"url": {
+						"value": "@concat('https://', pipeline().DataFactory, '.dev.azuresynapse.net/datasets/GenericCuratedParquet?api-version=2020-12-01')",
+						"type": "Expression"
+					},
+					"connectVia": {
+						"referenceName": "SHIR",
+						"type": "IntegrationRuntimeReference"
+					},
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://dev.azuresynapse.net/"
+					}
+				}
+			},
+			{
+				"name": "GenericEnrichedParquet linked service",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "GenericCuratedParquet attributes",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"method": "GET",
+					"url": {
+						"value": "@concat('https://', pipeline().DataFactory, '.dev.azuresynapse.net/linkedservices/', activity('GenericCuratedParquet attributes').output.properties.linkedServiceName.referenceName, '?api-version=2020-12-01')",
+						"type": "Expression"
+					},
+					"connectVia": {
+						"referenceName": "SHIR",
+						"type": "IntegrationRuntimeReference"
+					},
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://dev.azuresynapse.net/"
+					}
+				}
 			}
 		],
 		"parameters": {
@@ -89,6 +223,18 @@
 			},
 			"p_datetime_from": {
 				"type": "string"
+			},
+			"p_trg_table": {
+				"type": "string",
+				"defaultValue": "DimDataflows"
+			},
+			"c_trg_container": {
+				"type": "string",
+				"defaultValue": "template"
+			},
+			"c_trg_root_folder": {
+				"type": "string",
+				"defaultValue": "StarSchemaObjects"
 			}
 		},
 		"folder": {
