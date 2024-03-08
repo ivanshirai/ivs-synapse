@@ -5,6 +5,8 @@
 			{
 				"name": "StarSchemaDimension",
 				"type": "ExecuteDataFlow",
+				"state": "Inactive",
+				"onInactiveMarkAs": "Succeeded",
 				"dependsOn": [
 					{
 						"activity": "If Target Delta Exists",
@@ -337,6 +339,48 @@
 					],
 					"scriptBlockExecutionTimeout": "02:00:00"
 				}
+			},
+			{
+				"name": "ExternalTableSQL",
+				"type": "Script",
+				"dependsOn": [
+					{
+						"activity": "createTmpView",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"linkedServiceName": {
+					"referenceName": "serverless_ARIR",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"p_database": {
+							"value": "@pipeline().parameters.c_serverless_db",
+							"type": "Expression"
+						}
+					}
+				},
+				"typeProperties": {
+					"scripts": [
+						{
+							"type": "Query",
+							"text": {
+								"value": "select 'CREATE EXTERNAL TABLE ' +\n'@{pipeline().parameters.p_trg_table} (' + \nchar(10) +\nSTRING_AGG('[' + \ncast(colName as varchar(max)) + '] ' + \ndataType, ',' + char(10)) \nWITHIN GROUP (ORDER BY column_id ASC) + char(10) +\n') WITH (LOCATION = ''@{pipeline().parameters.c_trg_root_folder}/@{pipeline().parameters.p_trg_table}'', DATA_SOURCE = pipeline().parameters.p_cur_data_source,  FILE_FORMAT = Delta)' as SQL\nfrom (select \nc.name colName, coalesce(r.dataType,\nCASE \n      WHEN t.[name] IN ('varchar', 'char', 'varbinary') THEN t.[name] + '(' + IIF(c.max_length = -1, 'max', CAST(c.max_length AS VARCHAR(25))) + ')' \n      WHEN t.[name] IN ('nvarchar','nchar') THEN t.[name] + '(' + IIF(c.max_length = -1, 'max', CAST(c.max_length / 2 AS VARCHAR(25)))+ ')'      \n      WHEN t.[name] IN ('decimal', 'numeric') THEN t.[name] + '(' + CAST(c.[precision] AS VARCHAR(25)) + ', ' + CAST(c.[scale] AS VARCHAR(25)) + ')'\n      WHEN t.[name] IN ('datetime2') THEN t.[name] + '(' + CAST(c.[scale] AS VARCHAR(25)) + ')'\n      ELSE t.[name]\nEND) AS dataType,\nc.column_id\nfrom sys.columns c\njoin sys.views v on v.object_id = c.object_id\njoin sys.schemas s on s.schema_id = v.schema_id\njoin sys.types t on c.user_type_id = t.user_type_id \nleft outer join \n@{if(empty(pipeline().parameters.p_data_type_replace), \n'(select null col, null dataType) r',\nconcat('(select * from OpenJson(N''',\nstring(pipeline().parameters.p_data_type_replace),\n''') WITH (col varchar(255), dataType varchar(255)) as r) r'))}\non r.col = c.name\nwhere s.name = 'dbo' and c.name <> '@{pipeline().parameters.c_trg_partition_col}' and v.name = \n'@{pipeline().parameters.p_trg_table}_tmp') q",
+								"type": "Expression"
+							}
+						}
+					],
+					"scriptBlockExecutionTimeout": "02:00:00"
+				}
 			}
 		],
 		"parameters": {
@@ -362,6 +406,25 @@
 			"p_src_cdc_col": {
 				"type": "string",
 				"defaultValue": "enrTimestamp"
+			},
+			"p_cur_data_source": {
+				"type": "string",
+				"defaultValue": "TemplateCuratedSource"
+			},
+			"p_data_type_replace": {
+				"type": "array",
+				"defaultValue": [
+					{
+						"col": "name"
+					},
+					{
+						"dataType": "varchar(255)"
+					}
+				]
+			},
+			"c_trg_partition_col": {
+				"type": "string",
+				"defaultValue": "DIM_PARTITION"
 			}
 		},
 		"variables": {
