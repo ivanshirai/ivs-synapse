@@ -20,6 +20,12 @@
 		"template_dedicated_ARIR_connectionString": {
 			"value": "Integrated Security=False;Encrypt=True;Connection Timeout=30;Data Source=ivs-synapse.sql.azuresynapse.net;Initial Catalog=ivssql"
 		},
+		"azuresynapse_REST_properties_typeProperties_url": {
+			"value": "@{concat('https://', linkedService().p_workspace, '.dev.azuresynapse.net')}"
+		},
+		"azuresynapse_REST_properties_typeProperties_aadResourceId": {
+			"value": "https://dev.azuresynapse.net/"
+		},
 		"ivs-synapse-WorkspaceDefaultStorage_properties_typeProperties_url": {
 			"value": "https://ivsdatastorage.dfs.core.windows.net"
 		},
@@ -34,12 +40,6 @@
 		},
 		"templaterawst_ARIR_properties_typeProperties_url": {
 			"value": "https://ivsraw.dfs.core.windows.net/"
-		},
-		"azuresynapse_REST_properties_typeProperties_url": {
-			"value": "@{concat('https://', linkedService().p_workspace, '.dev.azuresynapse.net')}"
-		},
-		"azuresynapse_REST_properties_typeProperties_aadResourceId": {
-			"value": "https://dev.azuresynapse.net/"
 		}
 	}
 }
