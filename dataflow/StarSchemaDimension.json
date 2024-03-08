@@ -112,7 +112,7 @@
 				"     p_src_object as string ('dataflows_REST_API'),",
 				"     p_datetime_from as string (''),",
 				"     p_trg_table as string ('DimDataflows'),",
-				"     p_init_load as boolean (true()),",
+				"     p_init_load as boolean (false()),",
 				"     c_target_container as string ('template'),",
 				"     c_target_root_folder as string ('StarSchemaObjects')",
 				"}",
