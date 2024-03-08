@@ -26,28 +26,62 @@
 						"referenceName": "StarSchemaDimension",
 						"type": "DataFlowReference",
 						"parameters": {
-							"p_src_key_cols": [
-								"name"
-							],
-							"p_src_cdc_col": "'rawTimestamp'",
-							"p_surrogate_key_col": "'dataflows_key'",
-							"c_trg_dss_update_col": "'dss_update_time'",
-							"c_trg_dss_create_col": "'dss_create_time'",
-							"p_partition_formula": "\"'dummy'\"",
-							"c_trg_partition_col": "'DIM_PARTITION'",
-							"p_src_schema": "'enr'",
-							"p_src_object": "'dataflows_REST_API'",
+							"p_src_key_cols": {
+								"value": "@pipeline().parameters.p_src_key_cols",
+								"type": "Expression"
+							},
+							"p_src_cdc_col": {
+								"value": "'@{pipeline().parameters.p_src_cdc_col}'",
+								"type": "Expression"
+							},
+							"p_surrogate_key_col": {
+								"value": "'@{pipeline().parameters.p_surrogate_key_col}'",
+								"type": "Expression"
+							},
+							"c_trg_dss_update_col": {
+								"value": "'@{pipeline().parameters.c_trg_dss_update_col}'",
+								"type": "Expression"
+							},
+							"c_trg_dss_create_col": {
+								"value": "'@{pipeline().parameters.c_trg_dss_create_col}'",
+								"type": "Expression"
+							},
+							"p_partition_formula": {
+								"value": "@pipeline().parameters.p_partition_formula",
+								"type": "Expression"
+							},
+							"c_trg_partition_col": {
+								"value": "'@{pipeline().parameters.c_trg_partition_col}'",
+								"type": "Expression"
+							},
+							"p_src_schema": {
+								"value": "'@{pipeline().parameters.p_src_schema}'",
+								"type": "Expression"
+							},
+							"p_src_object": {
+								"value": "'@{pipeline().parameters.p_src_object}'",
+								"type": "Expression"
+							},
 							"p_datetime_from": {
 								"value": "'@{variables('v_datetime_from')}'",
 								"type": "Expression"
 							},
-							"p_trg_table": "'DimDataflows'",
+							"p_trg_table": {
+								"value": "'@{pipeline().parameters.p_trg_table}'",
+								"type": "Expression"
+							},
 							"p_init_load": {
 								"value": "@not(activity('GetTargetDeltaMetadata').output.exists)",
 								"type": "Expression"
 							},
-							"c_trg_container": "'template'",
-							"c_trg_root_folder": "'StarSchemaObjects'"
+							"c_trg_container": {
+								"value": "'@{pipeline().parameters.c_trg_container}'",
+								"type": "Expression"
+							},
+							"c_trg_root_folder": {
+								"value": "'@{pipeline().parameters.c_trg_root_folder}'",
+								"type": "Expression"
+							}
 						},
 						"datasetParameters": {
 							"DataSource": {
