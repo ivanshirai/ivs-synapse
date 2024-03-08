@@ -1,0 +1,20 @@
+{
+	"name": "Template_cur_source",
+	"properties": {
+		"folder": {
+			"name": "Serverless Deploy"
+		},
+		"content": {
+			"query": "IF NOT EXISTS (SELECT * FROM sys.external_data_sources WHERE name = 'TemplateCuratedSource') \n\tCREATE EXTERNAL DATA SOURCE [TemplateCuratedSourceTemplateCuratedSource] \n\tWITH (\n\t\tLOCATION = 'https://ivscur.blob.core.windows.net/template',\n\t\tCREDENTIAL = [SynapseIdentity] \n\t)\n",
+			"metadata": {
+				"language": "sql"
+			},
+			"currentConnection": {
+				"databaseName": "templateDB",
+				"poolName": "Built-in"
+			},
+			"resultLimit": 5000
+		},
+		"type": "SqlQuery"
+	}
+}
