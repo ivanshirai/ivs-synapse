@@ -120,6 +120,7 @@
 					],
 					"storeSettings": {
 						"type": "AzureBlobFSReadSettings",
+						"recursive": true,
 						"enablePartitionDiscovery": false
 					},
 					"formatSettings": {
@@ -296,7 +297,7 @@
 				}
 			},
 			{
-				"name": "createView",
+				"name": "createTmpView",
 				"type": "Script",
 				"dependsOn": [
 					{
