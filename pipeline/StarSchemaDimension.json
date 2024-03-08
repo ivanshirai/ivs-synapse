@@ -329,7 +329,7 @@
 						{
 							"type": "Query",
 							"text": {
-								"value": "create or alter view \n@{pipeline().parameters.p_trg_table}\nas select * from OPENROWSET(\n\tBULK '@{activity('GenericCuratedParquet linked service').output.properties.typeProperties.url}@{pipeline().parameters.c_trg_container}/@{pipeline().parameters.c_trg_root_folder}/@{pipeline().parameters.p_trg_table}',\n\tFORMAT = 'Delta'\n) as r",
+								"value": "create or alter view \n@{pipeline().parameters.p_trg_table}_tmp\nas select * from OPENROWSET(\n\tBULK '@{activity('GenericCuratedParquet linked service').output.properties.typeProperties.url}@{pipeline().parameters.c_trg_container}/@{pipeline().parameters.c_trg_root_folder}/@{pipeline().parameters.p_trg_table}',\n\tFORMAT = 'Delta'\n) as r",
 								"type": "Expression"
 							}
 						}
