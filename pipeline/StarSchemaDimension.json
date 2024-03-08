@@ -224,7 +224,7 @@
 							"typeProperties": {
 								"variableName": "v_datetime_from",
 								"value": {
-									"value": "@activity('DatetimeFrom').output.resultSets.rows[0].CDCTimestamp",
+									"value": "@activity('DatetimeFrom').output.resultSets[0].rows[0].CDCTimestamp",
 									"type": "Expression"
 								}
 							}
