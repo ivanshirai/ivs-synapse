@@ -38,7 +38,7 @@
 							"p_src_schema": "'enr'",
 							"p_src_object": "'dataflows_REST_API'",
 							"p_datetime_from": {
-								"value": "'@{pipeline().parameters.p_datetime_from}'",
+								"value": "'@{variables('v_datetime_from')}'",
 								"type": "Expression"
 							},
 							"p_trg_table": "'DimDataflows'",
@@ -147,9 +147,89 @@
 				"userProperties": [],
 				"typeProperties": {
 					"expression": {
-						"value": "@activity('GetTargetDeltaMetadata').output.exists",
+						"value": "@and(activity('GetTargetDeltaMetadata').output.exists, not(empty(pipeline().parameters.p_src_cdc_col)))",
 						"type": "Expression"
-					}
+					},
+					"ifFalseActivities": [
+						{
+							"name": "Set v_datetime_from False",
+							"type": "SetVariable",
+							"dependsOn": [],
+							"policy": {
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "v_datetime_from",
+								"value": {
+									"value": "@pipeline().parameters.p_datetime_from",
+									"type": "Expression"
+								}
+							}
+						}
+					],
+					"ifTrueActivities": [
+						{
+							"name": "DatetimeFrom",
+							"type": "Script",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 2,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"linkedServiceName": {
+								"referenceName": "serverless_ARIR",
+								"type": "LinkedServiceReference",
+								"parameters": {
+									"p_database": {
+										"value": "@pipeline().parameters.c_serverless_db",
+										"type": "Expression"
+									}
+								}
+							},
+							"typeProperties": {
+								"scripts": [
+									{
+										"type": "Query",
+										"text": {
+											"value": "@if(empty(pipeline().parameters.p_datetime_from),\n    concat('select max(', pipeline().parameters.p_src_cdc_col, ') as CDCTimestamp from openrowset( bulk ''',activity('GenericEnrichedParquet linked service').output.properties.typeProperties.url, pipeline().parameters.c_trg_container, '/', pipeline().parameters.c_trg_root_folder, '/', pipeline().parameters.p_trg_table, ''', format = ''DELTA'') as result'),\n    concat('select ''', replace(replace(replace(replace(replace(\n                    formatDateTime(\n                        pipeline().parameters.p_datetime_from, \n                        'yyyy-MM-ddTHH:mm:ss.fffffffZ'\n                    ), \n                    '0000Z', 'Z'), '000Z', 'Z'), '00Z', 'Z'), '0Z', 'Z'), '.Z', 'Z'\n                ),\n        ''' as CDCTimestamp'\n    )\n)",
+											"type": "Expression"
+										}
+									}
+								],
+								"scriptBlockExecutionTimeout": "02:00:00"
+							}
+						},
+						{
+							"name": "Set v_datetime_from True",
+							"type": "SetVariable",
+							"dependsOn": [
+								{
+									"activity": "DatetimeFrom",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "v_datetime_from",
+								"value": {
+									"value": "@activity('DatetimeFrom').output.resultSets.rows[0].CDCTimestamp",
+									"type": "Expression"
+								}
+							}
+						}
+					]
 				}
 			},
 			{
@@ -235,6 +315,15 @@
 			"c_trg_root_folder": {
 				"type": "string",
 				"defaultValue": "StarSchemaObjects"
+			},
+			"p_src_cdc_col": {
+				"type": "string",
+				"defaultValue": "enrTimestamp"
+			}
+		},
+		"variables": {
+			"v_datetime_from": {
+				"type": "String"
 			}
 		},
 		"folder": {
