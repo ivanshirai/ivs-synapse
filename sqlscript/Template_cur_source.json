@@ -5,7 +5,7 @@
 			"name": "Serverless Deploy"
 		},
 		"content": {
-			"query": "IF NOT EXISTS (SELECT * FROM sys.external_data_sources WHERE name = 'TemplateCuratedSource') \n\tCREATE EXTERNAL DATA SOURCE [TemplateCuratedSourceTemplateCuratedSource] \n\tWITH (\n\t\tLOCATION = 'https://ivscur.blob.core.windows.net/template',\n\t\tCREDENTIAL = [SynapseIdentity] \n\t)\n",
+			"query": "IF NOT EXISTS (SELECT * FROM sys.external_data_sources WHERE name = 'TemplateCuratedSource') \n\tCREATE EXTERNAL DATA SOURCE [TemplateCuratedSource] \n\tWITH (\n\t\tLOCATION = 'https://ivscur.blob.core.windows.net/template',\n\t\tCREDENTIAL = [SynapseIdentity] \n\t)",
 			"metadata": {
 				"language": "sql"
 			},
