@@ -47,7 +47,7 @@
 								"type": "Expression"
 							},
 							"p_partition_formula": {
-								"value": "@pipeline().parameters.p_partition_formula",
+								"value": "@concat('\"', pipeline().parameters.p_partition_formula, '\"')",
 								"type": "Expression"
 							},
 							"c_trg_partition_col": {
