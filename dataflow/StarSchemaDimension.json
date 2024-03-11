@@ -103,7 +103,7 @@
 				"parameters{",
 				"     p_src_key_cols as string[] ([\"name\"]),",
 				"     p_src_cdc_col as string ('enrTimestamp'),",
-				"     p_surrogate_key_col as string ('dataflows_key'),",
+				"     p_surrogate_key_col as string,",
 				"     c_trg_dss_update_col as string ('dss_update_time'),",
 				"     c_trg_dss_create_col as string ('dss_create_time'),",
 				"     p_partition_formula as string (\"'dummy'\"),",
