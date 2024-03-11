@@ -65,6 +65,451 @@
 	},
 	"resources": [
 		{
+			"name": "[concat(parameters('workspaceName'), '/FromDeltaToWideDelta')]",
+			"type": "Microsoft.Synapse/workspaces/pipelines",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"activities": [
+					{
+						"name": "GetTargetDeltaMetadata",
+						"type": "GetMetadata",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 2,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataset": {
+								"referenceName": "GenericEnrichedJsonFolder",
+								"type": "DatasetReference",
+								"parameters": {
+									"p_container": {
+										"value": "@pipeline().parameters.c_trg_container",
+										"type": "Expression"
+									},
+									"p_folder": {
+										"value": "@concat(pipeline().parameters.c_trg_root_folder, '/', pipeline().parameters.c_trg_object)",
+										"type": "Expression"
+									}
+								}
+							},
+							"fieldList": [
+								"exists"
+							],
+							"storeSettings": {
+								"type": "AzureBlobFSReadSettings",
+								"recursive": true,
+								"enablePartitionDiscovery": false
+							},
+							"formatSettings": {
+								"type": "JsonReadSettings"
+							}
+						}
+					},
+					{
+						"name": "EnrichedLakeSettings",
+						"type": "WebActivity",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 2,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"method": "GET",
+							"headers": {},
+							"url": {
+								"value": "@concat('https://', pipeline().DataFactory, '.dev.azuresynapse.net/linkedservices/', pipeline().parameters.c_trg_linked_service, '?api-version=2020-12-01')",
+								"type": "Expression"
+							},
+							"connectVia": {
+								"referenceName": "SHIR",
+								"type": "IntegrationRuntimeReference"
+							},
+							"authentication": {
+								"type": "MSI",
+								"resource": "https://dev.azuresynapse.net/"
+							}
+						}
+					},
+					{
+						"name": "SourceQueryParts",
+						"type": "Script",
+						"dependsOn": [
+							{
+								"activity": "GetTargetDeltaMetadata",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "Set v_cdc",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 2,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"linkedServiceName": {
+							"referenceName": "serverless_ARIR",
+							"type": "LinkedServiceReference",
+							"parameters": {
+								"p_database": {
+									"value": "@pipeline().parameters.c_serverless_db",
+									"type": "Expression"
+								}
+							}
+						},
+						"typeProperties": {
+							"scripts": [
+								{
+									"type": "Query",
+									"text": {
+										"value": "declare @SQLScript nvarchar(max)\n\nwith src as (\nselect *\n   FROM OPENJSON('@{replace(string(pipeline().parameters.p_src_objects), '''', '''''')}') \n   WITH (\n    iteration integer '$.iteration',\n    object NVARCHAR(max) '$.object',\n    dbschema NVARCHAR(max) '$.schema',\n    alias NVARCHAR(max) '$.alias',\n    trgKeyCol NVARCHAR(max) '$.trgKeyCol',\n    cdcCol NVARCHAR(max) '$.cdcCol',\n    selectCols NVARCHAR(max) '$.selectCols',\n    joinCondition NVARCHAR(max) '$.joinCondition',\n    joinType NVARCHAR(max) '$.joinType',\n    joinOrder integer '$.joinOrder')\n),\nkcl as (    select src.*, k.keyCols from src left outer join(select iteration, string_agg(coalesce(alias, object) + '_' + replace(replace(trgKeyCol, ' ', ''), ',', ', ' + coalesce(alias, object) + '_'), ', ') keyCols\n   FROM OPENJSON('@{replace(string(pipeline().parameters.p_src_objects), '''', '''''')}') \n   WITH (\n    iteration integer '$.iteration',\n    object NVARCHAR(max) '$.object',\n    dbschema NVARCHAR(max) '$.schema',\n    alias NVARCHAR(max) '$.alias',\n    trgKeyCol NVARCHAR(max) '$.trgKeyCol',\n    cdcCol NVARCHAR(max) '$.cdcCol',\n    selectCols NVARCHAR(max) '$.selectCols',\n    joinCondition NVARCHAR(max) '$.joinCondition',\n    joinType NVARCHAR(max) '$.joinType',\n    joinOrder integer '$.joinOrder')\n\twhere iteration = 0 group by iteration) k \non 1 = 1),\nrpl as (select kcl.*, r.replace_start, r.replace_end from kcl join\n(select iteration, string_agg('replace(', '') replace_start, \nstring_agg(', ''' + case when left(trim(object), 1) = '(' and right(trim(object), 1) = ')' \nthen alias + '.' else object + '.' end + ''', ''' + coalesce(alias, object) + '.'')', '') replace_end\n   FROM OPENJSON('@{replace(string(pipeline().parameters.p_src_objects), '''', '''''')}') \n   WITH (\n    iteration integer '$.iteration',\n    object NVARCHAR(max) '$.object',\n    dbschema NVARCHAR(max) '$.schema',\n    alias NVARCHAR(max) '$.alias',\n    trgKeyCol NVARCHAR(max) '$.trgKeyCol',\n    cdcCol NVARCHAR(max) '$.cdcCol',\n    selectCols NVARCHAR(max) '$.selectCols',\n    joinCondition NVARCHAR(max) '$.joinCondition',\n    joinType NVARCHAR(max) '$.joinType',\n    joinOrder integer '$.joinOrder')\n\tgroup by iteration) r\n\ton r.iteration = kcl.iteration)\nselect @SQLScript = STRING_AGG(cast(SQLScript as nvarchar(max)), ' union ') from (\nselect 'select ' + cast(rpl.iteration as varchar(10)) + ' as iteration, ' +\ncoalesce('''' + replace(rpl.object, char(39), char(39) + char(39)) + '''', 'null') + ' as object, ' +\ncoalesce('''' + replace(rpl.dbschema, char(39), char(39) + char(39)) + '''', 'null') + ' as dbschema, ' +\ncoalesce('''' + replace(rpl.alias, char(39), char(39) + char(39)) + '''', 'null') + ' as alias, ' +\ncoalesce('''' + replace(rpl.trgKeyCol, char(39), char(39) + char(39)) + '''', 'null') + ' as trgKeyCol, ' +\ncoalesce('''' + replace(rpl.cdcCol, char(39), char(39) + char(39)) + '''', 'null') + ' as cdcCol, ' +\ncoalesce('''' + replace(rpl.selectCols, char(39), char(39) + char(39)) + '''', 'null') + ' as selectCols, ' +\ncoalesce('''' + replace(rpl.joinCondition, char(39), char(39) + char(39)) + '''', 'null') + ' as joinCondition, ' +\ncoalesce('''' + replace(rpl.joinType, char(39), char(39) + char(39)) + '''', 'null') + ' as joinType, ' +\ncast(rpl.joinOrder as varchar(10)) + ' as joinOrder, ' +\ncoalesce('''' + replace(rpl.replace_start, char(39), char(39) + char(39)) + '''', 'null') + ' as replaceStart, ' +\ncoalesce('''' + replace(rpl.replace_end, char(39), char(39) + char(39)) + '''', 'null') + ' as replaceEnd, ' +\ncoalesce('''' + replace(rpl.keyCols, char(39), char(39) + char(39)) + '''', 'null') + ' as keyColsStatement, ' +\ncoalesce('''' + replace(CASE trim(rpl.selectCols)\n\t\t\t\tWHEN '*' THEN (select string_agg(cast('<obj>.' + c.name + ' as <obj>_' + c.name as nvarchar(max)), ', ') \n\t\t\t\t\tfrom sys.columns c \n\t\t\t\t\tjoin sys.views v on c.object_id = v.object_id\n\t\t\t\t\tjoin sys.schemas s on s.schema_id = v.schema_id\n\t\t\t\t\twhere v.name = rpl.object and s.name = rpl.dbschema)\n\t\t\t\tELSE (select string_agg(cast('<obj>.' + value + ' as <obj>_' + value as nvarchar(max)), ', ') \n\t\t\t\t\tfrom string_split(replace(replace(rpl.selectCols, char(39), char(39) + char(39)), ' ', ''), ',')\n\t\t\t\t\twhere lower(value) <> rpl.cdcCol) + coalesce(', ' + cast('<obj>.' + rpl.cdcCol + ' as <obj>_' + rpl.cdcCol as nvarchar(max)), '') END, '<obj>', coalesce(rpl.alias, rpl.object)) + '''', 'null') + ' as selectStatement, ' +\ncoalesce('''' + CASE WHEN left(trim(object), 1) = '(' and right(trim(object), 1) = ')' \n\t\t\t\tTHEN replace(replace(object, char(39), char(39) + char(39)), '<schema>', rpl.dbschema) + ' ' + alias\n\t\t\t\tELSE replace(rpl.object, rpl.object, rpl.dbschema + '.' + rpl.object + ' as ' + coalesce(rpl.alias, rpl.object)) \n\t\t\t\tEND + '''', 'null') + ' as fromStatement, ' + \ncoalesce('' + rpl.replace_start + char(39) + \nreplace(CASE WHEN rpl.iteration = 0 THEN rpl.joinCondition ELSE replace(rpl.joinCondition, '<trgtab>', '_stg') END, char(39), char(39) + char(39)) + char(39) + rpl.replace_end, 'null') + ' as joinStatement, ' + \ncoalesce('''' + coalesce(alias, object) +'.' + rpl.cdcCol + ' > '''''' + ' + coalesce('cast(max(' + @{if(empty(pipeline().parameters.p_datetime_from), if(activity('GetTargetDeltaMetadata').output.exists, 'dbSys.colName', '''''''1900-01-01'''''''), concat('''', pipeline().parameters.p_datetime_from, ''''))} + ') as varchar(50)) ', '''1900-01-01''') + ' + ''''''''', 'null') + ' as whereStatement' +\ncase when dbSys.colName is null or @{if(activity('GetTargetDeltaMetadata').output.exists, '1=0', '1=1')} then '' else ' from @{pipeline().parameters.c_trg_schema}.@{pipeline().parameters.c_trg_object}' end as SQLScript\nfrom rpl\nleft outer join \n(select c.name as colName, v.name as viewName, s.name as schemaName\nfrom sys.columns c\njoin sys.views v on c.object_id = v.object_id \njoin sys.schemas s on v.schema_id = s.schema_id) dbSys \non dbSys.ColName = coalesce(rpl.alias, rpl.object) + '_' + cdcCol\nand dbSys.schemaName = '@{pipeline().parameters.c_trg_schema}'\nand dbSys.viewName = '@{pipeline().parameters.c_trg_object}') q\n\nexec('select * from (' + @SQLScript + ') q order by iteration, joinOrder')",
+										"type": "Expression"
+									}
+								}
+							],
+							"scriptBlockExecutionTimeout": "02:00:00"
+						}
+					},
+					{
+						"name": "SourceQuery",
+						"type": "Script",
+						"dependsOn": [
+							{
+								"activity": "SourceQueryParts",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 2,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"linkedServiceName": {
+							"referenceName": "serverless_ARIR",
+							"type": "LinkedServiceReference",
+							"parameters": {
+								"p_database": {
+									"value": "@pipeline().parameters.c_serverless_db",
+									"type": "Expression"
+								}
+							}
+						},
+						"typeProperties": {
+							"scripts": [
+								{
+									"type": "Query",
+									"text": {
+										"value": "declare @SQLScript nvarchar(max)\n\nSELECT @SQLScript = STRING_AGG('select ' + cast(iteration as nvarchar(max)) + ' as iteration, ''' \n+ keyCols + ''' as keyCols, ' + sourceQuery + ' as sourceQuery, ' + pruningQuery + ' as pruningQuery', ' union ') FROM (\nSELECT iteration, min(keyColsStatement) as keyCols, '''select '''\n+ coalesce(' + ''@{pipeline().parameters.c_trg_alias}.' + replace(replace(replace(min(case iteration when 0 then null else keyColsStatement end), ' ', ''), ',', ', @{pipeline().parameters.c_trg_alias}.'), char(39), char(39) + char(39)) + ', ''', '')\n+ (' + ''' + replace(STRING_AGG(selectStatement, ', '), char(39), char(39) + char(39)) + '''')\n+ coalesce(' + '', '' + ' + CASE WHEN iteration = 0 THEN min(replaceStart) + ''''\n+ replace('@{replace(pipeline().parameters.c_partition_formula, '''', '''''')}', char(39), char(39) + char(39)) + '''' + min(replaceEnd) ELSE '''@{pipeline().parameters.c_trg_alias}.@{pipeline().parameters.c_trg_partition_col}''' END + ' + '' as @{pipeline().parameters.c_trg_partition_col}''', '')\n+ @{if(empty(pipeline().parameters.c_trg_cdc_col), '', concat(''' + '''', cast(''''''''', variables('v_cdc'), ''''''''' as datetime2) as ', pipeline().parameters.c_trg_cdc_col, ''''''''))}\n+ coalesce(' + '' from ' + CASE WHEN iteration = 0 THEN '' ELSE '@{concat(pipeline().parameters.c_trg_schema, '.', pipeline().parameters.c_trg_object, ' as ', pipeline().parameters.c_trg_alias)} ' END + replace(STRING_AGG(coalesce(coalesce(joinType + ' join ', '') + fromStatement, '')\n+ coalesce(' on ' +  joinStatement, ''), ' '), char(39), char(39) + char(39)) + '''', '')\n+ coalesce(' + '' where (' + replace(STRING_AGG(whereStatement, ' or ') + CASE WHEN iteration = 0 THEN '' ELSE ' or @{pipeline().parameters.c_trg_alias}.@{pipeline().parameters.c_trg_cdc_col} = ''@{variables('v_cdc')}''' END, char(39), char(39) + char(39)) + ')''', '') as sourceQuery,\n'''select distinct(''' + coalesce(' + ' + CASE WHEN iteration = 0 THEN min(replaceStart) + '''' + replace('@{replace(pipeline().parameters.c_partition_formula, '''', '''''')}', char(39), char(39) + char(39)) + '''' + min(replaceEnd) ELSE '''_stg._PARTITION''' END + ' + '') as _PARTITION''', '') \n+ coalesce(' + '' from ' + CASE WHEN iteration = 0 THEN '' ELSE '@{concat(pipeline().parameters.c_trg_schema, '.', pipeline().parameters.c_trg_object, ' as ', pipeline().parameters.c_trg_alias)} ' END + replace(STRING_AGG(coalesce(coalesce(joinType + ' join ', '') + fromStatement, '')\n+ coalesce(' on ' +  joinStatement, ''), ' '), char(39), char(39) + char(39)) + '''', '')\n+ coalesce(' + '' where (' + replace(STRING_AGG(whereStatement, ' or ') + CASE WHEN iteration = 0 THEN '' ELSE ' or @{pipeline().parameters.c_trg_alias}.@{pipeline().parameters.c_trg_cdc_col} = ''@{variables('v_cdc')}''' END, char(39), char(39) + char(39)) + ')''', '') as pruningQuery\nFROM OPENJSON('@{replace(string(activity('SourceQueryParts').output.resultSets[0].rows), '''', '''''')}')\nWITH (\n    iteration integer '$.iteration',\n    object NVARCHAR(max) '$.object',\n    alias NVARCHAR(max) '$.alias',\n    trgKeyCol NVARCHAR(max) '$.trgKeyCol',\n    cdcCol NVARCHAR(max) '$.cdcCol',\n    selectCols NVARCHAR(max) '$.selectCols',\n    joinCondition NVARCHAR(max) '$.joinCondition',\n    joinType NVARCHAR(max) '$.joinType',\n    joinOrder integer '$.joinOrder',\n    replaceStart NVARCHAR(max) '$.replaceStart',\n    replaceEnd NVARCHAR(max) '$.replaceEnd',\n    keyColsStatement NVARCHAR(max) '$.keyColsStatement',\n    selectStatement NVARCHAR(max) '$.selectStatement',\n    fromStatement NVARCHAR(max) '$.fromStatement',\n    joinStatement NVARCHAR(max) '$.joinStatement',\n    whereStatement NVARCHAR(max) '$.whereStatement')\ngroup by iteration\n) q\n\nexec(@SQLScript)",
+										"type": "Expression"
+									}
+								}
+							],
+							"scriptBlockExecutionTimeout": "02:00:00"
+						}
+					},
+					{
+						"name": "Set v_cdc",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "v_cdc",
+							"value": {
+								"value": "@utcNow()",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "ForEachIteration",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "SourceQuery",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "EnrichedLakeSettings",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@activity('SourceQuery').output.resultSets[0].rows",
+								"type": "Expression"
+							},
+							"isSequential": true,
+							"activities": [
+								{
+									"name": "FromDeltaToWideDelta",
+									"type": "ExecuteDataFlow",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 2,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"dataflow": {
+											"referenceName": "FromDeltaToWideDelta",
+											"type": "DataFlowReference",
+											"parameters": {
+												"c_trg_object": {
+													"value": "'@{pipeline().parameters.c_trg_object}'",
+													"type": "Expression"
+												},
+												"c_trg_container": {
+													"value": "'@{pipeline().parameters.c_trg_container}'",
+													"type": "Expression"
+												},
+												"c_trg_root_folder": {
+													"value": "'@{pipeline().parameters.c_trg_root_folder}'",
+													"type": "Expression"
+												},
+												"p_keyCols": {
+													"value": "'@{item().keyCols}'",
+													"type": "Expression"
+												},
+												"p_source_query": {
+													"value": "@concat('\"', item().sourceQuery, '\"')",
+													"type": "Expression"
+												},
+												"p_pruning_query": {
+													"value": "@concat('\"', item().pruningQuery, '\"')",
+													"type": "Expression"
+												},
+												"c_trg_partition_col": {
+													"value": "'@{pipeline().parameters.c_trg_partition_col}'",
+													"type": "Expression"
+												},
+												"p_iteration": {
+													"value": "@item().iteration",
+													"type": "Expression"
+												}
+											},
+											"datasetParameters": {
+												"sourceWide": {
+													"p_database": {
+														"value": "@pipeline().parameters.c_serverless_db",
+														"type": "Expression"
+													},
+													"p_schema": "dbo",
+													"p_table": "dummy"
+												},
+												"sourcePartitionPruning": {
+													"p_database": {
+														"value": "@pipeline().parameters.c_serverless_db",
+														"type": "Expression"
+													},
+													"p_schema": "dbo",
+													"p_table": "dummy"
+												},
+												"sinkWide": {},
+												"sinkPartitionPruning": {}
+											}
+										},
+										"staging": {},
+										"compute": {
+											"coreCount": 8,
+											"computeType": "General"
+										},
+										"traceLevel": "Fine"
+									}
+								},
+								{
+									"name": "CreateTargetView",
+									"type": "Script",
+									"dependsOn": [
+										{
+											"activity": "FromDeltaToWideDelta",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 2,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"linkedServiceName": {
+										"referenceName": "serverless_ARIR",
+										"type": "LinkedServiceReference",
+										"parameters": {
+											"p_database": {
+												"value": "@pipeline().parameters.c_serverless_db",
+												"type": "Expression"
+											}
+										}
+									},
+									"typeProperties": {
+										"scripts": [
+											{
+												"type": "Query",
+												"text": {
+													"value": "create or alter view @{pipeline().parameters.c_trg_schema}.@{pipeline().parameters.c_trg_object} as\nselect * from OPENROWSET(\n        BULK '@{activity('EnrichedLakeSettings').output.properties.typeProperties.url}@{if(endswith(activity('EnrichedLakeSettings').output.properties.typeProperties.url, '/'), '', '/')}@{pipeline().parameters.c_trg_container}/@{pipeline().parameters.c_trg_root_folder}/@{pipeline().parameters.c_trg_object}/',\n        FORMAT = 'DELTA'\n    ) AS [result]",
+													"type": "Expression"
+												}
+											}
+										],
+										"scriptBlockExecutionTimeout": "02:00:00"
+									}
+								}
+							]
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"parameters": {
+					"p_src_objects": {
+						"type": "array",
+						"defaultValue": [
+							{
+								"iteration": 0,
+								"object": "dataflows_datasets_REST_API",
+								"schema": "enr",
+								"alias": "dataflows_datasets",
+								"trgKeyCol": "name,propertiestypePropertiessourcesdatasetreferenceName",
+								"cdcCol": "enrTimestamp",
+								"selectCols": "*",
+								"joinCondition": null,
+								"joinType": null,
+								"joinOrder": 0
+							},
+							{
+								"iteration": 0,
+								"object": "dataflows_REST_API",
+								"schema": "enr",
+								"alias": "dataflows",
+								"trgKeyCol": null,
+								"cdcCol": "enrTimestamp",
+								"selectCols": "*",
+								"joinCondition": "dataflows.name = dataflows_datasets.name",
+								"joinType": "left outer",
+								"joinOrder": 1
+							},
+							{
+								"iteration": 0,
+								"object": "datasets_REST_API",
+								"schema": "enr",
+								"alias": "datasets",
+								"trgKeyCol": null,
+								"cdcCol": "enrTimestamp",
+								"selectCols": "*",
+								"joinCondition": "datasets.name = dataflows_datasets.propertiestypePropertiessourcesdatasetreferenceName",
+								"joinType": "left outer",
+								"joinOrder": 2
+							}
+						]
+					},
+					"p_datetime_from": {
+						"type": "string"
+					},
+					"c_trg_object": {
+						"type": "string",
+						"defaultValue": "dataflows_datasets_WIDE"
+					},
+					"c_trg_container": {
+						"type": "string",
+						"defaultValue": "template"
+					},
+					"c_trg_root_folder": {
+						"type": "string",
+						"defaultValue": "FromDeltaToWideDelta"
+					},
+					"c_serverless_db": {
+						"type": "string",
+						"defaultValue": "templateDB"
+					},
+					"c_trg_schema": {
+						"type": "string",
+						"defaultValue": "enr"
+					},
+					"c_partition_formula": {
+						"type": "string",
+						"defaultValue": "dataflows_datasets_REST_API.DELTA_PARTITION"
+					},
+					"c_trg_partition_col": {
+						"type": "string",
+						"defaultValue": "_PARTITION"
+					},
+					"c_trg_cdc_col": {
+						"type": "string",
+						"defaultValue": "_DSS_UPDATE_TIME"
+					},
+					"c_trg_alias": {
+						"type": "string",
+						"defaultValue": "_stg"
+					},
+					"c_trg_linked_service": {
+						"type": "string",
+						"defaultValue": "templateenrst_ARIR"
+					}
+				},
+				"variables": {
+					"v_master_query_parts": {
+						"type": "Array"
+					},
+					"v_slave_row_count": {
+						"type": "Integer"
+					},
+					"v_cdc": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "Templates"
+				},
+				"annotations": [],
+				"lastPublishTime": "2024-01-24T18:40:41Z"
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/datasets/GenericEnrichedJsonFolder')]",
+				"[concat(variables('workspaceId'), '/integrationRuntimes/SHIR')]",
+				"[concat(variables('workspaceId'), '/linkedServices/serverless_ARIR')]",
+				"[concat(variables('workspaceId'), '/dataflows/FromDeltaToWideDelta')]"
+			]
+		},
+		{
 			"name": "[concat(parameters('workspaceName'), '/FromJsonToDeltaParquet')]",
 			"type": "Microsoft.Synapse/workspaces/pipelines",
 			"apiVersion": "2019-06-01-preview",
@@ -1508,8 +1953,7 @@
 															},
 															"EnrichedDeltaLake": {},
 															"sinkPartitionPruning": {}
-														},
-														"linkedServiceParameters": {}
+														}
 													},
 													"staging": {},
 													"compute": {
@@ -1817,8 +2261,7 @@
 				"[concat(variables('workspaceId'), '/datasets/GenericServerlessSQL')]",
 				"[concat(variables('workspaceId'), '/datasets/GenericRawCSV_NoHeaderNoQuote')]",
 				"[concat(variables('workspaceId'), '/linkedServices/serverless_ARIR')]",
-				"[concat(variables('workspaceId'), '/dataflows/FromParquetToDeltaParquet')]",
-				"[concat(variables('workspaceId'), '/integrationRuntimes/AutoResolveIntegrationRuntime')]"
+				"[concat(variables('workspaceId'), '/dataflows/FromParquetToDeltaParquet')]"
 			]
 		},
 		{
@@ -3916,6 +4359,128 @@
 			]
 		},
 		{
+			"name": "[concat(parameters('workspaceName'), '/GenericCuratedJsonFolder')]",
+			"type": "Microsoft.Synapse/workspaces/datasets",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "templatecurst_ARIR",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"p_container": {
+						"type": "string"
+					},
+					"p_folder": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"type": "Json",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"folderPath": {
+							"value": "@dataset().p_folder",
+							"type": "Expression"
+						},
+						"fileSystem": {
+							"value": "@dataset().p_container",
+							"type": "Expression"
+						}
+					}
+				},
+				"schema": {}
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/linkedServices/templatecurst_ARIR')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/GenericCuratedParquet')]",
+			"type": "Microsoft.Synapse/workspaces/datasets",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "templatecurst_ARIR",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"p_container": {
+						"type": "string"
+					},
+					"p_folder": {
+						"type": "string"
+					},
+					"p_file": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"type": "Parquet",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"fileName": {
+							"value": "@concat(dataset().p_file, '.parquet')",
+							"type": "Expression"
+						},
+						"folderPath": {
+							"value": "@dataset().p_folder",
+							"type": "Expression"
+						},
+						"fileSystem": {
+							"value": "@dataset().p_container",
+							"type": "Expression"
+						}
+					},
+					"compressionCodec": "snappy"
+				},
+				"schema": []
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/linkedServices/templatecurst_ARIR')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/GenericEnrichedJsonFolder')]",
+			"type": "Microsoft.Synapse/workspaces/datasets",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "templateenrst_ARIR",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"p_container": {
+						"type": "string"
+					},
+					"p_folder": {
+						"type": "string"
+					}
+				},
+				"annotations": [],
+				"type": "Json",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"folderPath": {
+							"value": "@dataset().p_folder",
+							"type": "Expression"
+						},
+						"fileSystem": {
+							"value": "@dataset().p_container",
+							"type": "Expression"
+						}
+					}
+				},
+				"schema": {}
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/linkedServices/templateenrst_ARIR')]"
+			]
+		},
+		{
 			"name": "[concat(parameters('workspaceName'), '/GenericEnrichedParquet')]",
 			"type": "Microsoft.Synapse/workspaces/datasets",
 			"apiVersion": "2019-06-01-preview",
@@ -4968,6 +5533,120 @@
 				"typeProperties": {}
 			},
 			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/FromDeltaToWideDelta')]",
+			"type": "Microsoft.Synapse/workspaces/dataflows",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"folder": {
+					"name": "Audit"
+				},
+				"type": "MappingDataFlow",
+				"typeProperties": {
+					"sources": [
+						{
+							"dataset": {
+								"referenceName": "GenericServerlessSQL",
+								"type": "DatasetReference"
+							},
+							"name": "sourceWide"
+						},
+						{
+							"dataset": {
+								"referenceName": "GenericServerlessSQL",
+								"type": "DatasetReference"
+							},
+							"name": "sourcePartitionPruning"
+						}
+					],
+					"sinks": [
+						{
+							"linkedService": {
+								"referenceName": "templateenrst_ARIR",
+								"type": "LinkedServiceReference"
+							},
+							"name": "sinkWide"
+						},
+						{
+							"name": "sinkPartitionPruning"
+						}
+					],
+					"transformations": [
+						{
+							"name": "alterRowWide"
+						},
+						{
+							"name": "derivedWide"
+						}
+					],
+					"scriptLines": [
+						"parameters{",
+						"     c_trg_object as string ('dataflows_datasets_WIDE'),",
+						"     c_trg_container as string ('template'),",
+						"     c_trg_root_folder as string ('FromDeltaToWideDelta'),",
+						"     p_keyCols as string ('dataflows_datasets_name, dataflows_datasets_propertiestypePropertiessourcesdatasetreferenceName'),",
+						"     p_source_query as string (\"select dataflows_datasets.DELTA_PARTITION as dataflows_datasets_DELTA_PARTITION, dataflows_datasets.enrTimestamp as dataflows_datasets_enrTimestamp, dataflows_datasets.name as dataflows_datasets_name, dataflows_datasets.propertiestypePropertiessourcesdatasetreferenceName as dataflows_datasets_propertiestypePropertiessourcesdatasetreferenceName, dataflows_datasets.rawTimestamp as dataflows_datasets_rawTimestamp, dataflows.DELTA_PARTITION as dataflows_DELTA_PARTITION, dataflows.enrTimestamp as dataflows_enrTimestamp, dataflows.etag as dataflows_etag, dataflows.id as dataflows_id, dataflows.name as dataflows_name, dataflows.rawTimestamp as dataflows_rawTimestamp, dataflows.type as dataflows_type, datasets.DELTA_PARTITION as datasets_DELTA_PARTITION, datasets.enrTimestamp as datasets_enrTimestamp, datasets.etag as datasets_etag, datasets.id as datasets_id, datasets.name as datasets_name, datasets.rawTimestamp as datasets_rawTimestamp, datasets.type as datasets_type, dataflows_datasets.DELTA_PARTITION as _PARTITION, cast('2024-03-07T14:10:09.9058210Z' as datetime2) as _DSS_UPDATE_TIME from enr.dataflows_datasets_REST_API as dataflows_datasets left outer join enr.dataflows_REST_API as dataflows on dataflows.name = dataflows_datasets.name left outer join enr.datasets_REST_API as datasets on datasets.name = dataflows_datasets.propertiestypePropertiessourcesdatasetreferenceName where (dataflows_datasets.enrTimestamp > '1900-01-01' or dataflows.enrTimestamp > '1900-01-01' or datasets.enrTimestamp > '1900-01-01')\"),",
+						"     p_pruning_query as string (\"select distinct(dataflows_datasets.DELTA_PARTITION) as _PARTITION from enr.dataflows_datasets_REST_API as dataflows_datasets left outer join enr.dataflows_REST_API as dataflows on dataflows.name = dataflows_datasets.name left outer join enr.datasets_REST_API as datasets on datasets.name = dataflows_datasets.propertiestypePropertiessourcesdatasetreferenceName where (dataflows_datasets.enrTimestamp > '1900-01-01' or dataflows.enrTimestamp > '1900-01-01' or datasets.enrTimestamp > '1900-01-01')\"),",
+						"     c_trg_partition_col as string ('_PARTITION'),",
+						"     p_iteration as integer (0)",
+						"}",
+						"source(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     isolationLevel: 'READ_UNCOMMITTED',",
+						"     query: ($p_source_query),",
+						"     format: 'query',",
+						"     staged: false) ~> sourceWide",
+						"source(output(",
+						"          PartitionPruning as string",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     isolationLevel: 'READ_UNCOMMITTED',",
+						"     query: (\"select distinct \" + $c_trg_partition_col + \" as PartitionPruning from (select 'dummy' as \" + $c_trg_partition_col + \" union \" + $p_pruning_query + \") q\"),",
+						"     format: 'query',",
+						"     staged: false) ~> sourcePartitionPruning",
+						"derivedWide alterRow(upsertIf($p_iteration==0),",
+						"     updateIf($p_iteration!=0)) ~> alterRowWide",
+						"sourceWide derive({_PARTITION} = byName($c_trg_partition_col)) ~> derivedWide",
+						"alterRowWide sink(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     format: 'delta',",
+						"     fileSystem: ($c_trg_container),",
+						"     folderPath: ($c_trg_root_folder + \"/\" + $c_trg_object),",
+						"     mergeSchema: false,",
+						"     autoCompact: false,",
+						"     optimizedWrite: false,",
+						"     vacuum: 0,",
+						"     deletable: false,",
+						"     insertable: true,",
+						"     updateable: false,",
+						"     upsertable: false,",
+						"     pruneCondition: ['_PARTITION' -> (sinkPartitionPruning#outputs().PartitionPruning)],",
+						"     umask: 0022,",
+						"     preCommands: [],",
+						"     postCommands: [],",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true,",
+						"     saveOrder: 2,",
+						"     partitionBy('key',",
+						"          0,",
+						"          {_PARTITION}",
+						"     )) ~> sinkWide",
+						"sourcePartitionPruning sink(validateSchema: false,",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true,",
+						"     store: 'cache',",
+						"     format: 'inline',",
+						"     output: false,",
+						"     saveOrder: 1) ~> sinkPartitionPruning"
+					]
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/datasets/GenericServerlessSQL')]",
+				"[concat(variables('workspaceId'), '/linkedServices/templateenrst_ARIR')]"
+			]
 		},
 		{
 			"name": "[concat(parameters('workspaceName'), '/FromJsonToDeltaParquet_Basic')]",
@@ -6043,6 +6722,29 @@
 						"databaseName": "ivs_sqlpool",
 						"poolName": "ivs_sqlpool"
 					}
+				},
+				"type": "SqlQuery"
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/Template_cur_source')]",
+			"type": "Microsoft.Synapse/workspaces/sqlscripts",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"folder": {
+					"name": "Serverless Deploy"
+				},
+				"content": {
+					"query": "IF NOT EXISTS (SELECT * FROM sys.external_data_sources WHERE name = 'TemplateCuratedSource') \n\tCREATE EXTERNAL DATA SOURCE [TemplateCuratedSource] \n\tWITH (\n\t\tLOCATION = 'https://ivscur.blob.core.windows.net/template',\n\t\tCREDENTIAL = [SynapseIdentity] \n\t)",
+					"metadata": {
+						"language": "sql"
+					},
+					"currentConnection": {
+						"databaseName": "templateDB",
+						"poolName": "Built-in"
+					},
+					"resultLimit": 5000
 				},
 				"type": "SqlQuery"
 			},
@@ -9182,603 +9884,27 @@
 			"location": "westus"
 		},
 		{
-			"name": "[concat(parameters('workspaceName'), '/GenericEnrichedJsonFolder')]",
-			"type": "Microsoft.Synapse/workspaces/datasets",
-			"apiVersion": "2019-06-01-preview",
-			"properties": {
-				"linkedServiceName": {
-					"referenceName": "templateenrst_ARIR",
-					"type": "LinkedServiceReference"
-				},
-				"parameters": {
-					"p_container": {
-						"type": "string"
-					},
-					"p_folder": {
-						"type": "string"
-					}
-				},
-				"annotations": [],
-				"type": "Json",
-				"typeProperties": {
-					"location": {
-						"type": "AzureBlobFSLocation",
-						"folderPath": {
-							"value": "@dataset().p_folder",
-							"type": "Expression"
-						},
-						"fileSystem": {
-							"value": "@dataset().p_container",
-							"type": "Expression"
-						}
-					}
-				},
-				"schema": {}
-			},
-			"dependsOn": [
-				"[concat(variables('workspaceId'), '/linkedServices/templateenrst_ARIR')]"
-			]
-		},
-		{
-			"name": "[concat(parameters('workspaceName'), '/FromDeltaToWideDelta')]",
-			"type": "Microsoft.Synapse/workspaces/dataflows",
+			"name": "[concat(parameters('workspaceName'), '/Template_delta_format')]",
+			"type": "Microsoft.Synapse/workspaces/sqlscripts",
 			"apiVersion": "2019-06-01-preview",
 			"properties": {
 				"folder": {
-					"name": "Audit"
+					"name": "Serverless Deploy"
 				},
-				"type": "MappingDataFlow",
-				"typeProperties": {
-					"sources": [
-						{
-							"dataset": {
-								"referenceName": "GenericServerlessSQL",
-								"type": "DatasetReference"
-							},
-							"name": "sourceWide"
-						},
-						{
-							"dataset": {
-								"referenceName": "GenericServerlessSQL",
-								"type": "DatasetReference"
-							},
-							"name": "sourcePartitionPruning"
-						}
-					],
-					"sinks": [
-						{
-							"linkedService": {
-								"referenceName": "templateenrst_ARIR",
-								"type": "LinkedServiceReference"
-							},
-							"name": "sinkWide"
-						},
-						{
-							"name": "sinkPartitionPruning"
-						}
-					],
-					"transformations": [
-						{
-							"name": "alterRowWide"
-						},
-						{
-							"name": "derivedWide"
-						}
-					],
-					"scriptLines": [
-						"parameters{",
-						"     c_trg_object as string ('dataflows_datasets_WIDE'),",
-						"     c_trg_container as string ('template'),",
-						"     c_trg_root_folder as string ('FromDeltaToWideDelta'),",
-						"     p_keyCols as string ('dataflows_datasets_name, dataflows_datasets_propertiestypePropertiessourcesdatasetreferenceName'),",
-						"     p_source_query as string (\"select dataflows_datasets.DELTA_PARTITION as dataflows_datasets_DELTA_PARTITION, dataflows_datasets.enrTimestamp as dataflows_datasets_enrTimestamp, dataflows_datasets.name as dataflows_datasets_name, dataflows_datasets.propertiestypePropertiessourcesdatasetreferenceName as dataflows_datasets_propertiestypePropertiessourcesdatasetreferenceName, dataflows_datasets.rawTimestamp as dataflows_datasets_rawTimestamp, dataflows.DELTA_PARTITION as dataflows_DELTA_PARTITION, dataflows.enrTimestamp as dataflows_enrTimestamp, dataflows.etag as dataflows_etag, dataflows.id as dataflows_id, dataflows.name as dataflows_name, dataflows.rawTimestamp as dataflows_rawTimestamp, dataflows.type as dataflows_type, datasets.DELTA_PARTITION as datasets_DELTA_PARTITION, datasets.enrTimestamp as datasets_enrTimestamp, datasets.etag as datasets_etag, datasets.id as datasets_id, datasets.name as datasets_name, datasets.rawTimestamp as datasets_rawTimestamp, datasets.type as datasets_type, dataflows_datasets.DELTA_PARTITION as _PARTITION, cast('2024-03-07T14:10:09.9058210Z' as datetime2) as _DSS_UPDATE_TIME from enr.dataflows_datasets_REST_API as dataflows_datasets left outer join enr.dataflows_REST_API as dataflows on dataflows.name = dataflows_datasets.name left outer join enr.datasets_REST_API as datasets on datasets.name = dataflows_datasets.propertiestypePropertiessourcesdatasetreferenceName where (dataflows_datasets.enrTimestamp > '1900-01-01' or dataflows.enrTimestamp > '1900-01-01' or datasets.enrTimestamp > '1900-01-01')\"),",
-						"     p_pruning_query as string (\"select distinct(dataflows_datasets.DELTA_PARTITION) as _PARTITION from enr.dataflows_datasets_REST_API as dataflows_datasets left outer join enr.dataflows_REST_API as dataflows on dataflows.name = dataflows_datasets.name left outer join enr.datasets_REST_API as datasets on datasets.name = dataflows_datasets.propertiestypePropertiessourcesdatasetreferenceName where (dataflows_datasets.enrTimestamp > '1900-01-01' or dataflows.enrTimestamp > '1900-01-01' or datasets.enrTimestamp > '1900-01-01')\"),",
-						"     c_trg_partition_col as string ('_PARTITION'),",
-						"     p_iteration as integer (0)",
-						"}",
-						"source(allowSchemaDrift: true,",
-						"     validateSchema: false,",
-						"     isolationLevel: 'READ_UNCOMMITTED',",
-						"     query: ($p_source_query),",
-						"     format: 'query',",
-						"     staged: false) ~> sourceWide",
-						"source(output(",
-						"          PartitionPruning as string",
-						"     ),",
-						"     allowSchemaDrift: true,",
-						"     validateSchema: false,",
-						"     isolationLevel: 'READ_UNCOMMITTED',",
-						"     query: (\"select distinct \" + $c_trg_partition_col + \" as PartitionPruning from (select 'dummy' as \" + $c_trg_partition_col + \" union \" + $p_pruning_query + \") q\"),",
-						"     format: 'query',",
-						"     staged: false) ~> sourcePartitionPruning",
-						"derivedWide alterRow(upsertIf($p_iteration==0),",
-						"     updateIf($p_iteration!=0)) ~> alterRowWide",
-						"sourceWide derive({_PARTITION} = byName($c_trg_partition_col)) ~> derivedWide",
-						"alterRowWide sink(allowSchemaDrift: true,",
-						"     validateSchema: false,",
-						"     format: 'delta',",
-						"     fileSystem: ($c_trg_container),",
-						"     folderPath: ($c_trg_root_folder + \"/\" + $c_trg_object),",
-						"     mergeSchema: false,",
-						"     autoCompact: false,",
-						"     optimizedWrite: false,",
-						"     vacuum: 0,",
-						"     deletable: false,",
-						"     insertable: true,",
-						"     updateable: false,",
-						"     upsertable: false,",
-						"     pruneCondition: ['_PARTITION' -> (sinkPartitionPruning#outputs().PartitionPruning)],",
-						"     umask: 0022,",
-						"     preCommands: [],",
-						"     postCommands: [],",
-						"     skipDuplicateMapInputs: true,",
-						"     skipDuplicateMapOutputs: true,",
-						"     saveOrder: 2,",
-						"     partitionBy('key',",
-						"          0,",
-						"          {_PARTITION}",
-						"     )) ~> sinkWide",
-						"sourcePartitionPruning sink(validateSchema: false,",
-						"     skipDuplicateMapInputs: true,",
-						"     skipDuplicateMapOutputs: true,",
-						"     store: 'cache',",
-						"     format: 'inline',",
-						"     output: false,",
-						"     saveOrder: 1) ~> sinkPartitionPruning"
-					]
-				}
+				"content": {
+					"query": "IF NOT EXISTS (SELECT * FROM sys.external_file_formats WHERE name = 'Delta') \n\tCREATE EXTERNAL FILE FORMAT Delta\n\tWITH (\n\t\tFORMAT_TYPE = DELTA\n\t)",
+					"metadata": {
+						"language": "sql"
+					},
+					"currentConnection": {
+						"databaseName": "templateDB",
+						"poolName": "Built-in"
+					},
+					"resultLimit": 5000
+				},
+				"type": "SqlQuery"
 			},
-			"dependsOn": [
-				"[concat(variables('workspaceId'), '/datasets/GenericServerlessSQL')]",
-				"[concat(variables('workspaceId'), '/linkedServices/templateenrst_ARIR')]"
-			]
-		},
-		{
-			"name": "[concat(parameters('workspaceName'), '/FromDeltaToWideDelta')]",
-			"type": "Microsoft.Synapse/workspaces/pipelines",
-			"apiVersion": "2019-06-01-preview",
-			"properties": {
-				"activities": [
-					{
-						"name": "GetTargetDeltaMetadata",
-						"type": "GetMetadata",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 2,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"dataset": {
-								"referenceName": "GenericEnrichedJsonFolder",
-								"type": "DatasetReference",
-								"parameters": {
-									"p_container": {
-										"value": "@pipeline().parameters.c_trg_container",
-										"type": "Expression"
-									},
-									"p_folder": {
-										"value": "@concat(pipeline().parameters.c_trg_root_folder, '/', pipeline().parameters.c_trg_object)",
-										"type": "Expression"
-									}
-								}
-							},
-							"fieldList": [
-								"exists"
-							],
-							"storeSettings": {
-								"type": "AzureBlobFSReadSettings",
-								"recursive": true,
-								"enablePartitionDiscovery": false
-							},
-							"formatSettings": {
-								"type": "JsonReadSettings"
-							}
-						}
-					},
-					{
-						"name": "EnrichedLakeSettings",
-						"type": "WebActivity",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 2,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"method": "GET",
-							"headers": {},
-							"url": {
-								"value": "@concat('https://', pipeline().DataFactory, '.dev.azuresynapse.net/linkedservices/', pipeline().parameters.c_trg_linked_service, '?api-version=2020-12-01')",
-								"type": "Expression"
-							},
-							"connectVia": {
-								"referenceName": "SHIR",
-								"type": "IntegrationRuntimeReference"
-							},
-							"authentication": {
-								"type": "MSI",
-								"resource": "https://dev.azuresynapse.net/"
-							}
-						}
-					},
-					{
-						"name": "SourceQueryParts",
-						"type": "Script",
-						"dependsOn": [
-							{
-								"activity": "GetTargetDeltaMetadata",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							},
-							{
-								"activity": "Set v_cdc",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 2,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"linkedServiceName": {
-							"referenceName": "serverless_ARIR",
-							"type": "LinkedServiceReference",
-							"parameters": {
-								"p_database": {
-									"value": "@pipeline().parameters.c_serverless_db",
-									"type": "Expression"
-								}
-							}
-						},
-						"typeProperties": {
-							"scripts": [
-								{
-									"type": "Query",
-									"text": {
-										"value": "declare @SQLScript nvarchar(max)\n\nwith src as (\nselect *\n   FROM OPENJSON('@{replace(string(pipeline().parameters.p_src_objects), '''', '''''')}') \n   WITH (\n    iteration integer '$.iteration',\n    object NVARCHAR(max) '$.object',\n    dbschema NVARCHAR(max) '$.schema',\n    alias NVARCHAR(max) '$.alias',\n    trgKeyCol NVARCHAR(max) '$.trgKeyCol',\n    cdcCol NVARCHAR(max) '$.cdcCol',\n    selectCols NVARCHAR(max) '$.selectCols',\n    joinCondition NVARCHAR(max) '$.joinCondition',\n    joinType NVARCHAR(max) '$.joinType',\n    joinOrder integer '$.joinOrder')\n),\nkcl as (    select src.*, k.keyCols from src left outer join(select iteration, string_agg(coalesce(alias, object) + '_' + replace(replace(trgKeyCol, ' ', ''), ',', ', ' + coalesce(alias, object) + '_'), ', ') keyCols\n   FROM OPENJSON('@{replace(string(pipeline().parameters.p_src_objects), '''', '''''')}') \n   WITH (\n    iteration integer '$.iteration',\n    object NVARCHAR(max) '$.object',\n    dbschema NVARCHAR(max) '$.schema',\n    alias NVARCHAR(max) '$.alias',\n    trgKeyCol NVARCHAR(max) '$.trgKeyCol',\n    cdcCol NVARCHAR(max) '$.cdcCol',\n    selectCols NVARCHAR(max) '$.selectCols',\n    joinCondition NVARCHAR(max) '$.joinCondition',\n    joinType NVARCHAR(max) '$.joinType',\n    joinOrder integer '$.joinOrder')\n\twhere iteration = 0 group by iteration) k \non 1 = 1),\nrpl as (select kcl.*, r.replace_start, r.replace_end from kcl join\n(select iteration, string_agg('replace(', '') replace_start, \nstring_agg(', ''' + case when left(trim(object), 1) = '(' and right(trim(object), 1) = ')' \nthen alias + '.' else object + '.' end + ''', ''' + coalesce(alias, object) + '.'')', '') replace_end\n   FROM OPENJSON('@{replace(string(pipeline().parameters.p_src_objects), '''', '''''')}') \n   WITH (\n    iteration integer '$.iteration',\n    object NVARCHAR(max) '$.object',\n    dbschema NVARCHAR(max) '$.schema',\n    alias NVARCHAR(max) '$.alias',\n    trgKeyCol NVARCHAR(max) '$.trgKeyCol',\n    cdcCol NVARCHAR(max) '$.cdcCol',\n    selectCols NVARCHAR(max) '$.selectCols',\n    joinCondition NVARCHAR(max) '$.joinCondition',\n    joinType NVARCHAR(max) '$.joinType',\n    joinOrder integer '$.joinOrder')\n\tgroup by iteration) r\n\ton r.iteration = kcl.iteration)\nselect @SQLScript = STRING_AGG(cast(SQLScript as nvarchar(max)), ' union ') from (\nselect 'select ' + cast(rpl.iteration as varchar(10)) + ' as iteration, ' +\ncoalesce('''' + replace(rpl.object, char(39), char(39) + char(39)) + '''', 'null') + ' as object, ' +\ncoalesce('''' + replace(rpl.dbschema, char(39), char(39) + char(39)) + '''', 'null') + ' as dbschema, ' +\ncoalesce('''' + replace(rpl.alias, char(39), char(39) + char(39)) + '''', 'null') + ' as alias, ' +\ncoalesce('''' + replace(rpl.trgKeyCol, char(39), char(39) + char(39)) + '''', 'null') + ' as trgKeyCol, ' +\ncoalesce('''' + replace(rpl.cdcCol, char(39), char(39) + char(39)) + '''', 'null') + ' as cdcCol, ' +\ncoalesce('''' + replace(rpl.selectCols, char(39), char(39) + char(39)) + '''', 'null') + ' as selectCols, ' +\ncoalesce('''' + replace(rpl.joinCondition, char(39), char(39) + char(39)) + '''', 'null') + ' as joinCondition, ' +\ncoalesce('''' + replace(rpl.joinType, char(39), char(39) + char(39)) + '''', 'null') + ' as joinType, ' +\ncast(rpl.joinOrder as varchar(10)) + ' as joinOrder, ' +\ncoalesce('''' + replace(rpl.replace_start, char(39), char(39) + char(39)) + '''', 'null') + ' as replaceStart, ' +\ncoalesce('''' + replace(rpl.replace_end, char(39), char(39) + char(39)) + '''', 'null') + ' as replaceEnd, ' +\ncoalesce('''' + replace(rpl.keyCols, char(39), char(39) + char(39)) + '''', 'null') + ' as keyColsStatement, ' +\ncoalesce('''' + replace(CASE trim(rpl.selectCols)\n\t\t\t\tWHEN '*' THEN (select string_agg(cast('<obj>.' + c.name + ' as <obj>_' + c.name as nvarchar(max)), ', ') \n\t\t\t\t\tfrom sys.columns c \n\t\t\t\t\tjoin sys.views v on c.object_id = v.object_id\n\t\t\t\t\tjoin sys.schemas s on s.schema_id = v.schema_id\n\t\t\t\t\twhere v.name = rpl.object and s.name = rpl.dbschema)\n\t\t\t\tELSE (select string_agg(cast('<obj>.' + value + ' as <obj>_' + value as nvarchar(max)), ', ') \n\t\t\t\t\tfrom string_split(replace(replace(rpl.selectCols, char(39), char(39) + char(39)), ' ', ''), ',')\n\t\t\t\t\twhere lower(value) <> rpl.cdcCol) + coalesce(', ' + cast('<obj>.' + rpl.cdcCol + ' as <obj>_' + rpl.cdcCol as nvarchar(max)), '') END, '<obj>', coalesce(rpl.alias, rpl.object)) + '''', 'null') + ' as selectStatement, ' +\ncoalesce('''' + CASE WHEN left(trim(object), 1) = '(' and right(trim(object), 1) = ')' \n\t\t\t\tTHEN replace(replace(object, char(39), char(39) + char(39)), '<schema>', rpl.dbschema) + ' ' + alias\n\t\t\t\tELSE replace(rpl.object, rpl.object, rpl.dbschema + '.' + rpl.object + ' as ' + coalesce(rpl.alias, rpl.object)) \n\t\t\t\tEND + '''', 'null') + ' as fromStatement, ' + \ncoalesce('' + rpl.replace_start + char(39) + \nreplace(CASE WHEN rpl.iteration = 0 THEN rpl.joinCondition ELSE replace(rpl.joinCondition, '<trgtab>', '_stg') END, char(39), char(39) + char(39)) + char(39) + rpl.replace_end, 'null') + ' as joinStatement, ' + \ncoalesce('''' + coalesce(alias, object) +'.' + rpl.cdcCol + ' > '''''' + ' + coalesce('cast(max(' + @{if(empty(pipeline().parameters.p_datetime_from), if(activity('GetTargetDeltaMetadata').output.exists, 'dbSys.colName', '''''''1900-01-01'''''''), concat('''', pipeline().parameters.p_datetime_from, ''''))} + ') as varchar(50)) ', '''1900-01-01''') + ' + ''''''''', 'null') + ' as whereStatement' +\ncase when dbSys.colName is null or @{if(activity('GetTargetDeltaMetadata').output.exists, '1=0', '1=1')} then '' else ' from @{pipeline().parameters.c_trg_schema}.@{pipeline().parameters.c_trg_object}' end as SQLScript\nfrom rpl\nleft outer join \n(select c.name as colName, v.name as viewName, s.name as schemaName\nfrom sys.columns c\njoin sys.views v on c.object_id = v.object_id \njoin sys.schemas s on v.schema_id = s.schema_id) dbSys \non dbSys.ColName = coalesce(rpl.alias, rpl.object) + '_' + cdcCol\nand dbSys.schemaName = '@{pipeline().parameters.c_trg_schema}'\nand dbSys.viewName = '@{pipeline().parameters.c_trg_object}') q\n\nexec('select * from (' + @SQLScript + ') q order by iteration, joinOrder')",
-										"type": "Expression"
-									}
-								}
-							],
-							"scriptBlockExecutionTimeout": "02:00:00"
-						}
-					},
-					{
-						"name": "SourceQuery",
-						"type": "Script",
-						"dependsOn": [
-							{
-								"activity": "SourceQueryParts",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 2,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"linkedServiceName": {
-							"referenceName": "serverless_ARIR",
-							"type": "LinkedServiceReference",
-							"parameters": {
-								"p_database": {
-									"value": "@pipeline().parameters.c_serverless_db",
-									"type": "Expression"
-								}
-							}
-						},
-						"typeProperties": {
-							"scripts": [
-								{
-									"type": "Query",
-									"text": {
-										"value": "declare @SQLScript nvarchar(max)\n\nSELECT @SQLScript = STRING_AGG('select ' + cast(iteration as nvarchar(max)) + ' as iteration, ''' \n+ keyCols + ''' as keyCols, ' + sourceQuery + ' as sourceQuery, ' + pruningQuery + ' as pruningQuery', ' union ') FROM (\nSELECT iteration, min(keyColsStatement) as keyCols, '''select '''\n+ coalesce(' + ''@{pipeline().parameters.c_trg_alias}.' + replace(replace(replace(min(case iteration when 0 then null else keyColsStatement end), ' ', ''), ',', ', @{pipeline().parameters.c_trg_alias}.'), char(39), char(39) + char(39)) + ', ''', '')\n+ (' + ''' + replace(STRING_AGG(selectStatement, ', '), char(39), char(39) + char(39)) + '''')\n+ coalesce(' + '', '' + ' + CASE WHEN iteration = 0 THEN min(replaceStart) + ''''\n+ replace('@{replace(pipeline().parameters.c_partition_formula, '''', '''''')}', char(39), char(39) + char(39)) + '''' + min(replaceEnd) ELSE '''@{pipeline().parameters.c_trg_alias}.@{pipeline().parameters.c_trg_partition_col}''' END + ' + '' as @{pipeline().parameters.c_trg_partition_col}''', '')\n+ @{if(empty(pipeline().parameters.c_trg_cdc_col), '', concat(''' + '''', cast(''''''''', variables('v_cdc'), ''''''''' as datetime2) as ', pipeline().parameters.c_trg_cdc_col, ''''''''))}\n+ coalesce(' + '' from ' + CASE WHEN iteration = 0 THEN '' ELSE '@{concat(pipeline().parameters.c_trg_schema, '.', pipeline().parameters.c_trg_object, ' as ', pipeline().parameters.c_trg_alias)} ' END + replace(STRING_AGG(coalesce(coalesce(joinType + ' join ', '') + fromStatement, '')\n+ coalesce(' on ' +  joinStatement, ''), ' '), char(39), char(39) + char(39)) + '''', '')\n+ coalesce(' + '' where (' + replace(STRING_AGG(whereStatement, ' or ') + CASE WHEN iteration = 0 THEN '' ELSE ' or @{pipeline().parameters.c_trg_alias}.@{pipeline().parameters.c_trg_cdc_col} = ''@{variables('v_cdc')}''' END, char(39), char(39) + char(39)) + ')''', '') as sourceQuery,\n'''select distinct(''' + coalesce(' + ' + CASE WHEN iteration = 0 THEN min(replaceStart) + '''' + replace('@{replace(pipeline().parameters.c_partition_formula, '''', '''''')}', char(39), char(39) + char(39)) + '''' + min(replaceEnd) ELSE '''_stg._PARTITION''' END + ' + '') as _PARTITION''', '') \n+ coalesce(' + '' from ' + CASE WHEN iteration = 0 THEN '' ELSE '@{concat(pipeline().parameters.c_trg_schema, '.', pipeline().parameters.c_trg_object, ' as ', pipeline().parameters.c_trg_alias)} ' END + replace(STRING_AGG(coalesce(coalesce(joinType + ' join ', '') + fromStatement, '')\n+ coalesce(' on ' +  joinStatement, ''), ' '), char(39), char(39) + char(39)) + '''', '')\n+ coalesce(' + '' where (' + replace(STRING_AGG(whereStatement, ' or ') + CASE WHEN iteration = 0 THEN '' ELSE ' or @{pipeline().parameters.c_trg_alias}.@{pipeline().parameters.c_trg_cdc_col} = ''@{variables('v_cdc')}''' END, char(39), char(39) + char(39)) + ')''', '') as pruningQuery\nFROM OPENJSON('@{replace(string(activity('SourceQueryParts').output.resultSets[0].rows), '''', '''''')}')\nWITH (\n    iteration integer '$.iteration',\n    object NVARCHAR(max) '$.object',\n    alias NVARCHAR(max) '$.alias',\n    trgKeyCol NVARCHAR(max) '$.trgKeyCol',\n    cdcCol NVARCHAR(max) '$.cdcCol',\n    selectCols NVARCHAR(max) '$.selectCols',\n    joinCondition NVARCHAR(max) '$.joinCondition',\n    joinType NVARCHAR(max) '$.joinType',\n    joinOrder integer '$.joinOrder',\n    replaceStart NVARCHAR(max) '$.replaceStart',\n    replaceEnd NVARCHAR(max) '$.replaceEnd',\n    keyColsStatement NVARCHAR(max) '$.keyColsStatement',\n    selectStatement NVARCHAR(max) '$.selectStatement',\n    fromStatement NVARCHAR(max) '$.fromStatement',\n    joinStatement NVARCHAR(max) '$.joinStatement',\n    whereStatement NVARCHAR(max) '$.whereStatement')\ngroup by iteration\n) q\n\nexec(@SQLScript)",
-										"type": "Expression"
-									}
-								}
-							],
-							"scriptBlockExecutionTimeout": "02:00:00"
-						}
-					},
-					{
-						"name": "Set v_cdc",
-						"type": "SetVariable",
-						"dependsOn": [],
-						"policy": {
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"variableName": "v_cdc",
-							"value": {
-								"value": "@utcNow()",
-								"type": "Expression"
-							}
-						}
-					},
-					{
-						"name": "ForEachIteration",
-						"type": "ForEach",
-						"dependsOn": [
-							{
-								"activity": "SourceQuery",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							},
-							{
-								"activity": "EnrichedLakeSettings",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"userProperties": [],
-						"typeProperties": {
-							"items": {
-								"value": "@activity('SourceQuery').output.resultSets[0].rows",
-								"type": "Expression"
-							},
-							"isSequential": true,
-							"activities": [
-								{
-									"name": "FromDeltaToWideDelta",
-									"type": "ExecuteDataFlow",
-									"dependsOn": [],
-									"policy": {
-										"timeout": "0.12:00:00",
-										"retry": 2,
-										"retryIntervalInSeconds": 30,
-										"secureOutput": false,
-										"secureInput": false
-									},
-									"userProperties": [],
-									"typeProperties": {
-										"dataflow": {
-											"referenceName": "FromDeltaToWideDelta",
-											"type": "DataFlowReference",
-											"parameters": {
-												"c_trg_object": {
-													"value": "'@{pipeline().parameters.c_trg_object}'",
-													"type": "Expression"
-												},
-												"c_trg_container": {
-													"value": "'@{pipeline().parameters.c_trg_container}'",
-													"type": "Expression"
-												},
-												"c_trg_root_folder": {
-													"value": "'@{pipeline().parameters.c_trg_root_folder}'",
-													"type": "Expression"
-												},
-												"p_keyCols": {
-													"value": "'@{item().keyCols}'",
-													"type": "Expression"
-												},
-												"p_source_query": {
-													"value": "@concat('\"', item().sourceQuery, '\"')",
-													"type": "Expression"
-												},
-												"p_pruning_query": {
-													"value": "@concat('\"', item().pruningQuery, '\"')",
-													"type": "Expression"
-												},
-												"c_trg_partition_col": {
-													"value": "'@{pipeline().parameters.c_trg_partition_col}'",
-													"type": "Expression"
-												},
-												"p_iteration": {
-													"value": "@item().iteration",
-													"type": "Expression"
-												}
-											},
-											"datasetParameters": {
-												"sourceWide": {
-													"p_database": {
-														"value": "@pipeline().parameters.c_serverless_db",
-														"type": "Expression"
-													},
-													"p_schema": "dbo",
-													"p_table": "dummy"
-												},
-												"sourcePartitionPruning": {
-													"p_database": {
-														"value": "@pipeline().parameters.c_serverless_db",
-														"type": "Expression"
-													},
-													"p_schema": "dbo",
-													"p_table": "dummy"
-												},
-												"sinkWide": {},
-												"sinkPartitionPruning": {}
-											},
-											"linkedServiceParameters": {}
-										},
-										"staging": {},
-										"compute": {
-											"coreCount": 8,
-											"computeType": "General"
-										},
-										"traceLevel": "Fine"
-									}
-								},
-								{
-									"name": "CreateTargetView",
-									"type": "Script",
-									"dependsOn": [
-										{
-											"activity": "FromDeltaToWideDelta",
-											"dependencyConditions": [
-												"Succeeded"
-											]
-										}
-									],
-									"policy": {
-										"timeout": "0.12:00:00",
-										"retry": 2,
-										"retryIntervalInSeconds": 30,
-										"secureOutput": false,
-										"secureInput": false
-									},
-									"userProperties": [],
-									"linkedServiceName": {
-										"referenceName": "serverless_ARIR",
-										"type": "LinkedServiceReference",
-										"parameters": {
-											"p_database": {
-												"value": "@pipeline().parameters.c_serverless_db",
-												"type": "Expression"
-											}
-										}
-									},
-									"typeProperties": {
-										"scripts": [
-											{
-												"type": "Query",
-												"text": {
-													"value": "create or alter view @{pipeline().parameters.c_trg_schema}.@{pipeline().parameters.c_trg_object} as\nselect * from OPENROWSET(\n        BULK '@{activity('EnrichedLakeSettings').output.properties.typeProperties.url}@{if(endswith(activity('EnrichedLakeSettings').output.properties.typeProperties.url, '/'), '', '/')}@{pipeline().parameters.c_trg_container}/@{pipeline().parameters.c_trg_root_folder}/@{pipeline().parameters.c_trg_object}/',\n        FORMAT = 'DELTA'\n    ) AS [result]",
-													"type": "Expression"
-												}
-											}
-										],
-										"scriptBlockExecutionTimeout": "02:00:00"
-									}
-								}
-							]
-						}
-					}
-				],
-				"policy": {
-					"elapsedTimeMetric": {}
-				},
-				"parameters": {
-					"p_src_objects": {
-						"type": "array",
-						"defaultValue": [
-							{
-								"iteration": 0,
-								"object": "dataflows_datasets_REST_API",
-								"schema": "enr",
-								"alias": "dataflows_datasets",
-								"trgKeyCol": "name,propertiestypePropertiessourcesdatasetreferenceName",
-								"cdcCol": "enrTimestamp",
-								"selectCols": "*",
-								"joinCondition": null,
-								"joinType": null,
-								"joinOrder": 0
-							},
-							{
-								"iteration": 0,
-								"object": "dataflows_REST_API",
-								"schema": "enr",
-								"alias": "dataflows",
-								"trgKeyCol": null,
-								"cdcCol": "enrTimestamp",
-								"selectCols": "*",
-								"joinCondition": "dataflows.name = dataflows_datasets.name",
-								"joinType": "left outer",
-								"joinOrder": 1
-							},
-							{
-								"iteration": 0,
-								"object": "datasets_REST_API",
-								"schema": "enr",
-								"alias": "datasets",
-								"trgKeyCol": null,
-								"cdcCol": "enrTimestamp",
-								"selectCols": "*",
-								"joinCondition": "datasets.name = dataflows_datasets.propertiestypePropertiessourcesdatasetreferenceName",
-								"joinType": "left outer",
-								"joinOrder": 2
-							}
-						]
-					},
-					"p_datetime_from": {
-						"type": "string"
-					},
-					"c_trg_object": {
-						"type": "string",
-						"defaultValue": "dataflows_datasets_WIDE"
-					},
-					"c_trg_container": {
-						"type": "string",
-						"defaultValue": "template"
-					},
-					"c_trg_root_folder": {
-						"type": "string",
-						"defaultValue": "FromDeltaToWideDelta"
-					},
-					"c_serverless_db": {
-						"type": "string",
-						"defaultValue": "templateDB"
-					},
-					"c_trg_schema": {
-						"type": "string",
-						"defaultValue": "enr"
-					},
-					"c_partition_formula": {
-						"type": "string",
-						"defaultValue": "dataflows_datasets_REST_API.DELTA_PARTITION"
-					},
-					"c_trg_partition_col": {
-						"type": "string",
-						"defaultValue": "_PARTITION"
-					},
-					"c_trg_cdc_col": {
-						"type": "string",
-						"defaultValue": "_DSS_UPDATE_TIME"
-					},
-					"c_trg_alias": {
-						"type": "string",
-						"defaultValue": "_stg"
-					},
-					"c_trg_linked_service": {
-						"type": "string",
-						"defaultValue": "templateenrst_ARIR"
-					}
-				},
-				"variables": {
-					"v_master_query_parts": {
-						"type": "Array"
-					},
-					"v_slave_row_count": {
-						"type": "Integer"
-					},
-					"v_cdc": {
-						"type": "String"
-					}
-				},
-				"folder": {
-					"name": "Templates"
-				},
-				"annotations": [],
-				"lastPublishTime": "2024-01-24T18:40:41Z"
-			},
-			"dependsOn": [
-				"[concat(variables('workspaceId'), '/datasets/GenericEnrichedJsonFolder')]",
-				"[concat(variables('workspaceId'), '/integrationRuntimes/SHIR')]",
-				"[concat(variables('workspaceId'), '/linkedServices/serverless_ARIR')]",
-				"[concat(variables('workspaceId'), '/dataflows/FromDeltaToWideDelta')]",
-				"[concat(variables('workspaceId'), '/integrationRuntimes/AutoResolveIntegrationRuntime')]"
-			]
+			"dependsOn": []
 		},
 		{
 			"name": "[concat(parameters('workspaceName'), '/StarSchemaDimension')]",
@@ -9810,25 +9936,62 @@
 								"referenceName": "StarSchemaDimension",
 								"type": "DataFlowReference",
 								"parameters": {
-									"p_src_key_cols": [
-										"name"
-									],
-									"p_src_cdc_col": "'rawTimestamp'",
-									"p_surrogate_key_col": "'dataflows_key'",
-									"c_trg_dss_update_col": "'dss_update_time'",
-									"c_trg_dss_create_col": "'dss_create_time'",
-									"p_partition_formula": "\"'dummy'\"",
-									"c_trg_partition_col": "'DIM_PARTITION'",
-									"p_src_schema": "'enr'",
-									"p_src_object": "'dataflows_REST_API'",
-									"p_datetime_from": {
-										"value": "'@{pipeline().parameters.p_datetime_from}'",
+									"p_src_key_cols": {
+										"value": "@pipeline().parameters.p_src_key_cols",
 										"type": "Expression"
 									},
-									"p_trg_table": "'DimDataflows'",
-									"p_init_load": "true()",
-									"c_trg_container": "'template'",
-									"c_trg_root_folder": "'StarSchemaObjects'"
+									"p_src_cdc_col": {
+										"value": "'@{pipeline().parameters.p_src_cdc_col}'",
+										"type": "Expression"
+									},
+									"p_surrogate_key_col": {
+										"value": "'@{pipeline().parameters.p_surrogate_key_col}'",
+										"type": "Expression"
+									},
+									"c_trg_dss_update_col": {
+										"value": "'@{pipeline().parameters.c_trg_dss_update_col}'",
+										"type": "Expression"
+									},
+									"c_trg_dss_create_col": {
+										"value": "'@{pipeline().parameters.c_trg_dss_create_col}'",
+										"type": "Expression"
+									},
+									"p_partition_formula": {
+										"value": "@concat('\"', pipeline().parameters.p_partition_formula, '\"')",
+										"type": "Expression"
+									},
+									"c_trg_partition_col": {
+										"value": "'@{pipeline().parameters.c_trg_partition_col}'",
+										"type": "Expression"
+									},
+									"p_src_schema": {
+										"value": "'@{pipeline().parameters.p_src_schema}'",
+										"type": "Expression"
+									},
+									"p_src_object": {
+										"value": "'@{pipeline().parameters.p_src_object}'",
+										"type": "Expression"
+									},
+									"p_datetime_from": {
+										"value": "'@{variables('v_datetime_from')}'",
+										"type": "Expression"
+									},
+									"p_trg_table": {
+										"value": "'@{pipeline().parameters.p_trg_table}'",
+										"type": "Expression"
+									},
+									"p_init_load": {
+										"value": "@not(activity('GetTargetDeltaMetadata').output.exists)",
+										"type": "Expression"
+									},
+									"c_trg_container": {
+										"value": "'@{pipeline().parameters.c_trg_container}'",
+										"type": "Expression"
+									},
+									"c_trg_root_folder": {
+										"value": "'@{pipeline().parameters.c_trg_root_folder}'",
+										"type": "Expression"
+									}
 								},
 								"datasetParameters": {
 									"DataSource": {
@@ -9909,6 +10072,7 @@
 							],
 							"storeSettings": {
 								"type": "AzureBlobFSReadSettings",
+								"recursive": true,
 								"enablePartitionDiscovery": false
 							},
 							"formatSettings": {
@@ -9927,7 +10091,7 @@
 								]
 							},
 							{
-								"activity": "GenericEnrichedParquet linked service",
+								"activity": "GenericCuratedParquet linked service",
 								"dependencyConditions": [
 									"Succeeded"
 								]
@@ -9936,9 +10100,89 @@
 						"userProperties": [],
 						"typeProperties": {
 							"expression": {
-								"value": "@activity('GetTargetDeltaMetadata').output.exists",
+								"value": "@and(activity('GetTargetDeltaMetadata').output.exists, not(empty(pipeline().parameters.p_src_cdc_col)))",
 								"type": "Expression"
-							}
+							},
+							"ifFalseActivities": [
+								{
+									"name": "Set v_datetime_from False",
+									"type": "SetVariable",
+									"dependsOn": [],
+									"policy": {
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "v_datetime_from",
+										"value": {
+											"value": "@pipeline().parameters.p_datetime_from",
+											"type": "Expression"
+										}
+									}
+								}
+							],
+							"ifTrueActivities": [
+								{
+									"name": "DatetimeFrom",
+									"type": "Script",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 2,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"linkedServiceName": {
+										"referenceName": "serverless_ARIR",
+										"type": "LinkedServiceReference",
+										"parameters": {
+											"p_database": {
+												"value": "@pipeline().parameters.c_serverless_db",
+												"type": "Expression"
+											}
+										}
+									},
+									"typeProperties": {
+										"scripts": [
+											{
+												"type": "Query",
+												"text": {
+													"value": "@if(empty(pipeline().parameters.p_datetime_from),\n    concat('select max(', pipeline().parameters.p_src_cdc_col, ') as CDCTimestamp from openrowset( bulk ''',activity('GenericCuratedParquet linked service').output.properties.typeProperties.url, pipeline().parameters.c_trg_container, '/', pipeline().parameters.c_trg_root_folder, '/', pipeline().parameters.p_trg_table, ''', format = ''DELTA'') as result'),\n    concat('select ''', replace(replace(replace(replace(replace(\n                    formatDateTime(\n                        pipeline().parameters.p_datetime_from, \n                        'yyyy-MM-ddTHH:mm:ss.fffffffZ'\n                    ), \n                    '0000Z', 'Z'), '000Z', 'Z'), '00Z', 'Z'), '0Z', 'Z'), '.Z', 'Z'\n                ),\n        ''' as CDCTimestamp'\n    )\n)",
+													"type": "Expression"
+												}
+											}
+										],
+										"scriptBlockExecutionTimeout": "02:00:00"
+									}
+								},
+								{
+									"name": "Set v_datetime_from True",
+									"type": "SetVariable",
+									"dependsOn": [
+										{
+											"activity": "DatetimeFrom",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "v_datetime_from",
+										"value": {
+											"value": "@activity('DatetimeFrom').output.resultSets[0].rows[0].CDCTimestamp",
+											"type": "Expression"
+										}
+									}
+								}
+							]
 						}
 					},
 					{
@@ -9971,7 +10215,7 @@
 						}
 					},
 					{
-						"name": "GenericEnrichedParquet linked service",
+						"name": "GenericCuratedParquet linked service",
 						"type": "WebActivity",
 						"dependsOn": [
 							{
@@ -10005,22 +10249,183 @@
 								"resource": "https://dev.azuresynapse.net/"
 							}
 						}
+					},
+					{
+						"name": "createTmpView",
+						"type": "Script",
+						"dependsOn": [
+							{
+								"activity": "StarSchemaDimension",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 2,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"linkedServiceName": {
+							"referenceName": "serverless_ARIR",
+							"type": "LinkedServiceReference",
+							"parameters": {
+								"p_database": {
+									"value": "@pipeline().parameters.c_serverless_db",
+									"type": "Expression"
+								}
+							}
+						},
+						"typeProperties": {
+							"scripts": [
+								{
+									"type": "Query",
+									"text": {
+										"value": "create or alter view \n@{pipeline().parameters.p_trg_table}_tmp\nas select * from OPENROWSET(\n\tBULK '@{activity('GenericCuratedParquet linked service').output.properties.typeProperties.url}@{pipeline().parameters.c_trg_container}/@{pipeline().parameters.c_trg_root_folder}/@{pipeline().parameters.p_trg_table}',\n\tFORMAT = 'Delta'\n) as r",
+										"type": "Expression"
+									}
+								}
+							],
+							"scriptBlockExecutionTimeout": "02:00:00"
+						}
+					},
+					{
+						"name": "ExternalTableSQL",
+						"type": "Script",
+						"dependsOn": [
+							{
+								"activity": "createTmpView",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"linkedServiceName": {
+							"referenceName": "serverless_ARIR",
+							"type": "LinkedServiceReference",
+							"parameters": {
+								"p_database": {
+									"value": "@pipeline().parameters.c_serverless_db",
+									"type": "Expression"
+								}
+							}
+						},
+						"typeProperties": {
+							"scripts": [
+								{
+									"type": "Query",
+									"text": {
+										"value": "select 'CREATE EXTERNAL TABLE ' +\n'@{pipeline().parameters.p_trg_table} (' + \nchar(10) +\nSTRING_AGG('[' + \ncast(colName as varchar(max)) + '] ' + \ndataType, ',' + char(10)) \nWITHIN GROUP (ORDER BY column_id ASC) + char(10) +\n') WITH (LOCATION = ''@{pipeline().parameters.c_trg_root_folder}/@{pipeline().parameters.p_trg_table}'', DATA_SOURCE = @{pipeline().parameters.c_cur_data_source},  FILE_FORMAT = Delta)' as SQL\nfrom (select \nc.name colName, coalesce(r.dataType,\nCASE \n      WHEN t.[name] IN ('varchar', 'char', 'varbinary') THEN t.[name] + '(' + IIF(c.max_length = -1, 'max', CAST(c.max_length AS VARCHAR(25))) + ')' \n      WHEN t.[name] IN ('nvarchar','nchar') THEN t.[name] + '(' + IIF(c.max_length = -1, 'max', CAST(c.max_length / 2 AS VARCHAR(25)))+ ')'      \n      WHEN t.[name] IN ('decimal', 'numeric') THEN t.[name] + '(' + CAST(c.[precision] AS VARCHAR(25)) + ', ' + CAST(c.[scale] AS VARCHAR(25)) + ')'\n      WHEN t.[name] IN ('datetime2') THEN t.[name] + '(' + CAST(c.[scale] AS VARCHAR(25)) + ')'\n      ELSE t.[name]\nEND) AS dataType,\nc.column_id\nfrom sys.columns c\njoin sys.views v on v.object_id = c.object_id\njoin sys.schemas s on s.schema_id = v.schema_id\njoin sys.types t on c.user_type_id = t.user_type_id \nleft outer join \n@{if(empty(pipeline().parameters.p_data_type_replace), \n'(select null col, null dataType) r',\nconcat('(select * from OpenJson(N''',\nstring(pipeline().parameters.p_data_type_replace),\n''') WITH (col varchar(255), dataType varchar(255)) as r) r'))}\non r.col = c.name\nwhere s.name = 'dbo' and c.name <> '@{pipeline().parameters.c_trg_partition_col}' and v.name = \n'@{pipeline().parameters.p_trg_table}_tmp') q",
+										"type": "Expression"
+									}
+								}
+							],
+							"scriptBlockExecutionTimeout": "02:00:00"
+						}
+					},
+					{
+						"name": "CreateExternalTable",
+						"type": "Script",
+						"dependsOn": [
+							{
+								"activity": "ExternalTableSQL",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"linkedServiceName": {
+							"referenceName": "serverless_ARIR",
+							"type": "LinkedServiceReference",
+							"parameters": {
+								"p_database": {
+									"value": "@pipeline().parameters.c_serverless_db",
+									"type": "Expression"
+								}
+							}
+						},
+						"typeProperties": {
+							"scripts": [
+								{
+									"type": "Query",
+									"text": {
+										"value": "begin transaction\n\nif exists (select * from sys.external_tables t join sys.schemas s on s.schema_id = t.schema_id where s.name = 'dbo' and t.name = '@{pipeline().parameters.p_trg_table}')\ndrop external table @{pipeline().parameters.p_trg_table};\n\n@{activity('ExternalTableSQL').output.resultSets[0].rows[0].SQL};\n\ndrop view @{pipeline().parameters.p_trg_table}_tmp;\n\ncommit;\n",
+										"type": "Expression"
+									}
+								}
+							],
+							"scriptBlockExecutionTimeout": "02:00:00"
+						}
 					}
 				],
 				"policy": {
 					"elapsedTimeMetric": {}
 				},
 				"parameters": {
-					"c_serverless_db": {
+					"p_trg_table": {
 						"type": "string",
-						"defaultValue": "templateDB"
+						"defaultValue": "DimDataflows"
 					},
 					"p_datetime_from": {
 						"type": "string"
 					},
-					"p_trg_table": {
+					"p_surrogate_key_col": {
 						"type": "string",
-						"defaultValue": "DimDataflows"
+						"defaultValue": "dataflows_key"
+					},
+					"p_src_schema": {
+						"type": "string",
+						"defaultValue": "enr"
+					},
+					"p_src_object": {
+						"type": "string",
+						"defaultValue": "dataflows_REST_API"
+					},
+					"p_src_key_cols": {
+						"type": "array",
+						"defaultValue": [
+							"name"
+						]
+					},
+					"p_src_cdc_col": {
+						"type": "string",
+						"defaultValue": "enrTimestamp"
+					},
+					"p_data_type_replace": {
+						"type": "array",
+						"defaultValue": [
+							{
+								"col": "name",
+								"dataType": "varchar(255)"
+							}
+						]
+					},
+					"p_partition_formula": {
+						"type": "string",
+						"defaultValue": "'dummy'"
+					},
+					"c_serverless_db": {
+						"type": "string",
+						"defaultValue": "templateDB"
 					},
 					"c_trg_container": {
 						"type": "string",
@@ -10029,6 +10434,27 @@
 					"c_trg_root_folder": {
 						"type": "string",
 						"defaultValue": "StarSchemaObjects"
+					},
+					"c_cur_data_source": {
+						"type": "string",
+						"defaultValue": "TemplateCuratedSource"
+					},
+					"c_trg_partition_col": {
+						"type": "string",
+						"defaultValue": "DIM_PARTITION"
+					},
+					"c_trg_dss_update_col": {
+						"type": "string",
+						"defaultValue": "dss_update_time"
+					},
+					"c_trg_dss_create_col": {
+						"type": "string",
+						"defaultValue": "dss_create_time"
+					}
+				},
+				"variables": {
+					"v_datetime_from": {
+						"type": "String"
 					}
 				},
 				"folder": {
@@ -10037,10 +10463,11 @@
 				"annotations": []
 			},
 			"dependsOn": [
-				"[concat(variables('workspaceId'), '/integrationRuntimes/AutoResolveIntegrationRuntime')]",
 				"[concat(variables('workspaceId'), '/dataflows/StarSchemaDimension')]",
+				"[concat(variables('workspaceId'), '/integrationRuntimes/AutoResolveIntegrationRuntime')]",
 				"[concat(variables('workspaceId'), '/datasets/GenericCuratedJsonFolder')]",
-				"[concat(variables('workspaceId'), '/integrationRuntimes/SHIR')]"
+				"[concat(variables('workspaceId'), '/integrationRuntimes/SHIR')]",
+				"[concat(variables('workspaceId'), '/linkedServices/serverless_ARIR')]"
 			]
 		},
 		{
@@ -10150,60 +10577,38 @@
 						"parameters{",
 						"     p_src_key_cols as string[] ([\"name\"]),",
 						"     p_src_cdc_col as string ('enrTimestamp'),",
-						"     p_surrogate_key_col as string ('dataflows_key'),",
+						"     p_surrogate_key_col as string,",
 						"     c_trg_dss_update_col as string ('dss_update_time'),",
 						"     c_trg_dss_create_col as string ('dss_create_time'),",
 						"     p_partition_formula as string (\"'dummy'\"),",
 						"     c_trg_partition_col as string ('DIM_PARTITION'),",
 						"     p_src_schema as string ('enr'),",
 						"     p_src_object as string ('dataflows_REST_API'),",
-						"     p_datetime_from as string (''),",
+						"     p_datetime_from as string ('2024-03-06T21:24:57'),",
 						"     p_trg_table as string ('DimDataflows'),",
 						"     p_init_load as boolean (false()),",
 						"     c_trg_container as string ('template'),",
 						"     c_trg_root_folder as string ('StarSchemaObjects')",
 						"}",
-						"source(output(",
-						"          etag as string,",
-						"          id as string,",
-						"          name as string,",
-						"          type as string,",
-						"          enrTimestamp as timestamp,",
-						"          rawTimestamp as string,",
-						"          DELTA_PARTITION as string",
-						"     ),",
-						"     allowSchemaDrift: true,",
+						"source(allowSchemaDrift: true,",
 						"     validateSchema: false,",
 						"     isolationLevel: 'READ_UNCOMMITTED',",
 						"     query: (\"select * from \" + $p_src_schema + \".\" + $p_src_object + iif(length(coalesce($p_src_cdc_col, \"\")) == 0, \"\", \" where \" + $p_src_cdc_col + \" > '\" + iif(length(coalesce($p_datetime_from, \"\")) == 0, \"1900-01-01\", $p_datetime_from) + \"'\")),",
 						"     format: 'query',",
 						"     staged: false) ~> DataSource",
-						"source(output(",
-						"          dataflows_key as long,",
-						"          name as string,",
-						"          dss_create_time as timestamp",
-						"     ),",
-						"     allowSchemaDrift: true,",
+						"source(allowSchemaDrift: true,",
 						"     validateSchema: false,",
 						"     isolationLevel: 'READ_UNCOMMITTED',",
-						"     query: (iif(not($p_init_load), \"select cast(\" + $p_surrogate_key_col + \"as bigint) as \" + $p_surrogate_key_col + reduce($p_src_key_cols, \"\", #acc + \", \" + #item, #result) + iif(length(coalesce($c_trg_dss_create_col, \"\")) == 0, \"\", \", \" + $c_trg_dss_create_col) + \" from \" + $p_trg_table, \"select cast(0 as bigint) as \" + $p_surrogate_key_col + reduce($p_src_key_cols, \"\", #acc + \", '' as \" + #item, #result) + iif(length(coalesce($c_trg_dss_create_col, \"\")) == 0, \"\", \", cast('1900-01-01' as datetime) as \" + $c_trg_dss_create_col)) + \" where 1 = 0\"),",
+						"     query: (iif(not($p_init_load), \"select \" + $p_surrogate_key_col + reduce($p_src_key_cols, \"\", #acc + \", \" + #item, #result) + iif(length(coalesce($c_trg_dss_create_col, \"\")) == 0, \"\", \", \" + $c_trg_dss_create_col) + \" from \" + $p_trg_table, \"select cast(0 as bigint) as \" + $p_surrogate_key_col + reduce($p_src_key_cols, \"\", #acc + \", '' as \" + #item, #result) + iif(length(coalesce($c_trg_dss_create_col, \"\")) == 0, \"\", \", cast('1900-01-01' as datetime) as \" + $c_trg_dss_create_col + \" where 1 = 0\"))),",
 						"     format: 'query',",
 						"     staged: false) ~> Dimension",
-						"source(output(",
-						"          dataflows_key as long",
-						"     ),",
-						"     allowSchemaDrift: true,",
+						"source(allowSchemaDrift: true,",
 						"     validateSchema: false,",
 						"     isolationLevel: 'READ_UNCOMMITTED',",
-						"     query: (iif(not($p_init_load), \"select max(cast(\" + $p_surrogate_key_col + \" as bigint)) as \" + $p_surrogate_key_col + \" from \" + $p_trg_table, \"select cast(0 as bigint) as \" + $p_surrogate_key_col)),",
+						"     query: (iif(not($p_init_load), \"select max(\" + $p_surrogate_key_col + \") as \" + $p_surrogate_key_col + \" from \" + $p_trg_table, \"select cast(0 as bigint) as \" + $p_surrogate_key_col)),",
 						"     format: 'query',",
 						"     staged: false) ~> DimensionMaxKey",
-						"source(output(",
-						"          dataflows_key as long,",
-						"          name as string,",
-						"          DIM_PARTITION as string",
-						"     ),",
-						"     allowSchemaDrift: true,",
+						"source(allowSchemaDrift: true,",
 						"     validateSchema: false,",
 						"     isolationLevel: 'READ_UNCOMMITTED',",
 						"     query: (\"select cast(0 as bigint) as \" + $p_surrogate_key_col + reduce($p_src_key_cols, \"\", #acc + \", '' as \" + #item, #result) + \", 'dummy' as \" + $c_trg_partition_col),",
@@ -10304,90 +10709,6 @@
 			},
 			"dependsOn": [
 				"[concat(variables('workspaceId'), '/datasets/GenericServerlessSQL')]",
-				"[concat(variables('workspaceId'), '/linkedServices/templatecurst_ARIR')]"
-			]
-		},
-		{
-			"name": "[concat(parameters('workspaceName'), '/GenericCuratedJsonFolder')]",
-			"type": "Microsoft.Synapse/workspaces/datasets",
-			"apiVersion": "2019-06-01-preview",
-			"properties": {
-				"linkedServiceName": {
-					"referenceName": "templatecurst_ARIR",
-					"type": "LinkedServiceReference"
-				},
-				"parameters": {
-					"p_container": {
-						"type": "string"
-					},
-					"p_folder": {
-						"type": "string"
-					}
-				},
-				"annotations": [],
-				"type": "Json",
-				"typeProperties": {
-					"location": {
-						"type": "AzureBlobFSLocation",
-						"folderPath": {
-							"value": "@dataset().p_folder",
-							"type": "Expression"
-						},
-						"fileSystem": {
-							"value": "@dataset().p_container",
-							"type": "Expression"
-						}
-					}
-				},
-				"schema": {}
-			},
-			"dependsOn": [
-				"[concat(variables('workspaceId'), '/linkedServices/templatecurst_ARIR')]"
-			]
-		},
-		{
-			"name": "[concat(parameters('workspaceName'), '/GenericCuratedParquet')]",
-			"type": "Microsoft.Synapse/workspaces/datasets",
-			"apiVersion": "2019-06-01-preview",
-			"properties": {
-				"linkedServiceName": {
-					"referenceName": "templatecurst_ARIR",
-					"type": "LinkedServiceReference"
-				},
-				"parameters": {
-					"p_container": {
-						"type": "string"
-					},
-					"p_folder": {
-						"type": "string"
-					},
-					"p_file": {
-						"type": "string"
-					}
-				},
-				"annotations": [],
-				"type": "Parquet",
-				"typeProperties": {
-					"location": {
-						"type": "AzureBlobFSLocation",
-						"fileName": {
-							"value": "@concat(dataset().p_file, '.parquet')",
-							"type": "Expression"
-						},
-						"folderPath": {
-							"value": "@dataset().p_folder",
-							"type": "Expression"
-						},
-						"fileSystem": {
-							"value": "@dataset().p_container",
-							"type": "Expression"
-						}
-					},
-					"compressionCodec": "snappy"
-				},
-				"schema": []
-			},
-			"dependsOn": [
 				"[concat(variables('workspaceId'), '/linkedServices/templatecurst_ARIR')]"
 			]
 		}
