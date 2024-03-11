@@ -380,7 +380,7 @@
 														"type": "Expression"
 													},
 													"c_key_column_name": {
-														"value": "'@{replace(replace(replace(string(item().keyCol), '[', ''), ']', ''), '\"', '')}'",
+														"value": "@item().keyCol",
 														"type": "Expression"
 													},
 													"c_raw_cdc_column": {

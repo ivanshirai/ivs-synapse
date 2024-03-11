@@ -34,6 +34,20 @@
 						"type": "DatasetReference"
 					},
 					"name": "DimensionZeroRow"
+				},
+				{
+					"dataset": {
+						"referenceName": "GenericServerlessSQL",
+						"type": "DatasetReference"
+					},
+					"name": "SourcePartitionPruning"
+				},
+				{
+					"dataset": {
+						"referenceName": "GenericServerlessSQL",
+						"type": "DatasetReference"
+					},
+					"name": "dummyPartitionPruning"
 				}
 			],
 			"sinks": [
@@ -53,6 +67,9 @@
 						"type": "LinkedServiceReference"
 					},
 					"name": "sinkDimension"
+				},
+				{
+					"name": "sinkPartitionPruning"
 				}
 			],
 			"transformations": [
@@ -97,6 +114,15 @@
 				},
 				{
 					"name": "derivedMaxKey"
+				},
+				{
+					"name": "aggregatePartitionPruning"
+				},
+				{
+					"name": "unionPartitionPruning"
+				},
+				{
+					"name": "collectPartitionPruning"
 				}
 			],
 			"scriptLines": [
@@ -140,6 +166,23 @@
 				"     query: (\"select cast(0 as bigint) as \" + $p_surrogate_key_col + reduce($p_src_key_cols, \"\", #acc + \", '' as \" + #item, #result) + \", 'dummy' as \" + $c_trg_partition_col),",
 				"     format: 'query',",
 				"     staged: false) ~> DimensionZeroRow",
+				"source(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     query: (\"select * from \" + $p_src_schema + \".\" + $p_src_object + iif(length(coalesce($p_src_cdc_col, \"\")) == 0, \"\", \" where \" + $p_src_cdc_col + \" > '\" + iif(length(coalesce($p_datetime_from, \"\")) == 0, \"1900-01-01\", $p_datetime_from) + \"'\")),",
+				"     format: 'query',",
+				"     staged: false) ~> SourcePartitionPruning",
+				"source(output(",
+				"          PARTITION as string,",
+				"          CONSTANT as string,",
+				"          AGGREGATE as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     query: 'select \\'dummy\\' as PARTITION,\\n\\'CONSTANT\\' as CONSTANT, \\'dummy\\' as AGGREGATE',",
+				"     format: 'query',",
+				"     staged: false) ~> dummyPartitionPruning",
 				"sourceLookupKey, selectDimension lookup(lookupKey == PREFIX_lookupKey,",
 				"     multiple: false,",
 				"     pickup: 'any',",
@@ -170,6 +213,12 @@
 				"DataSource derive(lookupKey = md5(byNames($p_src_key_cols))) ~> sourceLookupKey",
 				"Dimension derive(lookupKey = md5(byNames($p_src_key_cols))) ~> dimLookupKey",
 				"DimensionMaxKey derive(surrogateKey = toLong(byName($p_surrogate_key_col))) ~> derivedMaxKey",
+				"SourcePartitionPruning aggregate(groupBy(PARTITION = expr($p_partition_formula),",
+				"          CONSTANT = 'CONSTANT'),",
+				"     AGGREGATE = first(expr($p_partition_formula))) ~> aggregatePartitionPruning",
+				"aggregatePartitionPruning, dummyPartitionPruning union(byName: true)~> unionPartitionPruning",
+				"unionPartitionPruning aggregate(groupBy(CONSTANT),",
+				"     PARTITION = collect(AGGREGATE)) ~> collectPartitionPruning",
 				"derivedMaxKey sink(validateSchema: false,",
 				"     skipDuplicateMapInputs: true,",
 				"     skipDuplicateMapOutputs: true,",
@@ -219,7 +268,7 @@
 				"     updateable: false,",
 				"     upsertable: true,",
 				"     keys:($p_src_key_cols),",
-				"     pruneCondition: [($c_trg_partition_col) -> ([\"dummy\"])],",
+				"     pruneCondition: [($c_trg_partition_col) -> (sinkPartitionPruning#outputs().PARTITION_PRUNING)],",
 				"     umask: 0022,",
 				"     preCommands: [],",
 				"     postCommands: [],",
@@ -229,7 +278,17 @@
 				"     partitionBy('key',",
 				"          0,",
 				"          byName($c_trg_partition_col)",
-				"     )) ~> sinkDimension"
+				"     )) ~> sinkDimension",
+				"collectPartitionPruning sink(validateSchema: false,",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     store: 'cache',",
+				"     format: 'inline',",
+				"     output: false,",
+				"     saveOrder: 1,",
+				"     mapColumn(",
+				"          PARTITION_PRUNING = PARTITION",
+				"     )) ~> sinkPartitionPruning"
 			]
 		}
 	}

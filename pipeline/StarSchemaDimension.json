@@ -115,6 +115,22 @@
 								},
 								"p_schema": "dummy",
 								"p_table": "dummy"
+							},
+							"SourcePartitionPruning": {
+								"p_database": {
+									"value": "@pipeline().parameters.c_serverless_db",
+									"type": "Expression"
+								},
+								"p_schema": "dummy",
+								"p_table": "dummy"
+							},
+							"dummyPartitionPruning": {
+								"p_database": {
+									"value": "@pipeline().parameters.c_serverless_db",
+									"type": "Expression"
+								},
+								"p_schema": "dummy",
+								"p_table": "dummy"
 							}
 						}
 					},
