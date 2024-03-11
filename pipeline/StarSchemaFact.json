@@ -314,12 +314,6 @@
 						"dependencyConditions": [
 							"Succeeded"
 						]
-					},
-					{
-						"activity": "ScriptStagingDimKeysSQL_copy1",
-						"dependencyConditions": [
-							"Succeeded"
-						]
 					}
 				],
 				"userProperties": [],
@@ -335,6 +329,12 @@
 							"dependsOn": [
 								{
 									"activity": "ScriptStagingDimKeysSQL",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								},
+								{
+									"activity": "ScriptFactCreateTime",
 									"dependencyConditions": [
 										"Succeeded"
 									]
@@ -628,6 +628,41 @@
 								],
 								"scriptBlockExecutionTimeout": "02:00:00"
 							}
+						},
+						{
+							"name": "ScriptFactCreateTime",
+							"type": "Script",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"linkedServiceName": {
+								"referenceName": "serverless_ARIR",
+								"type": "LinkedServiceReference",
+								"parameters": {
+									"p_database": {
+										"value": "@pipeline().parameters.c_serverless_db",
+										"type": "Expression"
+									}
+								}
+							},
+							"typeProperties": {
+								"scripts": [
+									{
+										"type": "Query",
+										"text": {
+											"value": "@if(activity('GetTargetDeltaMetadata').output.exists, \nconcat('select ''select '' + STRING_AGG(value, '', '') + '', ', pipeline().parameters.c_trg_dss_create_col, ' from ', pipeline().parameters.p_trg_table, ''' targetQuery from OPENJSON (''', string(pipeline().parameters.p_src_key_cols), ''')'), \nconcat('select ''select null as '' + STRING_AGG(value, '', null as '') + '', cast(null as datetime) as ', pipeline().parameters.c_trg_dss_create_col, ' where 1 = 0'' targetQuery from OPENJSON (''', string(pipeline().parameters.p_src_key_cols), ''') as r'))\n\n",
+											"type": "Expression"
+										}
+									}
+								],
+								"scriptBlockExecutionTimeout": "02:00:00"
+							}
 						}
 					]
 				}
@@ -693,54 +728,6 @@
 						"type": "MSI",
 						"resource": "https://dev.azuresynapse.net/"
 					}
-				}
-			},
-			{
-				"name": "ScriptStagingDimKeysSQL_copy1",
-				"type": "Script",
-				"dependsOn": [
-					{
-						"activity": "GenericEnrichedParquet linked service",
-						"dependencyConditions": [
-							"Succeeded"
-						]
-					},
-					{
-						"activity": "StagingParquet",
-						"dependencyConditions": [
-							"Succeeded"
-						]
-					}
-				],
-				"policy": {
-					"timeout": "0.12:00:00",
-					"retry": 0,
-					"retryIntervalInSeconds": 30,
-					"secureOutput": false,
-					"secureInput": false
-				},
-				"userProperties": [],
-				"linkedServiceName": {
-					"referenceName": "serverless_ARIR",
-					"type": "LinkedServiceReference",
-					"parameters": {
-						"p_database": {
-							"value": "@pipeline().parameters.c_serverless_db",
-							"type": "Expression"
-						}
-					}
-				},
-				"typeProperties": {
-					"scripts": [
-						{
-							"type": "Query",
-							"text": {
-								"value": "select 'select ' + \nSTRING_AGG('coalesce(' + coalesce(dimAlias, dimTab) + '.' + dimKey + ', 0) ' + coalesce(keyAlias, dimKey), ', ') + ', ' + 'stg.*' +\n' from openrowset(bulk ''@{activity('GenericEnrichedParquet linked service').output.properties.typeProperties.url}@{pipeline().parameters.c_stg_container}/@{pipeline().parameters.c_stg_root_folder}/@{pipeline().parameters.p_trg_table}Stg.parquet'', format = ''PARQUET'') as stg ' +\nSTRING_AGG('left outer join ' + dimTab + ' ' + coalesce(dimAlias, dimTab) + ' on ' + replace(joinStatement,  dimTab, coalesce(dimAlias, dimTab)), ' ') sourceQuery\nfrom\n(select * from OPENJSON('@{replace(string(pipeline().parameters.p_dw_dim_tabs), '''', '''''')}')\nWITH (\n    dimTab NVARCHAR(max) '$.dimTab',\n    dimAlias NVARCHAR(max) '$.dimAlias',\n    dimKey NVARCHAR(max) '$.dimKey',\n    keyAlias NVARCHAR(max) '$.keyAlias',\n    joinStatement NVARCHAR(max) '$.joinStatement'\n)) q",
-								"type": "Expression"
-							}
-						}
-					],
-					"scriptBlockExecutionTimeout": "02:00:00"
 				}
 			}
 		],
