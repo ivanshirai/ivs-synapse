@@ -308,6 +308,18 @@
 						"dependencyConditions": [
 							"Succeeded"
 						]
+					},
+					{
+						"activity": "GenericEnrichedParquet linked service",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "ScriptStagingDimKeysSQL_copy1",
+						"dependencyConditions": [
+							"Succeeded"
+						]
 					}
 				],
 				"userProperties": [],
@@ -320,7 +332,14 @@
 						{
 							"name": "StarSchemaDimension",
 							"type": "ExecuteDataFlow",
-							"dependsOn": [],
+							"dependsOn": [
+								{
+									"activity": "ScriptStagingDimKeysSQL",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
 							"policy": {
 								"timeout": "0.12:00:00",
 								"retry": 0,
@@ -574,8 +593,154 @@
 								],
 								"scriptBlockExecutionTimeout": "02:00:00"
 							}
+						},
+						{
+							"name": "ScriptStagingDimKeysSQL",
+							"type": "Script",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"linkedServiceName": {
+								"referenceName": "serverless_ARIR",
+								"type": "LinkedServiceReference",
+								"parameters": {
+									"p_database": {
+										"value": "@pipeline().parameters.c_serverless_db",
+										"type": "Expression"
+									}
+								}
+							},
+							"typeProperties": {
+								"scripts": [
+									{
+										"type": "Query",
+										"text": {
+											"value": "select 'select ' + \nSTRING_AGG('coalesce(' + coalesce(dimAlias, dimTab) + '.' + dimKey + ', 0) ' + coalesce(keyAlias, dimKey), ', ') + ', ' + 'stg.*' +\n' from openrowset(bulk ''@{activity('GenericEnrichedParquet linked service').output.properties.typeProperties.url}@{pipeline().parameters.c_stg_container}/@{pipeline().parameters.c_stg_root_folder}/@{pipeline().parameters.p_trg_table}Stg.parquet'', format = ''PARQUET'') as stg ' +\nSTRING_AGG('left outer join ' + dimTab + ' ' + coalesce(dimAlias, dimTab) + ' on ' + replace(joinStatement,  dimTab, coalesce(dimAlias, dimTab)), ' ') sourceQuery\nfrom\n(select * from OPENJSON('@{replace(string(pipeline().parameters.p_dw_dim_tabs), '''', '''''')}')\nWITH (\n    dimTab NVARCHAR(max) '$.dimTab',\n    dimAlias NVARCHAR(max) '$.dimAlias',\n    dimKey NVARCHAR(max) '$.dimKey',\n    keyAlias NVARCHAR(max) '$.keyAlias',\n    joinStatement NVARCHAR(max) '$.joinStatement'\n)) q",
+											"type": "Expression"
+										}
+									}
+								],
+								"scriptBlockExecutionTimeout": "02:00:00"
+							}
 						}
 					]
+				}
+			},
+			{
+				"name": "GenericEnrichedParquet attributes",
+				"type": "WebActivity",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"method": "GET",
+					"url": {
+						"value": "@concat('https://', pipeline().DataFactory, '.dev.azuresynapse.net/datasets/GenericEnrichedParquet?api-version=2020-12-01')",
+						"type": "Expression"
+					},
+					"connectVia": {
+						"referenceName": "SHIR",
+						"type": "IntegrationRuntimeReference"
+					},
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://dev.azuresynapse.net/"
+					}
+				}
+			},
+			{
+				"name": "GenericEnrichedParquet linked service",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "GenericEnrichedParquet attributes",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"method": "GET",
+					"url": {
+						"value": "@concat('https://', pipeline().DataFactory, '.dev.azuresynapse.net/linkedservices/', activity('GenericEnrichedParquet attributes').output.properties.linkedServiceName.referenceName, '?api-version=2020-12-01')",
+						"type": "Expression"
+					},
+					"connectVia": {
+						"referenceName": "SHIR",
+						"type": "IntegrationRuntimeReference"
+					},
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://dev.azuresynapse.net/"
+					}
+				}
+			},
+			{
+				"name": "ScriptStagingDimKeysSQL_copy1",
+				"type": "Script",
+				"dependsOn": [
+					{
+						"activity": "GenericEnrichedParquet linked service",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "StagingParquet",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"linkedServiceName": {
+					"referenceName": "serverless_ARIR",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"p_database": {
+							"value": "@pipeline().parameters.c_serverless_db",
+							"type": "Expression"
+						}
+					}
+				},
+				"typeProperties": {
+					"scripts": [
+						{
+							"type": "Query",
+							"text": {
+								"value": "select 'select ' + \nSTRING_AGG('coalesce(' + coalesce(dimAlias, dimTab) + '.' + dimKey + ', 0) ' + coalesce(keyAlias, dimKey), ', ') + ', ' + 'stg.*' +\n' from openrowset(bulk ''@{activity('GenericEnrichedParquet linked service').output.properties.typeProperties.url}@{pipeline().parameters.c_stg_container}/@{pipeline().parameters.c_stg_root_folder}/@{pipeline().parameters.p_trg_table}Stg.parquet'', format = ''PARQUET'') as stg ' +\nSTRING_AGG('left outer join ' + dimTab + ' ' + coalesce(dimAlias, dimTab) + ' on ' + replace(joinStatement,  dimTab, coalesce(dimAlias, dimTab)), ' ') sourceQuery\nfrom\n(select * from OPENJSON('@{replace(string(pipeline().parameters.p_dw_dim_tabs), '''', '''''')}')\nWITH (\n    dimTab NVARCHAR(max) '$.dimTab',\n    dimAlias NVARCHAR(max) '$.dimAlias',\n    dimKey NVARCHAR(max) '$.dimKey',\n    keyAlias NVARCHAR(max) '$.keyAlias',\n    joinStatement NVARCHAR(max) '$.joinStatement'\n)) q",
+								"type": "Expression"
+							}
+						}
+					],
+					"scriptBlockExecutionTimeout": "02:00:00"
 				}
 			}
 		],
