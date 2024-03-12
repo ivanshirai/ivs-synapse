@@ -3,65 +3,6 @@
 	"properties": {
 		"activities": [
 			{
-				"name": "ForEachScript",
-				"type": "ForEach",
-				"dependsOn": [
-					{
-						"activity": "ForEachInitScript",
-						"dependencyConditions": [
-							"Succeeded"
-						]
-					},
-					{
-						"activity": "ForEachTextReplaceMap",
-						"dependencyConditions": [
-							"Succeeded"
-						]
-					}
-				],
-				"userProperties": [],
-				"typeProperties": {
-					"items": {
-						"value": "@variables('v_scripts')",
-						"type": "Expression"
-					},
-					"isSequential": false,
-					"activities": [
-						{
-							"name": "Run SQL Script",
-							"type": "Script",
-							"dependsOn": [],
-							"policy": {
-								"timeout": "0.12:00:00",
-								"retry": 2,
-								"retryIntervalInSeconds": 30,
-								"secureOutput": false,
-								"secureInput": false
-							},
-							"userProperties": [],
-							"linkedServiceName": {
-								"referenceName": "serverless_ARIR",
-								"type": "LinkedServiceReference",
-								"parameters": {
-									"p_database": "master"
-								}
-							},
-							"typeProperties": {
-								"scripts": [
-									{
-										"type": "NonQuery",
-										"text": {
-											"value": "@replace(item().query, '{raw_storage_account}', pipeline().parameters.c_raw_storage_account)",
-											"type": "Expression"
-										}
-									}
-								]
-							}
-						}
-					]
-				}
-			},
-			{
 				"name": "Copy SQL scripts",
 				"type": "Copy",
 				"dependsOn": [],
@@ -223,46 +164,7 @@
 				]
 			},
 			{
-				"name": "Filter Scripts",
-				"type": "Script",
-				"dependsOn": [
-					{
-						"activity": "Copy SQL scripts",
-						"dependencyConditions": [
-							"Succeeded"
-						]
-					}
-				],
-				"policy": {
-					"timeout": "0.12:00:00",
-					"retry": 2,
-					"retryIntervalInSeconds": 30,
-					"secureOutput": false,
-					"secureInput": false
-				},
-				"userProperties": [],
-				"linkedServiceName": {
-					"referenceName": "serverless_ARIR",
-					"type": "LinkedServiceReference",
-					"parameters": {
-						"p_database": "master"
-					}
-				},
-				"typeProperties": {
-					"scripts": [
-						{
-							"type": "Query",
-							"text": {
-								"value": "SELECT\n    *\nFROM\n    OPENROWSET(\n        BULK 'https://@{pipeline().parameters.c_raw_storage_account}.dfs.core.windows.net/@{pipeline().parameters.c_raw_container}/@{pipeline().parameters.c_raw_folder}/@{pipeline().parameters.c_raw_file}.parquet',\n        FORMAT = 'PARQUET'\n    ) \nWITH (id nvarchar(1000),\nname nvarchar(255),\ntype nvarchar(100),\netag nvarchar(100),\nfolderName nvarchar(1000),\nquery nvarchar(max),\nlanguage nvarchar(100),\ndatabaseName nvarchar(100),\npoolName nvarchar(100),\nresultLimit int,\nconnectionType nvarchar(100)\n) AS [result]\nwhere left(folderName, len('@{pipeline().parameters.c_script_folder}')) = '@{pipeline().parameters.c_script_folder}'\nand charindex('@{pipeline().parameters.c_init_script_suffix}', name) = 0",
-								"type": "Expression"
-							}
-						}
-					],
-					"scriptBlockExecutionTimeout": "02:00:00"
-				}
-			},
-			{
-				"name": "Filter Init Scripts",
+				"name": "Sort Scripts",
 				"type": "Script",
 				"dependsOn": [
 					{
@@ -298,7 +200,7 @@
 						{
 							"type": "Query",
 							"text": {
-								"value": "SELECT\n    *\nFROM\n    OPENROWSET(\n        BULK '@{activity('GenericRawParquet linked service').output.properties.typeProperties.url}@{pipeline().parameters.c_raw_container}/@{pipeline().parameters.c_raw_folder}/@{pipeline().parameters.c_raw_file}.parquet',\n        FORMAT = 'PARQUET'\n    ) \nWITH (id nvarchar(1000),\nname nvarchar(255),\ntype nvarchar(100),\netag nvarchar(100),\nfolderName nvarchar(1000),\nquery nvarchar(max),\nlanguage nvarchar(100),\ndatabaseName nvarchar(100),\npoolName nvarchar(100),\nresultLimit int,\nconnectionType nvarchar(100)\n) AS [result]\nwhere left(folderName, len('@{pipeline().parameters.c_script_folder}')) = '@{pipeline().parameters.c_script_folder}'\nand charindex('@{pipeline().parameters.c_init_script_suffix}', name) > 0\n\nunion\n\nSELECT\n    *\nFROM\n    OPENROWSET(\n        BULK '@{activity('GenericRawParquet linked service').output.properties.typeProperties.url}@{pipeline().parameters.c_raw_container}/@{pipeline().parameters.c_raw_folder}/@{pipeline().parameters.c_raw_file}.parquet',\n        FORMAT = 'PARQUET'\n    ) \nWITH (id nvarchar(1000),\nname nvarchar(255),\ntype nvarchar(100),\netag nvarchar(100),\nfolderName nvarchar(1000),\nquery nvarchar(max),\nlanguage nvarchar(100),\ndatabaseName nvarchar(100),\npoolName nvarchar(100),\nresultLimit int,\nconnectionType nvarchar(100)\n) AS [result]\nwhere left(folderName, len('@{pipeline().parameters.c_script_folder}')) = '@{pipeline().parameters.c_script_folder}'\nand charindex('@{pipeline().parameters.c_init_script_suffix}', name) = 0\n\norder by name",
+								"value": "SELECT\n    ' ' + name as name, query\nFROM\n    OPENROWSET(\n        BULK '@{activity('GenericRawParquet linked service').output.properties.typeProperties.url}@{pipeline().parameters.c_raw_container}/@{pipeline().parameters.c_raw_folder}/@{pipeline().parameters.c_raw_file}.parquet',\n        FORMAT = 'PARQUET'\n    ) \nWITH (id nvarchar(1000),\nname nvarchar(255),\ntype nvarchar(100),\netag nvarchar(100),\nfolderName nvarchar(1000),\nquery nvarchar(max),\nlanguage nvarchar(100),\ndatabaseName nvarchar(100),\npoolName nvarchar(100),\nresultLimit int,\nconnectionType nvarchar(100)\n) AS [result]\nwhere left(folderName, len('@{pipeline().parameters.c_script_folder}')) = '@{pipeline().parameters.c_script_folder}'\nand charindex('@{pipeline().parameters.c_init_script_suffix}', name) > 0\n\nunion\n\nSELECT\n    name, query\nFROM\n    OPENROWSET(\n        BULK '@{activity('GenericRawParquet linked service').output.properties.typeProperties.url}@{pipeline().parameters.c_raw_container}/@{pipeline().parameters.c_raw_folder}/@{pipeline().parameters.c_raw_file}.parquet',\n        FORMAT = 'PARQUET'\n    ) \nWITH (id nvarchar(1000),\nname nvarchar(255),\ntype nvarchar(100),\netag nvarchar(100),\nfolderName nvarchar(1000),\nquery nvarchar(max),\nlanguage nvarchar(100),\ndatabaseName nvarchar(100),\npoolName nvarchar(100),\nresultLimit int,\nconnectionType nvarchar(100)\n) AS [result]\nwhere left(folderName, len('@{pipeline().parameters.c_script_folder}')) = '@{pipeline().parameters.c_script_folder}'\nand charindex('@{pipeline().parameters.c_init_script_suffix}', name) = 0\n\norder by name",
 								"type": "Expression"
 							}
 						}
@@ -307,11 +209,11 @@
 				}
 			},
 			{
-				"name": "ForEachInitScript",
+				"name": "ForEachScript",
 				"type": "ForEach",
 				"dependsOn": [
 					{
-						"activity": "ForEachTextReplaceMap Init",
+						"activity": "ForEachTextReplaceMap",
 						"dependencyConditions": [
 							"Succeeded"
 						]
@@ -360,11 +262,11 @@
 				}
 			},
 			{
-				"name": "ForEachTextReplaceMap Init",
+				"name": "ForEachTextReplaceMap",
 				"type": "ForEach",
 				"dependsOn": [
 					{
-						"activity": "Set v_scripts Init",
+						"activity": "Set v_scripts",
 						"dependencyConditions": [
 							"Succeeded"
 						]
@@ -423,104 +325,11 @@
 				}
 			},
 			{
-				"name": "Set v_scripts Init",
-				"type": "SetVariable",
-				"dependsOn": [
-					{
-						"activity": "Filter Init Scripts",
-						"dependencyConditions": [
-							"Succeeded"
-						]
-					}
-				],
-				"policy": {
-					"secureOutput": false,
-					"secureInput": false
-				},
-				"userProperties": [],
-				"typeProperties": {
-					"variableName": "v_scripts",
-					"value": {
-						"value": "@activity('Filter Init Scripts').output.resultSets[0].rows",
-						"type": "Expression"
-					}
-				}
-			},
-			{
-				"name": "ForEachTextReplaceMap",
-				"type": "ForEach",
-				"dependsOn": [
-					{
-						"activity": "Set v_scripts",
-						"dependencyConditions": [
-							"Succeeded"
-						]
-					}
-				],
-				"userProperties": [],
-				"typeProperties": {
-					"items": {
-						"value": "@json(string(pipeline().parameters.c_text_replacement))",
-						"type": "Expression"
-					},
-					"isSequential": true,
-					"activities": [
-						{
-							"name": "Set v_scripts_tmp",
-							"type": "SetVariable",
-							"dependsOn": [],
-							"policy": {
-								"secureOutput": false,
-								"secureInput": false
-							},
-							"userProperties": [],
-							"typeProperties": {
-								"variableName": "v_scripts_tmp",
-								"value": {
-									"value": "@replace(string(variables('v_scripts')), item().textToFind, item().textForReplace)",
-									"type": "Expression"
-								}
-							}
-						},
-						{
-							"name": "Update v_scripts",
-							"type": "SetVariable",
-							"dependsOn": [
-								{
-									"activity": "Set v_scripts_tmp",
-									"dependencyConditions": [
-										"Succeeded"
-									]
-								}
-							],
-							"policy": {
-								"secureOutput": false,
-								"secureInput": false
-							},
-							"userProperties": [],
-							"typeProperties": {
-								"variableName": "v_scripts",
-								"value": {
-									"value": "@json(variables('v_scripts_tmp'))",
-									"type": "Expression"
-								}
-							}
-						}
-					]
-				}
-			},
-			{
 				"name": "Set v_scripts",
 				"type": "SetVariable",
 				"dependsOn": [
 					{
-						"activity": "Filter Scripts",
-						"dependencyConditions": [
-							"Succeeded"
-						]
-					},
-					{
-						"activity": "ForEachInitScript",
+						"activity": "Sort Scripts",
 						"dependencyConditions": [
 							"Succeeded"
 						]
@@ -534,7 +343,7 @@
 				"typeProperties": {
 					"variableName": "v_scripts",
 					"value": {
-						"value": "@activity('Filter Scripts').output.resultSets[0].rows",
+						"value": "@activity('Sort Scripts').output.resultSets[0].rows",
 						"type": "Expression"
 					}
 				}
@@ -636,10 +445,6 @@
 			"c_init_script_suffix": {
 				"type": "string",
 				"defaultValue": "_Init_"
-			},
-			"c_raw_storage_account": {
-				"type": "string",
-				"defaultValue": "kbsmoderndwdevrawst002"
 			}
 		},
 		"variables": {
