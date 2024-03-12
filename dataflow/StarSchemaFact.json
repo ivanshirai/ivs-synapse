@@ -1,0 +1,192 @@
+{
+	"name": "StarSchemaFact",
+	"properties": {
+		"folder": {
+			"name": "Templates"
+		},
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "GenericServerlessSQL",
+						"type": "DatasetReference"
+					},
+					"name": "DataSource"
+				},
+				{
+					"dataset": {
+						"referenceName": "GenericServerlessSQL",
+						"type": "DatasetReference"
+					},
+					"name": "Fact"
+				},
+				{
+					"dataset": {
+						"referenceName": "GenericServerlessSQL",
+						"type": "DatasetReference"
+					},
+					"name": "SourcePartitionPruning"
+				},
+				{
+					"dataset": {
+						"referenceName": "GenericServerlessSQL",
+						"type": "DatasetReference"
+					},
+					"name": "dummyPartitionPruning"
+				}
+			],
+			"sinks": [
+				{
+					"linkedService": {
+						"referenceName": "templatecurst_ARIR",
+						"type": "LinkedServiceReference"
+					},
+					"name": "sinkDimension"
+				},
+				{
+					"name": "sinkPartitionPruning"
+				}
+			],
+			"transformations": [
+				{
+					"name": "lookupDimension"
+				},
+				{
+					"name": "selectFact"
+				},
+				{
+					"name": "derivedColumns"
+				},
+				{
+					"name": "selectBeforeSink"
+				},
+				{
+					"name": "alterRow"
+				},
+				{
+					"name": "sourceLookupKey"
+				},
+				{
+					"name": "factLookupKey"
+				},
+				{
+					"name": "aggregatePartitionPruning"
+				},
+				{
+					"name": "unionPartitionPruning"
+				},
+				{
+					"name": "collectPartitionPruning"
+				}
+			],
+			"scriptLines": [
+				"parameters{",
+				"     p_src_key_cols as string[] ([\"dataflows_name\", \"datasets_name\"]),",
+				"     p_src_cdc_col as string ('_DSS_UPDATE_TIME'),",
+				"     c_trg_dss_update_col as string ('dss_update_time'),",
+				"     c_trg_dss_create_col as string ('dss_create_time'),",
+				"     p_partition_formula as string (\"'dummy'\"),",
+				"     c_trg_partition_col as string ('FACT_PARTITION'),",
+				"     p_src_schema as string ('enr'),",
+				"     p_src_object as string ('dataflows_REST_API'),",
+				"     p_datetime_from as string ('2024-03-06T21:24:57'),",
+				"     p_trg_table as string ('FactDataflowsDatasets'),",
+				"     c_trg_container as string ('template'),",
+				"     c_trg_root_folder as string ('StarSchemaObjects'),",
+				"     p_src_query as string (\"select coalesce(DimDataflows.dataflows_key, 0) dataflows_key, coalesce(DimDatasets.datasets_key, 0) datasets_key, stg.* from openrowset(bulk 'https://ivsenr.dfs.core.windows.net/template/Staging/FactDataflowsDatasetsStg.parquet', format = 'PARQUET') as stg left outer join DimDataflows DimDataflows on stg.dataflows_name = DimDataflows.name left outer join DimDatasets DimDatasets on stg.datasets_name = DimDatasets.name\"),",
+				"     p_trg_query as string (\"select null as dataflows_name, null as datasets_name, cast(null as datetime) as dss_create_time where 1 = 0\")",
+				"}",
+				"source(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     query: ($p_src_query),",
+				"     format: 'query',",
+				"     staged: false) ~> DataSource",
+				"source(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     query: ($p_trg_query),",
+				"     format: 'query',",
+				"     staged: false) ~> Fact",
+				"source(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     query: ($p_src_query),",
+				"     format: 'query',",
+				"     staged: false) ~> SourcePartitionPruning",
+				"source(output(",
+				"          PARTITION as string,",
+				"          CONSTANT as string,",
+				"          AGGREGATE as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     isolationLevel: 'READ_UNCOMMITTED',",
+				"     query: 'select \\'dummy\\' as PARTITION,\\n\\'CONSTANT\\' as CONSTANT, \\'dummy\\' as AGGREGATE',",
+				"     format: 'query',",
+				"     staged: false) ~> dummyPartitionPruning",
+				"sourceLookupKey, selectFact lookup(lookupKey == PREFIX_lookupKey,",
+				"     multiple: false,",
+				"     pickup: 'any',",
+				"     broadcast: 'auto')~> lookupDimension",
+				"factLookupKey select(mapColumn(",
+				"          each(match(true()),",
+				"               'PREFIX_'+$$ = $$)",
+				"     ),",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true) ~> selectFact",
+				"lookupDimension derive(each(match(name=='PREFIX_'+$c_trg_dss_create_col), $c_trg_dss_create_col = coalesce($$, currentTimestamp()), $c_trg_dss_update_col = currentTimestamp(), $c_trg_partition_col = expr($p_partition_formula))) ~> derivedColumns",
+				"derivedColumns select(mapColumn(",
+				"          each(match(left(name,length('PREFIX_'))!='PREFIX_'&&name!='surrogateKey'&&name!='lookupKey'))",
+				"     ),",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true) ~> selectBeforeSink",
+				"selectBeforeSink alterRow(upsertIf(true())) ~> alterRow",
+				"DataSource derive(lookupKey = md5(byNames($p_src_key_cols))) ~> sourceLookupKey",
+				"Fact derive(lookupKey = md5(byNames($p_src_key_cols))) ~> factLookupKey",
+				"SourcePartitionPruning aggregate(groupBy(PARTITION = expr($p_partition_formula),",
+				"          CONSTANT = 'CONSTANT'),",
+				"     AGGREGATE = first(expr($p_partition_formula))) ~> aggregatePartitionPruning",
+				"aggregatePartitionPruning, dummyPartitionPruning union(byName: true)~> unionPartitionPruning",
+				"unionPartitionPruning aggregate(groupBy(CONSTANT),",
+				"     PARTITION = collect(AGGREGATE)) ~> collectPartitionPruning",
+				"alterRow sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     format: 'delta',",
+				"     fileSystem: ($c_trg_container),",
+				"     folderPath: ($c_trg_root_folder + \"/\" + $p_trg_table),",
+				"     mergeSchema: true,",
+				"     autoCompact: true,",
+				"     optimizedWrite: true,",
+				"     vacuum: 0,",
+				"     deletable: false,",
+				"     insertable: false,",
+				"     updateable: false,",
+				"     upsertable: true,",
+				"     keys:($p_src_key_cols),",
+				"     pruneCondition: [($c_trg_partition_col) -> (sinkPartitionPruning#outputs().PARTITION_PRUNING)],",
+				"     umask: 0022,",
+				"     preCommands: [],",
+				"     postCommands: [],",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     saveOrder: 1,",
+				"     partitionBy('key',",
+				"          0,",
+				"          byName($c_trg_partition_col)",
+				"     )) ~> sinkDimension",
+				"collectPartitionPruning sink(validateSchema: false,",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     store: 'cache',",
+				"     format: 'inline',",
+				"     output: false,",
+				"     saveOrder: 1,",
+				"     mapColumn(",
+				"          PARTITION_PRUNING = PARTITION",
+				"     )) ~> sinkPartitionPruning"
+			]
+		}
+	}
+}
