@@ -1,0 +1,660 @@
+{
+	"name": "ServerlessObjectsDeploy",
+	"properties": {
+		"activities": [
+			{
+				"name": "ForEachScript",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "ForEachInitScript",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "ForEachTextReplaceMap",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@variables('v_scripts')",
+						"type": "Expression"
+					},
+					"isSequential": false,
+					"activities": [
+						{
+							"name": "Run SQL Script",
+							"type": "Script",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 2,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"linkedServiceName": {
+								"referenceName": "serverless_ARIR",
+								"type": "LinkedServiceReference",
+								"parameters": {
+									"p_database": "master"
+								}
+							},
+							"typeProperties": {
+								"scripts": [
+									{
+										"type": "NonQuery",
+										"text": {
+											"value": "@replace(item().query, '{raw_storage_account}', pipeline().parameters.c_raw_storage_account)",
+											"type": "Expression"
+										}
+									}
+								]
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Copy SQL scripts",
+				"type": "Copy",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "RestSource",
+						"httpRequestTimeout": "00:01:40",
+						"requestInterval": "00.00:00:00.010",
+						"requestMethod": "GET",
+						"paginationRules": {
+							"AbsoluteUrl": "$.nextLink"
+						}
+					},
+					"sink": {
+						"type": "ParquetSink",
+						"storeSettings": {
+							"type": "AzureBlobFSWriteSettings"
+						},
+						"formatSettings": {
+							"type": "ParquetWriteSettings"
+						}
+					},
+					"enableStaging": false,
+					"translator": {
+						"type": "TabularTranslator",
+						"mappings": [
+							{
+								"source": {
+									"path": "['id']"
+								},
+								"sink": {
+									"name": "id"
+								}
+							},
+							{
+								"source": {
+									"path": "['name']"
+								},
+								"sink": {
+									"name": "name"
+								}
+							},
+							{
+								"source": {
+									"path": "['type']"
+								},
+								"sink": {
+									"name": "type"
+								}
+							},
+							{
+								"source": {
+									"path": "['etag']"
+								},
+								"sink": {
+									"name": "etag"
+								}
+							},
+							{
+								"source": {
+									"path": "['properties']['folder']['name']"
+								},
+								"sink": {
+									"name": "folderName"
+								}
+							},
+							{
+								"source": {
+									"path": "['properties']['content']['query']"
+								},
+								"sink": {
+									"name": "query"
+								}
+							},
+							{
+								"source": {
+									"path": "['properties']['content']['metadata']['language']"
+								},
+								"sink": {
+									"name": "language"
+								}
+							},
+							{
+								"source": {
+									"path": "['properties']['content']['currentConnection']['databaseName']"
+								},
+								"sink": {
+									"name": "databaseName"
+								}
+							},
+							{
+								"source": {
+									"path": "['properties']['content']['currentConnection']['poolName']"
+								},
+								"sink": {
+									"name": "poolName"
+								}
+							},
+							{
+								"source": {
+									"path": "['properties']['content']['resultLimit']"
+								},
+								"sink": {
+									"name": "resultLimit"
+								}
+							},
+							{
+								"source": {
+									"path": "['properties']['type']"
+								},
+								"sink": {
+									"name": "connectionType"
+								}
+							}
+						],
+						"collectionReference": "$['value']"
+					}
+				},
+				"inputs": [
+					{
+						"referenceName": "azuresynapse",
+						"type": "DatasetReference",
+						"parameters": {
+							"p_workspace": {
+								"value": "@pipeline().DataFactory",
+								"type": "Expression"
+							},
+							"p_relative_url": "/sqlScripts/?api-version=2020-12-01"
+						}
+					}
+				],
+				"outputs": [
+					{
+						"referenceName": "GenericRawParquet",
+						"type": "DatasetReference",
+						"parameters": {
+							"p_container": {
+								"value": "@pipeline().parameters.c_raw_container",
+								"type": "Expression"
+							},
+							"p_folder": {
+								"value": "@pipeline().parameters.c_raw_folder",
+								"type": "Expression"
+							},
+							"p_file": {
+								"value": "@pipeline().parameters.c_raw_file",
+								"type": "Expression"
+							}
+						}
+					}
+				]
+			},
+			{
+				"name": "Filter Scripts",
+				"type": "Script",
+				"dependsOn": [
+					{
+						"activity": "Copy SQL scripts",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 2,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"linkedServiceName": {
+					"referenceName": "serverless_ARIR",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"p_database": "master"
+					}
+				},
+				"typeProperties": {
+					"scripts": [
+						{
+							"type": "Query",
+							"text": {
+								"value": "SELECT\n    *\nFROM\n    OPENROWSET(\n        BULK 'https://@{pipeline().parameters.c_raw_storage_account}.dfs.core.windows.net/@{pipeline().parameters.c_raw_container}/@{pipeline().parameters.c_raw_folder}/@{pipeline().parameters.c_raw_file}.parquet',\n        FORMAT = 'PARQUET'\n    ) \nWITH (id nvarchar(1000),\nname nvarchar(255),\ntype nvarchar(100),\netag nvarchar(100),\nfolderName nvarchar(1000),\nquery nvarchar(max),\nlanguage nvarchar(100),\ndatabaseName nvarchar(100),\npoolName nvarchar(100),\nresultLimit int,\nconnectionType nvarchar(100)\n) AS [result]\nwhere left(folderName, len('@{pipeline().parameters.c_script_folder}')) = '@{pipeline().parameters.c_script_folder}'\nand charindex('@{pipeline().parameters.c_init_script_suffix}', name) = 0",
+								"type": "Expression"
+							}
+						}
+					],
+					"scriptBlockExecutionTimeout": "02:00:00"
+				}
+			},
+			{
+				"name": "Filter Init Scripts",
+				"type": "Script",
+				"dependsOn": [
+					{
+						"activity": "Copy SQL scripts",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "GenericRawParquet linked service",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"linkedServiceName": {
+					"referenceName": "serverless_ARIR",
+					"type": "LinkedServiceReference",
+					"parameters": {
+						"p_database": "master"
+					}
+				},
+				"typeProperties": {
+					"scripts": [
+						{
+							"type": "Query",
+							"text": {
+								"value": "SELECT\n    *\nFROM\n    OPENROWSET(\n        BULK '@{activity('GenericRawParquet linked service').output.properties.typeProperties.url}@{pipeline().parameters.c_raw_container}/@{pipeline().parameters.c_raw_folder}/@{pipeline().parameters.c_raw_file}.parquet',\n        FORMAT = 'PARQUET'\n    ) \nWITH (id nvarchar(1000),\nname nvarchar(255),\ntype nvarchar(100),\netag nvarchar(100),\nfolderName nvarchar(1000),\nquery nvarchar(max),\nlanguage nvarchar(100),\ndatabaseName nvarchar(100),\npoolName nvarchar(100),\nresultLimit int,\nconnectionType nvarchar(100)\n) AS [result]\nwhere left(folderName, len('@{pipeline().parameters.c_script_folder}')) = '@{pipeline().parameters.c_script_folder}'\nand charindex('@{pipeline().parameters.c_init_script_suffix}', name) > 0\n\nunion\n\nSELECT\n    *\nFROM\n    OPENROWSET(\n        BULK '@{activity('GenericRawParquet linked service').output.properties.typeProperties.url}@{pipeline().parameters.c_raw_container}/@{pipeline().parameters.c_raw_folder}/@{pipeline().parameters.c_raw_file}.parquet',\n        FORMAT = 'PARQUET'\n    ) \nWITH (id nvarchar(1000),\nname nvarchar(255),\ntype nvarchar(100),\netag nvarchar(100),\nfolderName nvarchar(1000),\nquery nvarchar(max),\nlanguage nvarchar(100),\ndatabaseName nvarchar(100),\npoolName nvarchar(100),\nresultLimit int,\nconnectionType nvarchar(100)\n) AS [result]\nwhere left(folderName, len('@{pipeline().parameters.c_script_folder}')) = '@{pipeline().parameters.c_script_folder}'\nand charindex('@{pipeline().parameters.c_init_script_suffix}', name) = 0\n\norder by name",
+								"type": "Expression"
+							}
+						}
+					],
+					"scriptBlockExecutionTimeout": "02:00:00"
+				}
+			},
+			{
+				"name": "ForEachInitScript",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "ForEachTextReplaceMap Init",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@variables('v_scripts')",
+						"type": "Expression"
+					},
+					"isSequential": false,
+					"activities": [
+						{
+							"name": "Run Init Script",
+							"type": "Script",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 2,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"linkedServiceName": {
+								"referenceName": "serverless_ARIR",
+								"type": "LinkedServiceReference",
+								"parameters": {
+									"p_database": "master"
+								}
+							},
+							"typeProperties": {
+								"scripts": [
+									{
+										"type": "NonQuery",
+										"text": {
+											"value": "@item().query",
+											"type": "Expression"
+										}
+									}
+								]
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "ForEachTextReplaceMap Init",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "Set v_scripts Init",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@json(string(pipeline().parameters.c_text_replacement))",
+						"type": "Expression"
+					},
+					"isSequential": true,
+					"activities": [
+						{
+							"name": "Set v_scripts_tmp Init",
+							"type": "SetVariable",
+							"dependsOn": [],
+							"policy": {
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "v_scripts_tmp",
+								"value": {
+									"value": "@replace(string(variables('v_scripts')), item().textToFind, item().textForReplace)",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "Update v_scripts Init",
+							"type": "SetVariable",
+							"dependsOn": [
+								{
+									"activity": "Set v_scripts_tmp Init",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "v_scripts",
+								"value": {
+									"value": "@json(variables('v_scripts_tmp'))",
+									"type": "Expression"
+								}
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Set v_scripts Init",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "Filter Init Scripts",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "v_scripts",
+					"value": {
+						"value": "@activity('Filter Init Scripts').output.resultSets[0].rows",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "ForEachTextReplaceMap",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "Set v_scripts",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@json(string(pipeline().parameters.c_text_replacement))",
+						"type": "Expression"
+					},
+					"isSequential": true,
+					"activities": [
+						{
+							"name": "Set v_scripts_tmp",
+							"type": "SetVariable",
+							"dependsOn": [],
+							"policy": {
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "v_scripts_tmp",
+								"value": {
+									"value": "@replace(string(variables('v_scripts')), item().textToFind, item().textForReplace)",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "Update v_scripts",
+							"type": "SetVariable",
+							"dependsOn": [
+								{
+									"activity": "Set v_scripts_tmp",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "v_scripts",
+								"value": {
+									"value": "@json(variables('v_scripts_tmp'))",
+									"type": "Expression"
+								}
+							}
+						}
+					]
+				}
+			},
+			{
+				"name": "Set v_scripts",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "Filter Scripts",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "ForEachInitScript",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "v_scripts",
+					"value": {
+						"value": "@activity('Filter Scripts').output.resultSets[0].rows",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "GenericRawParquet attributes",
+				"type": "WebActivity",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"method": "GET",
+					"url": {
+						"value": "@concat('https://', pipeline().DataFactory, '.dev.azuresynapse.net/datasets/GenericRawParquet?api-version=2020-12-01')",
+						"type": "Expression"
+					},
+					"connectVia": {
+						"referenceName": "SHIR",
+						"type": "IntegrationRuntimeReference"
+					},
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://dev.azuresynapse.net/"
+					}
+				}
+			},
+			{
+				"name": "GenericRawParquet linked service",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "GenericRawParquet attributes",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"method": "GET",
+					"url": {
+						"value": "@concat('https://', pipeline().DataFactory, '.dev.azuresynapse.net/linkedservices/', activity('GenericRawParquet attributes').output.properties.linkedServiceName.referenceName, '?api-version=2020-12-01')",
+						"type": "Expression"
+					},
+					"connectVia": {
+						"referenceName": "SHIR",
+						"type": "IntegrationRuntimeReference"
+					},
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://dev.azuresynapse.net/"
+					}
+				}
+			}
+		],
+		"parameters": {
+			"c_script_folder": {
+				"type": "string",
+				"defaultValue": "Serverless Deploy"
+			},
+			"c_raw_container": {
+				"type": "string",
+				"defaultValue": "template"
+			},
+			"c_raw_folder": {
+				"type": "string",
+				"defaultValue": "ServerlessObjectsDeploy"
+			},
+			"c_raw_file": {
+				"type": "string",
+				"defaultValue": "sqlScripts"
+			},
+			"c_text_replacement": {
+				"type": "string",
+				"defaultValue": [
+					{
+						"textToFind": "{raw_storage_account}",
+						"textForReplace": "kbsmoderndwdevrawst002"
+					},
+					{
+						"textToFind": "{cur_storage_account}",
+						"textForReplace": "kbsmoderndwdevcurst002"
+					}
+				]
+			},
+			"c_init_script_suffix": {
+				"type": "string",
+				"defaultValue": "_Init_"
+			},
+			"c_raw_storage_account": {
+				"type": "string",
+				"defaultValue": "kbsmoderndwdevrawst002"
+			}
+		},
+		"variables": {
+			"v_scripts_tmp": {
+				"type": "String"
+			},
+			"v_scripts": {
+				"type": "Array"
+			}
+		},
+		"folder": {
+			"name": "Templates"
+		},
+		"annotations": [],
+		"lastPublishTime": "2023-10-16T14:41:01Z"
+	},
+	"type": "Microsoft.Synapse/workspaces/pipelines"
+}
