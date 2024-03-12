@@ -5,7 +5,7 @@
 			"name": "Serverless Deploy"
 		},
 		"content": {
-			"query": "IF NOT EXISTS (SELECT * FROM sys.external_file_formats WHERE name = 'Delta') \n\tCREATE EXTERNAL FILE FORMAT Delta\n\tWITH (\n\t\tFORMAT_TYPE = DELTA\n\t)",
+			"query": "use templateDB\n\nIF NOT EXISTS (SELECT * FROM sys.external_file_formats WHERE name = 'Delta') \n\tCREATE EXTERNAL FILE FORMAT Delta\n\tWITH (\n\t\tFORMAT_TYPE = DELTA\n\t)",
 			"metadata": {
 				"language": "sql"
 			},

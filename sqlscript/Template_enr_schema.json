@@ -5,7 +5,7 @@
 			"name": "Serverless Deploy"
 		},
 		"content": {
-			"query": "IF NOT EXISTS (SELECT * FROM sys.schemas WHERE name = 'enr') \nEXEC('CREATE SCHEMA [enr]')",
+			"query": "use templateDB\n\nIF NOT EXISTS (SELECT * FROM sys.schemas WHERE name = 'enr') \nEXEC('CREATE SCHEMA [enr]')",
 			"metadata": {
 				"language": "sql"
 			},
