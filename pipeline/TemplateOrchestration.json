@@ -1,0 +1,225 @@
+{
+	"name": "TemplateOrchestration",
+	"properties": {
+		"activities": [
+			{
+				"name": "ServerlessDBDeploy",
+				"type": "ExecutePipeline",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "ServerlessDBDeploy",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true
+				}
+			},
+			{
+				"name": "ServerlessObjectsDeploy",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "ServerlessDBDeploy",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "ServerlessObjectsDeploy",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true
+				}
+			},
+			{
+				"name": "FromRESTAPIToJson",
+				"type": "ExecutePipeline",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "FromRESTAPIToJson",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true
+				}
+			},
+			{
+				"name": "FromJsonToDeltaParquet",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "FromRESTAPIToJson",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "ServerlessObjectsDeploy",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "FromJsonToDeltaParquet",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true
+				}
+			},
+			{
+				"name": "FromSQLtoRawParquet",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "FromJsonToDeltaParquet",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "FromSQLtoRawParquet",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true
+				}
+			},
+			{
+				"name": "FromParquetToDeltaParquet",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "FromSQLtoRawParquet",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "FromParquetToDeltaParquet",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true
+				}
+			},
+			{
+				"name": "Dataflows_StarSchemaDimension",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "FromJsonToDeltaParquet",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "StarSchemaDimension",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"p_trg_table": "DimDataflows",
+						"p_surrogate_key_col": "dataflows_key",
+						"p_src_object": "dataflows_REST_API"
+					}
+				}
+			},
+			{
+				"name": "Datasets_StarSchemaDimension",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "FromJsonToDeltaParquet",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "StarSchemaDimension",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true,
+					"parameters": {
+						"p_trg_table": "DimDatasets",
+						"p_surrogate_key_col": "datasets_key",
+						"p_src_object": "datasets_REST_API"
+					}
+				}
+			},
+			{
+				"name": "FromDeltaToWideDelta",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "FromJsonToDeltaParquet",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "FromDeltaToWideDelta",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true
+				}
+			},
+			{
+				"name": "StarSchemaFact",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Dataflows_StarSchemaDimension",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "Datasets_StarSchemaDimension",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					},
+					{
+						"activity": "FromDeltaToWideDelta",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "StarSchemaFact",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true
+				}
+			}
+		],
+		"folder": {
+			"name": "Templates"
+		},
+		"annotations": []
+	}
+}
