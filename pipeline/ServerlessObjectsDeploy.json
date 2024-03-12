@@ -430,7 +430,7 @@
 				"defaultValue": "sqlScripts"
 			},
 			"c_text_replacement": {
-				"type": "string",
+				"type": "array",
 				"defaultValue": [
 					{
 						"textToFind": "{raw_storage_account}",
