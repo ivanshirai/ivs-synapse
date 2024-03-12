@@ -350,19 +350,11 @@
 							"userProperties": [],
 							"typeProperties": {
 								"dataflow": {
-									"referenceName": "StarSchemaDimension",
+									"referenceName": "StarSchemaFact",
 									"type": "DataFlowReference",
 									"parameters": {
 										"p_src_key_cols": {
 											"value": "@pipeline().parameters.p_src_key_cols",
-											"type": "Expression"
-										},
-										"p_src_cdc_col": {
-											"value": "'@{pipeline().parameters.p_src_cdc_col}'",
-											"type": "Expression"
-										},
-										"p_surrogate_key_col": {
-											"value": "'@{pipeline().parameters.p_surrogate_key_col}'",
 											"type": "Expression"
 										},
 										"c_trg_dss_update_col": {
@@ -381,24 +373,8 @@
 											"value": "'@{pipeline().parameters.c_trg_partition_col}'",
 											"type": "Expression"
 										},
-										"p_src_schema": {
-											"value": "'@{pipeline().parameters.p_src_schema}'",
-											"type": "Expression"
-										},
-										"p_src_object": {
-											"value": "'@{pipeline().parameters.p_src_object}'",
-											"type": "Expression"
-										},
-										"p_datetime_from": {
-											"value": "'@{variables('v_datetime_from')}'",
-											"type": "Expression"
-										},
 										"p_trg_table": {
 											"value": "'@{pipeline().parameters.p_trg_table}'",
-											"type": "Expression"
-										},
-										"p_init_load": {
-											"value": "@not(activity('GetTargetDeltaMetadata').output.exists)",
 											"type": "Expression"
 										},
 										"c_trg_container": {
@@ -407,6 +383,14 @@
 										},
 										"c_trg_root_folder": {
 											"value": "'@{pipeline().parameters.c_trg_root_folder}'",
+											"type": "Expression"
+										},
+										"p_src_query": {
+											"value": "@concat('\"', activity('ScriptStagingDimKeysSQL').output.resultSets[0].rows[0].sourceQuery, '\"')",
+											"type": "Expression"
+										},
+										"p_trg_query": {
+											"value": "@concat('\"', activity('ScriptFactCreateTime').output.resultSets[0].rows[0].targetQuery, '\"')",
 											"type": "Expression"
 										}
 									},
@@ -419,23 +403,7 @@
 											"p_schema": "dummy",
 											"p_table": "dummy"
 										},
-										"Dimension": {
-											"p_database": {
-												"value": "@pipeline().parameters.c_serverless_db",
-												"type": "Expression"
-											},
-											"p_schema": "dummy",
-											"p_table": "dummy"
-										},
-										"DimensionMaxKey": {
-											"p_database": {
-												"value": "@pipeline().parameters.c_serverless_db",
-												"type": "Expression"
-											},
-											"p_schema": "dummy",
-											"p_table": "dummy"
-										},
-										"DimensionZeroRow": {
+										"Fact": {
 											"p_database": {
 												"value": "@pipeline().parameters.c_serverless_db",
 												"type": "Expression"
