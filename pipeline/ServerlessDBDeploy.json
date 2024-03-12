@@ -200,7 +200,7 @@
 			},
 			"p_key_vault_linked_service": {
 				"type": "string",
-				"defaultValue": "ivs_dwh_kv"
+				"defaultValue": "template_kv"
 			}
 		},
 		"variables": {
