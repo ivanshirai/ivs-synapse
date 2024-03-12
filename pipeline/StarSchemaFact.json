@@ -707,10 +707,6 @@
 			"p_datetime_from": {
 				"type": "string"
 			},
-			"p_surrogate_key_col": {
-				"type": "string",
-				"defaultValue": "dataflows_key"
-			},
 			"p_src_schema": {
 				"type": "string",
 				"defaultValue": "enr"

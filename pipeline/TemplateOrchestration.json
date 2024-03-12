@@ -12,7 +12,13 @@
 						"referenceName": "ServerlessDBDeploy",
 						"type": "PipelineReference"
 					},
-					"waitOnCompletion": true
+					"waitOnCompletion": true,
+					"parameters": {
+						"p_serverless_db": {
+							"value": "@pipeline().parameters.p_serverless_db",
+							"type": "Expression"
+						}
+					}
 				}
 			},
 			{
@@ -32,7 +38,13 @@
 						"referenceName": "ServerlessObjectsDeploy",
 						"type": "PipelineReference"
 					},
-					"waitOnCompletion": true
+					"waitOnCompletion": true,
+					"parameters": {
+						"c_text_replacement": {
+							"value": "@pipeline().parameters.c_text_replacement",
+							"type": "Expression"
+						}
+					}
 				}
 			},
 			{
@@ -45,7 +57,17 @@
 						"referenceName": "FromRESTAPIToJson",
 						"type": "PipelineReference"
 					},
-					"waitOnCompletion": true
+					"waitOnCompletion": true,
+					"parameters": {
+						"p_datasets": {
+							"value": "@pipeline().parameters.p_rest_api_datasets",
+							"type": "Expression"
+						},
+						"p_datetime_from": {
+							"value": "@pipeline().parameters.p_datetime_from",
+							"type": "Expression"
+						}
+					}
 				}
 			},
 			{
@@ -71,7 +93,17 @@
 						"referenceName": "FromJsonToDeltaParquet",
 						"type": "PipelineReference"
 					},
-					"waitOnCompletion": true
+					"waitOnCompletion": true,
+					"parameters": {
+						"p_datasets": {
+							"value": "@pipeline().parameters.p_json_to_delta_datasets",
+							"type": "Expression"
+						},
+						"p_datetime_from": {
+							"value": "@pipeline().parameters.p_datetime_from",
+							"type": "Expression"
+						}
+					}
 				}
 			},
 			{
@@ -91,7 +123,17 @@
 						"referenceName": "FromSQLtoRawParquet",
 						"type": "PipelineReference"
 					},
-					"waitOnCompletion": true
+					"waitOnCompletion": true,
+					"parameters": {
+						"p_datasets": {
+							"value": "@pipeline().parameters.p_sql_to_parquet_datasets",
+							"type": "Expression"
+						},
+						"p_datetime_from": {
+							"value": "@pipeline().parameters.p_datetime_from",
+							"type": "Expression"
+						}
+					}
 				}
 			},
 			{
@@ -111,7 +153,17 @@
 						"referenceName": "FromParquetToDeltaParquet",
 						"type": "PipelineReference"
 					},
-					"waitOnCompletion": true
+					"waitOnCompletion": true,
+					"parameters": {
+						"p_datasets": {
+							"value": "@pipeline().parameters.p_parquet_to_delta_datasets",
+							"type": "Expression"
+						},
+						"p_datetime_from": {
+							"value": "@pipeline().parameters.p_datetime_from",
+							"type": "Expression"
+						}
+					}
 				}
 			},
 			{
@@ -134,8 +186,14 @@
 					"waitOnCompletion": true,
 					"parameters": {
 						"p_trg_table": "DimDataflows",
+						"p_datetime_from": {
+							"value": "@pipeline().parameters.p_datetime_from",
+							"type": "Expression"
+						},
 						"p_surrogate_key_col": "dataflows_key",
-						"p_src_object": "dataflows_REST_API"
+						"p_src_object": "dataflows_REST_API",
+						"p_src_key_cols": "[\"name\"]",
+						"p_data_type_replace": "[{\"col\":\"name\",\"dataType\":\"varchar(255)\"}]"
 					}
 				}
 			},
@@ -159,8 +217,14 @@
 					"waitOnCompletion": true,
 					"parameters": {
 						"p_trg_table": "DimDatasets",
+						"p_datetime_from": {
+							"value": "@pipeline().parameters.p_datetime_from",
+							"type": "Expression"
+						},
 						"p_surrogate_key_col": "datasets_key",
-						"p_src_object": "datasets_REST_API"
+						"p_src_object": "datasets_REST_API",
+						"p_src_key_cols": "[\"name\"]",
+						"p_data_type_replace": "[{\"col\":\"name\",\"dataType\":\"varchar(255)\"}]"
 					}
 				}
 			},
@@ -181,7 +245,17 @@
 						"referenceName": "FromDeltaToWideDelta",
 						"type": "PipelineReference"
 					},
-					"waitOnCompletion": true
+					"waitOnCompletion": true,
+					"parameters": {
+						"p_src_objects": {
+							"value": "@pipeline().parameters.p_delta_to_wide_src_objects",
+							"type": "Expression"
+						},
+						"p_datetime_from": {
+							"value": "@pipeline().parameters.p_datetime_from",
+							"type": "Expression"
+						}
+					}
 				}
 			},
 			{
@@ -213,10 +287,315 @@
 						"referenceName": "StarSchemaFact",
 						"type": "PipelineReference"
 					},
-					"waitOnCompletion": true
+					"waitOnCompletion": true,
+					"parameters": {
+						"p_trg_table": "FactDataflowsDatasets",
+						"p_datetime_from": {
+							"value": "@pipeline().parameters.p_datetime_from",
+							"type": "Expression"
+						},
+						"p_src_object": "dataflows_datasets_WIDE",
+						"p_src_key_cols": "[\"dataflows_name\",\"datasets_name\"]",
+						"p_data_type_replace": "{\"col\":\"dataflows_datasets_name\",\"dataType\":\"varchar(255)\"},{\"col\":\"dataflows_name\",\"dataType\":\"varchar(255)\"},{\"col\":\"datasets_name\",\"dataType\":\"varchar(255)\"}]",
+						"p_dw_dim_tabs": {
+							"value": "@pipeline().parameters.p_star_schema_dw_dim_tabs",
+							"type": "Expression"
+						}
+					}
 				}
 			}
 		],
+		"parameters": {
+			"p_serverless_db": {
+				"type": "array",
+				"defaultValue": [
+					{
+						"serverlessDB": "templateDB",
+						"masterkeySecret": "template-sqlpool-master-key",
+						"scopedCredential": "SynapseIdentity"
+					}
+				]
+			},
+			"p_rest_api_datasets": {
+				"type": "array",
+				"defaultValue": [
+					{
+						"source": "dataflows",
+						"target": "dataflows_REST_API",
+						"path": "/",
+						"delta": false,
+						"crossApplyField": "value",
+						"select": null,
+						"filter": "api-version=2020-12-01",
+						"cdcCol": null,
+						"keyCol": "name",
+						"relCol": null
+					},
+					{
+						"source": "datasets",
+						"target": "datasets_REST_API",
+						"path": "/",
+						"delta": false,
+						"crossApplyField": "value",
+						"select": null,
+						"filter": "api-version=2020-12-01",
+						"cdcCol": null,
+						"keyCol": "name",
+						"relCol": null
+					},
+					{
+						"source": "datasets",
+						"target": "datasets_relations11_REST_API",
+						"path": "/",
+						"delta": false,
+						"crossApplyField": "value",
+						"select": null,
+						"filter": "api-version=2020-12-01",
+						"cdcCol": null,
+						"keyCol": "name",
+						"relCol": null
+					},
+					{
+						"source": "dataflows",
+						"target": "dataflows_datasets_REST_API",
+						"path": "/",
+						"delta": false,
+						"crossApplyField": "value",
+						"select": null,
+						"filter": "api-version=2020-12-01",
+						"cdcCol": null,
+						"keyCol": "name",
+						"relCol": "properties.typeProperties.sources.dataset.referenceName"
+					}
+				]
+			},
+			"c_text_replacement": {
+				"type": "array",
+				"defaultValue": [
+					{
+						"textToFind": "{raw_storage_account}",
+						"textForReplace": "ivsraw"
+					},
+					{
+						"textToFind": "{enr_storage_account}",
+						"textForReplace": "ivscur"
+					},
+					{
+						"textToFind": "{cur_storage_account}",
+						"textForReplace": "ivscur"
+					}
+				]
+			},
+			"p_json_to_delta_datasets": {
+				"type": "array",
+				"defaultValue": [
+					{
+						"type": "basic",
+						"target": "dataflows_REST_API",
+						"cdcCol": null,
+						"keyCol": "name",
+						"dataTypeReplace": [
+							{
+								"col": "type",
+								"dataType": "nvarchar(200)"
+							}
+						],
+						"relCol": null,
+						"partitionFormula": "'dummy'"
+					},
+					{
+						"type": "basic",
+						"target": "datasets_REST_API",
+						"cdcCol": null,
+						"keyCol": "name",
+						"dataTypeReplace": [
+							{
+								"col": "type",
+								"dataType": "nvarchar(200)"
+							}
+						],
+						"relCol": null,
+						"partitionFormula": "'dummy'"
+					},
+					{
+						"type": "relationsMM",
+						"target": "dataflows_datasets_REST_API",
+						"cdcCol": null,
+						"keyCol": "name",
+						"dataTypeReplace": null,
+						"relCol": "properties.typeProperties.sources.dataset.referenceName",
+						"partitionFormula": "'dummy'"
+					},
+					{
+						"type": "relations11",
+						"target": "datasets_relations11_REST_API",
+						"cdcCol": null,
+						"keyCol": "name",
+						"dataTypeReplace": null,
+						"relCol": null,
+						"partitionFormula": "'dummy'"
+					}
+				]
+			},
+			"p_sql_to_parquet_datasets": {
+				"type": "array",
+				"defaultValue": [
+					{
+						"sourceObject": "dataflows_REST_API",
+						"sourceSchema": "enr",
+						"whereStatement": "",
+						"target": "dataflows_SQL",
+						"processingMode": "bulk",
+						"cdcCol": ""
+					},
+					{
+						"sourceObject": "datasets_REST_API",
+						"sourceSchema": "enr",
+						"whereStatement": "lower(name) like '%template%' or lower(name) like '%generic%'",
+						"target": "datasets_SQL",
+						"processingMode": "bulk",
+						"cdcCol": ""
+					},
+					{
+						"sourceObject": "datasets_relations11_REST_API",
+						"sourceSchema": "enr",
+						"whereStatement": "",
+						"target": "datasets_relations11_SQL",
+						"processingMode": "incremental",
+						"cdcCol": "enrTimestamp"
+					},
+					{
+						"sourceObject": "dataflows_datasets_REST_API",
+						"sourceSchema": "enr",
+						"whereStatement": "",
+						"target": "dataflows_datasets_SQL",
+						"processingMode": "incremental",
+						"cdcCol": "enrTimestamp"
+					}
+				]
+			},
+			"p_parquet_to_delta_datasets": {
+				"type": "array",
+				"defaultValue": [
+					{
+						"sourceObject": "dataflows_REST_API",
+						"sourceSchema": "enr",
+						"whereStatement": "",
+						"target": "dataflows_SQL",
+						"processingMode": "bulk",
+						"cdcCol": "",
+						"keyCol": [
+							"name"
+						],
+						"dataTypeReplace": null,
+						"partitionFormula": "'dummy'"
+					},
+					{
+						"sourceObject": "datasets_REST_API",
+						"sourceSchema": "enr",
+						"whereStatement": "",
+						"target": "datasets_SQL",
+						"processingMode": "bulk",
+						"cdcCol": "",
+						"keyCol": [
+							"name"
+						],
+						"dataTypeReplace": null,
+						"partitionFormula": "'dummy'"
+					},
+					{
+						"sourceObject": "datasets_relations11_REST_API",
+						"sourceSchema": "enr",
+						"whereStatement": "",
+						"target": "datasets_relations11_SQL",
+						"processingMode": "incremental",
+						"cdcCol": "enrTimestamp",
+						"keyCol": [
+							"name"
+						],
+						"dataTypeReplace": null,
+						"partitionFormula": "'dummy'"
+					},
+					{
+						"sourceObject": "dataflows_datasets_REST_API",
+						"sourceSchema": "enr",
+						"whereStatement": "",
+						"target": "dataflows_datasets_SQL",
+						"processingMode": "incremental",
+						"cdcCol": "enrTimestamp",
+						"keyCol": [
+							"name",
+							"propertiestypePropertiessourcesdatasetreferenceName"
+						],
+						"dataTypeReplace": null,
+						"partitionFormula": "'dummy'"
+					}
+				]
+			},
+			"p_delta_to_wide_src_objects": {
+				"type": "array",
+				"defaultValue": [
+					{
+						"iteration": 0,
+						"object": "dataflows_datasets_REST_API",
+						"schema": "enr",
+						"alias": "dataflows_datasets",
+						"trgKeyCol": "name,propertiestypePropertiessourcesdatasetreferenceName",
+						"cdcCol": "enrTimestamp",
+						"selectCols": "*",
+						"joinCondition": null,
+						"joinType": null,
+						"joinOrder": 0
+					},
+					{
+						"iteration": 0,
+						"object": "dataflows_REST_API",
+						"schema": "enr",
+						"alias": "dataflows",
+						"trgKeyCol": null,
+						"cdcCol": "enrTimestamp",
+						"selectCols": "*",
+						"joinCondition": "dataflows.name = dataflows_datasets.name",
+						"joinType": "left outer",
+						"joinOrder": 1
+					},
+					{
+						"iteration": 0,
+						"object": "datasets_REST_API",
+						"schema": "enr",
+						"alias": "datasets",
+						"trgKeyCol": null,
+						"cdcCol": "enrTimestamp",
+						"selectCols": "*",
+						"joinCondition": "datasets.name = dataflows_datasets.propertiestypePropertiessourcesdatasetreferenceName",
+						"joinType": "left outer",
+						"joinOrder": 2
+					}
+				]
+			},
+			"p_star_schema_dw_dim_tabs": {
+				"type": "array",
+				"defaultValue": [
+					{
+						"dimTab": "DimDataflows",
+						"dimAlias": "DimDataflows",
+						"dimKey": "dataflows_key",
+						"keyAlias": "dataflows_key",
+						"joinStatement": "stg.dataflows_name = DimDataflows.name"
+					},
+					{
+						"dimTab": "DimDatasets",
+						"dimAlias": "DimDatasets",
+						"dimKey": "datasets_key",
+						"keyAlias": "datasets_key",
+						"joinStatement": "stg.datasets_name = DimDatasets.name"
+					}
+				]
+			},
+			"p_datetime_from": {
+				"type": "string"
+			}
+		},
 		"folder": {
 			"name": "Templates"
 		},
