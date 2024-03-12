@@ -4171,7 +4171,7 @@
 					},
 					"p_key_vault_linked_service": {
 						"type": "string",
-						"defaultValue": "ivs_dwh_kv"
+						"defaultValue": "template_kv"
 					}
 				},
 				"variables": {
@@ -4188,6 +4188,487 @@
 			"dependsOn": [
 				"[concat(variables('workspaceId'), '/integrationRuntimes/SHIR')]",
 				"[concat(variables('workspaceId'), '/linkedServices/serverless_ARIR')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/ServerlessObjectsDeploy')]",
+			"type": "Microsoft.Synapse/workspaces/pipelines",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"activities": [
+					{
+						"name": "Copy SQL scripts",
+						"type": "Copy",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "RestSource",
+								"httpRequestTimeout": "00:01:40",
+								"requestInterval": "00.00:00:00.010",
+								"requestMethod": "GET",
+								"paginationRules": {
+									"AbsoluteUrl": "$.nextLink"
+								}
+							},
+							"sink": {
+								"type": "ParquetSink",
+								"storeSettings": {
+									"type": "AzureBlobFSWriteSettings"
+								},
+								"formatSettings": {
+									"type": "ParquetWriteSettings"
+								}
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"path": "['id']"
+										},
+										"sink": {
+											"name": "id"
+										}
+									},
+									{
+										"source": {
+											"path": "['name']"
+										},
+										"sink": {
+											"name": "name"
+										}
+									},
+									{
+										"source": {
+											"path": "['type']"
+										},
+										"sink": {
+											"name": "type"
+										}
+									},
+									{
+										"source": {
+											"path": "['etag']"
+										},
+										"sink": {
+											"name": "etag"
+										}
+									},
+									{
+										"source": {
+											"path": "['properties']['folder']['name']"
+										},
+										"sink": {
+											"name": "folderName"
+										}
+									},
+									{
+										"source": {
+											"path": "['properties']['content']['query']"
+										},
+										"sink": {
+											"name": "query"
+										}
+									},
+									{
+										"source": {
+											"path": "['properties']['content']['metadata']['language']"
+										},
+										"sink": {
+											"name": "language"
+										}
+									},
+									{
+										"source": {
+											"path": "['properties']['content']['currentConnection']['databaseName']"
+										},
+										"sink": {
+											"name": "databaseName"
+										}
+									},
+									{
+										"source": {
+											"path": "['properties']['content']['currentConnection']['poolName']"
+										},
+										"sink": {
+											"name": "poolName"
+										}
+									},
+									{
+										"source": {
+											"path": "['properties']['content']['resultLimit']"
+										},
+										"sink": {
+											"name": "resultLimit"
+										}
+									},
+									{
+										"source": {
+											"path": "['properties']['type']"
+										},
+										"sink": {
+											"name": "connectionType"
+										}
+									}
+								],
+								"collectionReference": "$['value']"
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "azuresynapse",
+								"type": "DatasetReference",
+								"parameters": {
+									"p_workspace": {
+										"value": "@pipeline().DataFactory",
+										"type": "Expression"
+									},
+									"p_relative_url": "/sqlScripts/?api-version=2020-12-01"
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "GenericRawParquet",
+								"type": "DatasetReference",
+								"parameters": {
+									"p_container": {
+										"value": "@pipeline().parameters.c_raw_container",
+										"type": "Expression"
+									},
+									"p_folder": {
+										"value": "@pipeline().parameters.c_raw_folder",
+										"type": "Expression"
+									},
+									"p_file": {
+										"value": "@pipeline().parameters.c_raw_file",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					},
+					{
+						"name": "Sort Scripts",
+						"type": "Script",
+						"dependsOn": [
+							{
+								"activity": "Copy SQL scripts",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "GenericRawParquet linked service",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"linkedServiceName": {
+							"referenceName": "serverless_ARIR",
+							"type": "LinkedServiceReference",
+							"parameters": {
+								"p_database": "master"
+							}
+						},
+						"typeProperties": {
+							"scripts": [
+								{
+									"type": "Query",
+									"text": {
+										"value": "SELECT\n    ' ' + name as name, query\nFROM\n    OPENROWSET(\n        BULK '@{activity('GenericRawParquet linked service').output.properties.typeProperties.url}@{pipeline().parameters.c_raw_container}/@{pipeline().parameters.c_raw_folder}/@{pipeline().parameters.c_raw_file}.parquet',\n        FORMAT = 'PARQUET'\n    ) \nWITH (id nvarchar(1000),\nname nvarchar(255),\ntype nvarchar(100),\netag nvarchar(100),\nfolderName nvarchar(1000),\nquery nvarchar(max),\nlanguage nvarchar(100),\ndatabaseName nvarchar(100),\npoolName nvarchar(100),\nresultLimit int,\nconnectionType nvarchar(100)\n) AS [result]\nwhere left(folderName, len('@{pipeline().parameters.c_script_folder}')) = '@{pipeline().parameters.c_script_folder}'\nand charindex('@{pipeline().parameters.c_init_script_suffix}', name) > 0\n\nunion\n\nSELECT\n    name, query\nFROM\n    OPENROWSET(\n        BULK '@{activity('GenericRawParquet linked service').output.properties.typeProperties.url}@{pipeline().parameters.c_raw_container}/@{pipeline().parameters.c_raw_folder}/@{pipeline().parameters.c_raw_file}.parquet',\n        FORMAT = 'PARQUET'\n    ) \nWITH (id nvarchar(1000),\nname nvarchar(255),\ntype nvarchar(100),\netag nvarchar(100),\nfolderName nvarchar(1000),\nquery nvarchar(max),\nlanguage nvarchar(100),\ndatabaseName nvarchar(100),\npoolName nvarchar(100),\nresultLimit int,\nconnectionType nvarchar(100)\n) AS [result]\nwhere left(folderName, len('@{pipeline().parameters.c_script_folder}')) = '@{pipeline().parameters.c_script_folder}'\nand charindex('@{pipeline().parameters.c_init_script_suffix}', name) = 0\n\norder by name",
+										"type": "Expression"
+									}
+								}
+							],
+							"scriptBlockExecutionTimeout": "02:00:00"
+						}
+					},
+					{
+						"name": "ForEachScript",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "ForEachTextReplaceMap",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@variables('v_scripts')",
+								"type": "Expression"
+							},
+							"isSequential": false,
+							"activities": [
+								{
+									"name": "Run Init Script",
+									"type": "Script",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"linkedServiceName": {
+										"referenceName": "serverless_ARIR",
+										"type": "LinkedServiceReference",
+										"parameters": {
+											"p_database": "master"
+										}
+									},
+									"typeProperties": {
+										"scripts": [
+											{
+												"type": "NonQuery",
+												"text": {
+													"value": "@item().query",
+													"type": "Expression"
+												}
+											}
+										]
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "ForEachTextReplaceMap",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "Set v_scripts",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@json(string(pipeline().parameters.c_text_replacement))",
+								"type": "Expression"
+							},
+							"isSequential": true,
+							"activities": [
+								{
+									"name": "Set v_scripts_tmp Init",
+									"type": "SetVariable",
+									"dependsOn": [],
+									"policy": {
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "v_scripts_tmp",
+										"value": {
+											"value": "@replace(string(variables('v_scripts')), item().textToFind, item().textForReplace)",
+											"type": "Expression"
+										}
+									}
+								},
+								{
+									"name": "Update v_scripts Init",
+									"type": "SetVariable",
+									"dependsOn": [
+										{
+											"activity": "Set v_scripts_tmp Init",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "v_scripts",
+										"value": {
+											"value": "@json(variables('v_scripts_tmp'))",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "Set v_scripts",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Sort Scripts",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "v_scripts",
+							"value": {
+								"value": "@activity('Sort Scripts').output.resultSets[0].rows",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "GenericRawParquet attributes",
+						"type": "WebActivity",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"method": "GET",
+							"headers": {},
+							"url": {
+								"value": "@concat('https://', pipeline().DataFactory, '.dev.azuresynapse.net/datasets/GenericRawParquet?api-version=2020-12-01')",
+								"type": "Expression"
+							},
+							"connectVia": {
+								"referenceName": "SHIR",
+								"type": "IntegrationRuntimeReference"
+							},
+							"authentication": {
+								"type": "MSI",
+								"resource": "https://dev.azuresynapse.net/"
+							}
+						}
+					},
+					{
+						"name": "GenericRawParquet linked service",
+						"type": "WebActivity",
+						"dependsOn": [
+							{
+								"activity": "GenericRawParquet attributes",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"method": "GET",
+							"headers": {},
+							"url": {
+								"value": "@concat('https://', pipeline().DataFactory, '.dev.azuresynapse.net/linkedservices/', activity('GenericRawParquet attributes').output.properties.linkedServiceName.referenceName, '?api-version=2020-12-01')",
+								"type": "Expression"
+							},
+							"connectVia": {
+								"referenceName": "SHIR",
+								"type": "IntegrationRuntimeReference"
+							},
+							"authentication": {
+								"type": "MSI",
+								"resource": "https://dev.azuresynapse.net/"
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"parameters": {
+					"c_script_folder": {
+						"type": "string",
+						"defaultValue": "Serverless Deploy"
+					},
+					"c_raw_container": {
+						"type": "string",
+						"defaultValue": "template"
+					},
+					"c_raw_folder": {
+						"type": "string",
+						"defaultValue": "ServerlessObjectsDeploy"
+					},
+					"c_raw_file": {
+						"type": "string",
+						"defaultValue": "sqlScripts"
+					},
+					"c_text_replacement": {
+						"type": "array",
+						"defaultValue": [
+							{
+								"textToFind": "{raw_storage_account}",
+								"textForReplace": "ivsraw"
+							},
+							{
+								"textToFind": "{enr_storage_account}",
+								"textForReplace": "ivscur"
+							},
+							{
+								"textToFind": "{cur_storage_account}",
+								"textForReplace": "ivscur"
+							}
+						]
+					},
+					"c_init_script_suffix": {
+						"type": "string",
+						"defaultValue": "_Init_"
+					}
+				},
+				"variables": {
+					"v_scripts_tmp": {
+						"type": "String"
+					},
+					"v_scripts": {
+						"type": "Array"
+					}
+				},
+				"folder": {
+					"name": "Templates"
+				},
+				"annotations": [],
+				"lastPublishTime": "2023-10-16T14:41:01Z"
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/datasets/azuresynapse')]",
+				"[concat(variables('workspaceId'), '/datasets/GenericRawParquet')]",
+				"[concat(variables('workspaceId'), '/linkedServices/serverless_ARIR')]",
+				"[concat(variables('workspaceId'), '/integrationRuntimes/SHIR')]"
 			]
 		},
 		{
@@ -5205,8 +5686,7 @@
 												},
 												"sinkDimension": {},
 												"sinkPartitionPruning": {}
-											},
-											"linkedServiceParameters": {}
+											}
 										},
 										"staging": {},
 										"compute": {
@@ -5492,10 +5972,6 @@
 					"p_datetime_from": {
 						"type": "string"
 					},
-					"p_surrogate_key_col": {
-						"type": "string",
-						"defaultValue": "dataflows_key"
-					},
 					"p_src_schema": {
 						"type": "string",
 						"defaultValue": "enr"
@@ -5608,8 +6084,7 @@
 				"[concat(variables('workspaceId'), '/datasets/GenericServerlessSQL')]",
 				"[concat(variables('workspaceId'), '/datasets/GenericEnrichedParquet')]",
 				"[concat(variables('workspaceId'), '/linkedServices/serverless_ARIR')]",
-				"[concat(variables('workspaceId'), '/dataflows/StarSchemaFact')]",
-				"[concat(variables('workspaceId'), '/integrationRuntimes/AutoResolveIntegrationRuntime')]"
+				"[concat(variables('workspaceId'), '/dataflows/StarSchemaFact')]"
 			]
 		},
 		{
@@ -11825,223 +12300,36 @@
 			"location": "westus"
 		},
 		{
-			"name": "[concat(parameters('workspaceName'), '/ServerlessObjectsDeploy')]",
+			"name": "[concat(parameters('workspaceName'), '/TemplateOrchestration')]",
 			"type": "Microsoft.Synapse/workspaces/pipelines",
 			"apiVersion": "2019-06-01-preview",
 			"properties": {
 				"activities": [
 					{
-						"name": "Copy SQL scripts",
-						"type": "Copy",
+						"name": "ServerlessDBDeploy",
+						"type": "ExecutePipeline",
 						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
 						"userProperties": [],
 						"typeProperties": {
-							"source": {
-								"type": "RestSource",
-								"httpRequestTimeout": "00:01:40",
-								"requestInterval": "00.00:00:00.010",
-								"requestMethod": "GET",
-								"paginationRules": {
-									"AbsoluteUrl": "$.nextLink"
-								}
+							"pipeline": {
+								"referenceName": "ServerlessDBDeploy",
+								"type": "PipelineReference"
 							},
-							"sink": {
-								"type": "ParquetSink",
-								"storeSettings": {
-									"type": "AzureBlobFSWriteSettings"
-								},
-								"formatSettings": {
-									"type": "ParquetWriteSettings"
-								}
-							},
-							"enableStaging": false,
-							"translator": {
-								"type": "TabularTranslator",
-								"mappings": [
-									{
-										"source": {
-											"path": "['id']"
-										},
-										"sink": {
-											"name": "id"
-										}
-									},
-									{
-										"source": {
-											"path": "['name']"
-										},
-										"sink": {
-											"name": "name"
-										}
-									},
-									{
-										"source": {
-											"path": "['type']"
-										},
-										"sink": {
-											"name": "type"
-										}
-									},
-									{
-										"source": {
-											"path": "['etag']"
-										},
-										"sink": {
-											"name": "etag"
-										}
-									},
-									{
-										"source": {
-											"path": "['properties']['folder']['name']"
-										},
-										"sink": {
-											"name": "folderName"
-										}
-									},
-									{
-										"source": {
-											"path": "['properties']['content']['query']"
-										},
-										"sink": {
-											"name": "query"
-										}
-									},
-									{
-										"source": {
-											"path": "['properties']['content']['metadata']['language']"
-										},
-										"sink": {
-											"name": "language"
-										}
-									},
-									{
-										"source": {
-											"path": "['properties']['content']['currentConnection']['databaseName']"
-										},
-										"sink": {
-											"name": "databaseName"
-										}
-									},
-									{
-										"source": {
-											"path": "['properties']['content']['currentConnection']['poolName']"
-										},
-										"sink": {
-											"name": "poolName"
-										}
-									},
-									{
-										"source": {
-											"path": "['properties']['content']['resultLimit']"
-										},
-										"sink": {
-											"name": "resultLimit"
-										}
-									},
-									{
-										"source": {
-											"path": "['properties']['type']"
-										},
-										"sink": {
-											"name": "connectionType"
-										}
-									}
-								],
-								"collectionReference": "$['value']"
-							}
-						},
-						"inputs": [
-							{
-								"referenceName": "azuresynapse",
-								"type": "DatasetReference",
-								"parameters": {
-									"p_workspace": {
-										"value": "@pipeline().DataFactory",
-										"type": "Expression"
-									},
-									"p_relative_url": "/sqlScripts/?api-version=2020-12-01"
-								}
-							}
-						],
-						"outputs": [
-							{
-								"referenceName": "GenericRawParquet",
-								"type": "DatasetReference",
-								"parameters": {
-									"p_container": {
-										"value": "@pipeline().parameters.c_raw_container",
-										"type": "Expression"
-									},
-									"p_folder": {
-										"value": "@pipeline().parameters.c_raw_folder",
-										"type": "Expression"
-									},
-									"p_file": {
-										"value": "@pipeline().parameters.c_raw_file",
-										"type": "Expression"
-									}
-								}
-							}
-						]
-					},
-					{
-						"name": "Sort Scripts",
-						"type": "Script",
-						"dependsOn": [
-							{
-								"activity": "Copy SQL scripts",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							},
-							{
-								"activity": "GenericRawParquet linked service",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"linkedServiceName": {
-							"referenceName": "serverless_ARIR",
-							"type": "LinkedServiceReference",
+							"waitOnCompletion": true,
 							"parameters": {
-								"p_database": "master"
-							}
-						},
-						"typeProperties": {
-							"scripts": [
-								{
-									"type": "Query",
-									"text": {
-										"value": "SELECT\n    ' ' + name as name, query\nFROM\n    OPENROWSET(\n        BULK '@{activity('GenericRawParquet linked service').output.properties.typeProperties.url}@{pipeline().parameters.c_raw_container}/@{pipeline().parameters.c_raw_folder}/@{pipeline().parameters.c_raw_file}.parquet',\n        FORMAT = 'PARQUET'\n    ) \nWITH (id nvarchar(1000),\nname nvarchar(255),\ntype nvarchar(100),\netag nvarchar(100),\nfolderName nvarchar(1000),\nquery nvarchar(max),\nlanguage nvarchar(100),\ndatabaseName nvarchar(100),\npoolName nvarchar(100),\nresultLimit int,\nconnectionType nvarchar(100)\n) AS [result]\nwhere left(folderName, len('@{pipeline().parameters.c_script_folder}')) = '@{pipeline().parameters.c_script_folder}'\nand charindex('@{pipeline().parameters.c_init_script_suffix}', name) > 0\n\nunion\n\nSELECT\n    name, query\nFROM\n    OPENROWSET(\n        BULK '@{activity('GenericRawParquet linked service').output.properties.typeProperties.url}@{pipeline().parameters.c_raw_container}/@{pipeline().parameters.c_raw_folder}/@{pipeline().parameters.c_raw_file}.parquet',\n        FORMAT = 'PARQUET'\n    ) \nWITH (id nvarchar(1000),\nname nvarchar(255),\ntype nvarchar(100),\netag nvarchar(100),\nfolderName nvarchar(1000),\nquery nvarchar(max),\nlanguage nvarchar(100),\ndatabaseName nvarchar(100),\npoolName nvarchar(100),\nresultLimit int,\nconnectionType nvarchar(100)\n) AS [result]\nwhere left(folderName, len('@{pipeline().parameters.c_script_folder}')) = '@{pipeline().parameters.c_script_folder}'\nand charindex('@{pipeline().parameters.c_init_script_suffix}', name) = 0\n\norder by name",
-										"type": "Expression"
-									}
+								"p_serverless_db": {
+									"value": "@pipeline().parameters.p_serverless_db",
+									"type": "Expression"
 								}
-							],
-							"scriptBlockExecutionTimeout": "02:00:00"
+							}
 						}
 					},
 					{
-						"name": "ForEachScript",
-						"type": "ForEach",
+						"name": "ServerlessObjectsDeploy",
+						"type": "ExecutePipeline",
 						"dependsOn": [
 							{
-								"activity": "ForEachTextReplaceMap",
+								"activity": "ServerlessDBDeploy",
 								"dependencyConditions": [
 									"Succeeded"
 								]
@@ -12049,195 +12337,273 @@
 						],
 						"userProperties": [],
 						"typeProperties": {
-							"items": {
-								"value": "@variables('v_scripts')",
-								"type": "Expression"
+							"pipeline": {
+								"referenceName": "ServerlessObjectsDeploy",
+								"type": "PipelineReference"
 							},
-							"isSequential": false,
-							"activities": [
-								{
-									"name": "Run Init Script",
-									"type": "Script",
-									"dependsOn": [],
-									"policy": {
-										"timeout": "0.12:00:00",
-										"retry": 0,
-										"retryIntervalInSeconds": 30,
-										"secureOutput": false,
-										"secureInput": false
-									},
-									"userProperties": [],
-									"linkedServiceName": {
-										"referenceName": "serverless_ARIR",
-										"type": "LinkedServiceReference",
-										"parameters": {
-											"p_database": "master"
-										}
-									},
-									"typeProperties": {
-										"scripts": [
-											{
-												"type": "NonQuery",
-												"text": {
-													"value": "@item().query",
-													"type": "Expression"
-												}
-											}
-										]
-									}
+							"waitOnCompletion": true,
+							"parameters": {
+								"c_text_replacement": {
+									"value": "@pipeline().parameters.c_text_replacement",
+									"type": "Expression"
 								}
-							]
-						}
-					},
-					{
-						"name": "ForEachTextReplaceMap",
-						"type": "ForEach",
-						"dependsOn": [
-							{
-								"activity": "Set v_scripts",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"userProperties": [],
-						"typeProperties": {
-							"items": {
-								"value": "@json(string(pipeline().parameters.c_text_replacement))",
-								"type": "Expression"
-							},
-							"isSequential": true,
-							"activities": [
-								{
-									"name": "Set v_scripts_tmp Init",
-									"type": "SetVariable",
-									"dependsOn": [],
-									"policy": {
-										"secureOutput": false,
-										"secureInput": false
-									},
-									"userProperties": [],
-									"typeProperties": {
-										"variableName": "v_scripts_tmp",
-										"value": {
-											"value": "@replace(string(variables('v_scripts')), item().textToFind, item().textForReplace)",
-											"type": "Expression"
-										}
-									}
-								},
-								{
-									"name": "Update v_scripts Init",
-									"type": "SetVariable",
-									"dependsOn": [
-										{
-											"activity": "Set v_scripts_tmp Init",
-											"dependencyConditions": [
-												"Succeeded"
-											]
-										}
-									],
-									"policy": {
-										"secureOutput": false,
-										"secureInput": false
-									},
-									"userProperties": [],
-									"typeProperties": {
-										"variableName": "v_scripts",
-										"value": {
-											"value": "@json(variables('v_scripts_tmp'))",
-											"type": "Expression"
-										}
-									}
-								}
-							]
-						}
-					},
-					{
-						"name": "Set v_scripts",
-						"type": "SetVariable",
-						"dependsOn": [
-							{
-								"activity": "Sort Scripts",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"variableName": "v_scripts",
-							"value": {
-								"value": "@activity('Sort Scripts').output.resultSets[0].rows",
-								"type": "Expression"
 							}
 						}
 					},
 					{
-						"name": "GenericRawParquet attributes",
-						"type": "WebActivity",
+						"name": "FromRESTAPIToJson",
+						"type": "ExecutePipeline",
 						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
 						"userProperties": [],
 						"typeProperties": {
-							"method": "GET",
-							"headers": {},
-							"url": {
-								"value": "@concat('https://', pipeline().DataFactory, '.dev.azuresynapse.net/datasets/GenericRawParquet?api-version=2020-12-01')",
-								"type": "Expression"
+							"pipeline": {
+								"referenceName": "FromRESTAPIToJson",
+								"type": "PipelineReference"
 							},
-							"connectVia": {
-								"referenceName": "SHIR",
-								"type": "IntegrationRuntimeReference"
-							},
-							"authentication": {
-								"type": "MSI",
-								"resource": "https://dev.azuresynapse.net/"
+							"waitOnCompletion": true,
+							"parameters": {
+								"p_datasets": {
+									"value": "@pipeline().parameters.p_rest_api_datasets",
+									"type": "Expression"
+								},
+								"p_datetime_from": {
+									"value": "@pipeline().parameters.p_datetime_from",
+									"type": "Expression"
+								}
 							}
 						}
 					},
 					{
-						"name": "GenericRawParquet linked service",
-						"type": "WebActivity",
+						"name": "FromJsonToDeltaParquet",
+						"type": "ExecutePipeline",
 						"dependsOn": [
 							{
-								"activity": "GenericRawParquet attributes",
+								"activity": "FromRESTAPIToJson",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "ServerlessObjectsDeploy",
 								"dependencyConditions": [
 									"Succeeded"
 								]
 							}
 						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
 						"userProperties": [],
 						"typeProperties": {
-							"method": "GET",
-							"headers": {},
-							"url": {
-								"value": "@concat('https://', pipeline().DataFactory, '.dev.azuresynapse.net/linkedservices/', activity('GenericRawParquet attributes').output.properties.linkedServiceName.referenceName, '?api-version=2020-12-01')",
-								"type": "Expression"
+							"pipeline": {
+								"referenceName": "FromJsonToDeltaParquet",
+								"type": "PipelineReference"
 							},
-							"connectVia": {
-								"referenceName": "SHIR",
-								"type": "IntegrationRuntimeReference"
+							"waitOnCompletion": true,
+							"parameters": {
+								"p_datasets": {
+									"value": "@pipeline().parameters.p_json_to_delta_datasets",
+									"type": "Expression"
+								},
+								"p_datetime_from": {
+									"value": "@pipeline().parameters.p_datetime_from",
+									"type": "Expression"
+								}
+							}
+						}
+					},
+					{
+						"name": "FromSQLtoRawParquet",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "FromJsonToDeltaParquet",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "FromSQLtoRawParquet",
+								"type": "PipelineReference"
 							},
-							"authentication": {
-								"type": "MSI",
-								"resource": "https://dev.azuresynapse.net/"
+							"waitOnCompletion": true,
+							"parameters": {
+								"p_datasets": {
+									"value": "@pipeline().parameters.p_sql_to_parquet_datasets",
+									"type": "Expression"
+								},
+								"p_datetime_from": {
+									"value": "@pipeline().parameters.p_datetime_from",
+									"type": "Expression"
+								}
+							}
+						}
+					},
+					{
+						"name": "FromParquetToDeltaParquet",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "FromSQLtoRawParquet",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "FromParquetToDeltaParquet",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {
+								"p_datasets": {
+									"value": "@pipeline().parameters.p_parquet_to_delta_datasets",
+									"type": "Expression"
+								},
+								"p_datetime_from": {
+									"value": "@pipeline().parameters.p_datetime_from",
+									"type": "Expression"
+								}
+							}
+						}
+					},
+					{
+						"name": "Dataflows_StarSchemaDimension",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "FromJsonToDeltaParquet",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "StarSchemaDimension",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {
+								"p_trg_table": "DimDataflows",
+								"p_datetime_from": {
+									"value": "@pipeline().parameters.p_datetime_from",
+									"type": "Expression"
+								},
+								"p_surrogate_key_col": "dataflows_key",
+								"p_src_object": "dataflows_REST_API",
+								"p_src_key_cols": "[\"name\"]",
+								"p_data_type_replace": "[{\"col\":\"name\",\"dataType\":\"varchar(255)\"}]"
+							}
+						}
+					},
+					{
+						"name": "Datasets_StarSchemaDimension",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "FromJsonToDeltaParquet",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "StarSchemaDimension",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {
+								"p_trg_table": "DimDatasets",
+								"p_datetime_from": {
+									"value": "@pipeline().parameters.p_datetime_from",
+									"type": "Expression"
+								},
+								"p_surrogate_key_col": "datasets_key",
+								"p_src_object": "datasets_REST_API",
+								"p_src_key_cols": "[\"name\"]",
+								"p_data_type_replace": "[{\"col\":\"name\",\"dataType\":\"varchar(255)\"}]"
+							}
+						}
+					},
+					{
+						"name": "FromDeltaToWideDelta",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "FromJsonToDeltaParquet",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "FromDeltaToWideDelta",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {
+								"p_src_objects": {
+									"value": "@pipeline().parameters.p_delta_to_wide_src_objects",
+									"type": "Expression"
+								},
+								"p_datetime_from": {
+									"value": "@pipeline().parameters.p_datetime_from",
+									"type": "Expression"
+								}
+							}
+						}
+					},
+					{
+						"name": "StarSchemaFact",
+						"type": "ExecutePipeline",
+						"dependsOn": [
+							{
+								"activity": "Dataflows_StarSchemaDimension",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "Datasets_StarSchemaDimension",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "FromDeltaToWideDelta",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"pipeline": {
+								"referenceName": "StarSchemaFact",
+								"type": "PipelineReference"
+							},
+							"waitOnCompletion": true,
+							"parameters": {
+								"p_trg_table": "FactDataflowsDatasets",
+								"p_datetime_from": {
+									"value": "@pipeline().parameters.p_datetime_from",
+									"type": "Expression"
+								},
+								"p_src_object": "dataflows_datasets_WIDE",
+								"p_src_key_cols": "[\"dataflows_name\",\"datasets_name\"]",
+								"p_data_type_replace": "{\"col\":\"dataflows_datasets_name\",\"dataType\":\"varchar(255)\"},{\"col\":\"dataflows_name\",\"dataType\":\"varchar(255)\"},{\"col\":\"datasets_name\",\"dataType\":\"varchar(255)\"}]",
+								"p_dw_dim_tabs": {
+									"value": "@pipeline().parameters.p_star_schema_dw_dim_tabs",
+									"type": "Expression"
+								}
 							}
 						}
 					}
@@ -12246,24 +12612,71 @@
 					"elapsedTimeMetric": {}
 				},
 				"parameters": {
-					"c_script_folder": {
-						"type": "string",
-						"defaultValue": "Serverless Deploy"
+					"p_serverless_db": {
+						"type": "array",
+						"defaultValue": [
+							{
+								"serverlessDB": "templateDB",
+								"masterkeySecret": "template-sqlpool-master-key",
+								"scopedCredential": "SynapseIdentity"
+							}
+						]
 					},
-					"c_raw_container": {
-						"type": "string",
-						"defaultValue": "template"
-					},
-					"c_raw_folder": {
-						"type": "string",
-						"defaultValue": "ServerlessObjectsDeploy"
-					},
-					"c_raw_file": {
-						"type": "string",
-						"defaultValue": "sqlScripts"
+					"p_rest_api_datasets": {
+						"type": "array",
+						"defaultValue": [
+							{
+								"source": "dataflows",
+								"target": "dataflows_REST_API",
+								"path": "/",
+								"delta": false,
+								"crossApplyField": "value",
+								"select": null,
+								"filter": "api-version=2020-12-01",
+								"cdcCol": null,
+								"keyCol": "name",
+								"relCol": null
+							},
+							{
+								"source": "datasets",
+								"target": "datasets_REST_API",
+								"path": "/",
+								"delta": false,
+								"crossApplyField": "value",
+								"select": null,
+								"filter": "api-version=2020-12-01",
+								"cdcCol": null,
+								"keyCol": "name",
+								"relCol": null
+							},
+							{
+								"source": "datasets",
+								"target": "datasets_relations11_REST_API",
+								"path": "/",
+								"delta": false,
+								"crossApplyField": "value",
+								"select": null,
+								"filter": "api-version=2020-12-01",
+								"cdcCol": null,
+								"keyCol": "name",
+								"relCol": null
+							},
+							{
+								"source": "dataflows",
+								"target": "dataflows_datasets_REST_API",
+								"path": "/",
+								"delta": false,
+								"crossApplyField": "value",
+								"select": null,
+								"filter": "api-version=2020-12-01",
+								"cdcCol": null,
+								"keyCol": "name",
+								"relCol": "properties.typeProperties.sources.dataset.referenceName"
+							}
+						]
 					},
 					"c_text_replacement": {
-						"type": "string",
+						"type": "array",
 						"defaultValue": [
 							{
 								"textToFind": "{raw_storage_account}",
@@ -12279,30 +12692,231 @@
 							}
 						]
 					},
-					"c_init_script_suffix": {
-						"type": "string",
-						"defaultValue": "_Init_"
-					}
-				},
-				"variables": {
-					"v_scripts_tmp": {
-						"type": "String"
+					"p_json_to_delta_datasets": {
+						"type": "array",
+						"defaultValue": [
+							{
+								"type": "basic",
+								"target": "dataflows_REST_API",
+								"cdcCol": null,
+								"keyCol": "name",
+								"dataTypeReplace": [
+									{
+										"col": "type",
+										"dataType": "nvarchar(200)"
+									}
+								],
+								"relCol": null,
+								"partitionFormula": "'dummy'"
+							},
+							{
+								"type": "basic",
+								"target": "datasets_REST_API",
+								"cdcCol": null,
+								"keyCol": "name",
+								"dataTypeReplace": [
+									{
+										"col": "type",
+										"dataType": "nvarchar(200)"
+									}
+								],
+								"relCol": null,
+								"partitionFormula": "'dummy'"
+							},
+							{
+								"type": "relationsMM",
+								"target": "dataflows_datasets_REST_API",
+								"cdcCol": null,
+								"keyCol": "name",
+								"dataTypeReplace": null,
+								"relCol": "properties.typeProperties.sources.dataset.referenceName",
+								"partitionFormula": "'dummy'"
+							},
+							{
+								"type": "relations11",
+								"target": "datasets_relations11_REST_API",
+								"cdcCol": null,
+								"keyCol": "name",
+								"dataTypeReplace": null,
+								"relCol": null,
+								"partitionFormula": "'dummy'"
+							}
+						]
 					},
-					"v_scripts": {
-						"type": "Array"
+					"p_sql_to_parquet_datasets": {
+						"type": "array",
+						"defaultValue": [
+							{
+								"sourceObject": "dataflows_REST_API",
+								"sourceSchema": "enr",
+								"whereStatement": "",
+								"target": "dataflows_SQL",
+								"processingMode": "bulk",
+								"cdcCol": ""
+							},
+							{
+								"sourceObject": "datasets_REST_API",
+								"sourceSchema": "enr",
+								"whereStatement": "lower(name) like '%template%' or lower(name) like '%generic%'",
+								"target": "datasets_SQL",
+								"processingMode": "bulk",
+								"cdcCol": ""
+							},
+							{
+								"sourceObject": "datasets_relations11_REST_API",
+								"sourceSchema": "enr",
+								"whereStatement": "",
+								"target": "datasets_relations11_SQL",
+								"processingMode": "incremental",
+								"cdcCol": "enrTimestamp"
+							},
+							{
+								"sourceObject": "dataflows_datasets_REST_API",
+								"sourceSchema": "enr",
+								"whereStatement": "",
+								"target": "dataflows_datasets_SQL",
+								"processingMode": "incremental",
+								"cdcCol": "enrTimestamp"
+							}
+						]
+					},
+					"p_parquet_to_delta_datasets": {
+						"type": "array",
+						"defaultValue": [
+							{
+								"sourceObject": "dataflows_REST_API",
+								"sourceSchema": "enr",
+								"whereStatement": "",
+								"target": "dataflows_SQL",
+								"processingMode": "bulk",
+								"cdcCol": "",
+								"keyCol": [
+									"name"
+								],
+								"dataTypeReplace": null,
+								"partitionFormula": "'dummy'"
+							},
+							{
+								"sourceObject": "datasets_REST_API",
+								"sourceSchema": "enr",
+								"whereStatement": "",
+								"target": "datasets_SQL",
+								"processingMode": "bulk",
+								"cdcCol": "",
+								"keyCol": [
+									"name"
+								],
+								"dataTypeReplace": null,
+								"partitionFormula": "'dummy'"
+							},
+							{
+								"sourceObject": "datasets_relations11_REST_API",
+								"sourceSchema": "enr",
+								"whereStatement": "",
+								"target": "datasets_relations11_SQL",
+								"processingMode": "incremental",
+								"cdcCol": "enrTimestamp",
+								"keyCol": [
+									"name"
+								],
+								"dataTypeReplace": null,
+								"partitionFormula": "'dummy'"
+							},
+							{
+								"sourceObject": "dataflows_datasets_REST_API",
+								"sourceSchema": "enr",
+								"whereStatement": "",
+								"target": "dataflows_datasets_SQL",
+								"processingMode": "incremental",
+								"cdcCol": "enrTimestamp",
+								"keyCol": [
+									"name",
+									"propertiestypePropertiessourcesdatasetreferenceName"
+								],
+								"dataTypeReplace": null,
+								"partitionFormula": "'dummy'"
+							}
+						]
+					},
+					"p_delta_to_wide_src_objects": {
+						"type": "array",
+						"defaultValue": [
+							{
+								"iteration": 0,
+								"object": "dataflows_datasets_REST_API",
+								"schema": "enr",
+								"alias": "dataflows_datasets",
+								"trgKeyCol": "name,propertiestypePropertiessourcesdatasetreferenceName",
+								"cdcCol": "enrTimestamp",
+								"selectCols": "*",
+								"joinCondition": null,
+								"joinType": null,
+								"joinOrder": 0
+							},
+							{
+								"iteration": 0,
+								"object": "dataflows_REST_API",
+								"schema": "enr",
+								"alias": "dataflows",
+								"trgKeyCol": null,
+								"cdcCol": "enrTimestamp",
+								"selectCols": "*",
+								"joinCondition": "dataflows.name = dataflows_datasets.name",
+								"joinType": "left outer",
+								"joinOrder": 1
+							},
+							{
+								"iteration": 0,
+								"object": "datasets_REST_API",
+								"schema": "enr",
+								"alias": "datasets",
+								"trgKeyCol": null,
+								"cdcCol": "enrTimestamp",
+								"selectCols": "*",
+								"joinCondition": "datasets.name = dataflows_datasets.propertiestypePropertiessourcesdatasetreferenceName",
+								"joinType": "left outer",
+								"joinOrder": 2
+							}
+						]
+					},
+					"p_star_schema_dw_dim_tabs": {
+						"type": "array",
+						"defaultValue": [
+							{
+								"dimTab": "DimDataflows",
+								"dimAlias": "DimDataflows",
+								"dimKey": "dataflows_key",
+								"keyAlias": "dataflows_key",
+								"joinStatement": "stg.dataflows_name = DimDataflows.name"
+							},
+							{
+								"dimTab": "DimDatasets",
+								"dimAlias": "DimDatasets",
+								"dimKey": "datasets_key",
+								"keyAlias": "datasets_key",
+								"joinStatement": "stg.datasets_name = DimDatasets.name"
+							}
+						]
+					},
+					"p_datetime_from": {
+						"type": "string"
 					}
 				},
 				"folder": {
 					"name": "Templates"
 				},
-				"annotations": [],
-				"lastPublishTime": "2023-10-16T14:41:01Z"
+				"annotations": []
 			},
 			"dependsOn": [
-				"[concat(variables('workspaceId'), '/datasets/azuresynapse')]",
-				"[concat(variables('workspaceId'), '/datasets/GenericRawParquet')]",
-				"[concat(variables('workspaceId'), '/linkedServices/serverless_ARIR')]",
-				"[concat(variables('workspaceId'), '/integrationRuntimes/SHIR')]"
+				"[concat(variables('workspaceId'), '/pipelines/ServerlessDBDeploy')]",
+				"[concat(variables('workspaceId'), '/pipelines/ServerlessObjectsDeploy')]",
+				"[concat(variables('workspaceId'), '/pipelines/FromRESTAPIToJson')]",
+				"[concat(variables('workspaceId'), '/pipelines/FromJsonToDeltaParquet')]",
+				"[concat(variables('workspaceId'), '/pipelines/FromSQLtoRawParquet')]",
+				"[concat(variables('workspaceId'), '/pipelines/FromParquetToDeltaParquet')]",
+				"[concat(variables('workspaceId'), '/pipelines/StarSchemaDimension')]",
+				"[concat(variables('workspaceId'), '/pipelines/FromDeltaToWideDelta')]",
+				"[concat(variables('workspaceId'), '/pipelines/StarSchemaFact')]"
 			]
 		}
 	]
