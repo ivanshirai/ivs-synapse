@@ -8654,7 +8654,7 @@
 					"name": "Serverless Deploy"
 				},
 				"content": {
-					"query": "IF NOT EXISTS (SELECT * FROM sys.external_data_sources WHERE name = 'TemplateCuratedSource') \n\tCREATE EXTERNAL DATA SOURCE [TemplateCuratedSource] \n\tWITH (\n\t\tLOCATION = 'https://ivscur.blob.core.windows.net/template',\n\t\tCREDENTIAL = [SynapseIdentity] \n\t)",
+					"query": "use templateDB\n\nIF NOT EXISTS (SELECT * FROM sys.external_data_sources WHERE name = 'TemplateCuratedSource') \n\tCREATE EXTERNAL DATA SOURCE [TemplateCuratedSource] \n\tWITH (\n\t\tLOCATION = 'https://{cur_storage_account}.blob.core.windows.net/template',\n\t\tCREDENTIAL = [SynapseIdentity] \n\t)",
 					"metadata": {
 						"language": "sql"
 					},
@@ -8677,7 +8677,7 @@
 					"name": "Serverless Deploy"
 				},
 				"content": {
-					"query": "IF NOT EXISTS (SELECT * FROM sys.external_file_formats WHERE name = 'Delta') \n\tCREATE EXTERNAL FILE FORMAT Delta\n\tWITH (\n\t\tFORMAT_TYPE = DELTA\n\t)",
+					"query": "use templateDB\n\nIF NOT EXISTS (SELECT * FROM sys.external_file_formats WHERE name = 'Delta') \n\tCREATE EXTERNAL FILE FORMAT Delta\n\tWITH (\n\t\tFORMAT_TYPE = DELTA\n\t)",
 					"metadata": {
 						"language": "sql"
 					},
@@ -8700,7 +8700,7 @@
 					"name": "Serverless Deploy"
 				},
 				"content": {
-					"query": "IF NOT EXISTS (SELECT * FROM sys.schemas WHERE name = 'enr') \nEXEC('CREATE SCHEMA [enr]')",
+					"query": "use templateDB\n\nIF NOT EXISTS (SELECT * FROM sys.schemas WHERE name = 'enr') \nEXEC('CREATE SCHEMA [enr]')",
 					"metadata": {
 						"language": "sql"
 					},
@@ -12061,7 +12061,7 @@
 									"dependsOn": [],
 									"policy": {
 										"timeout": "0.12:00:00",
-										"retry": 2,
+										"retry": 0,
 										"retryIntervalInSeconds": 30,
 										"secureOutput": false,
 										"secureInput": false
@@ -12267,11 +12267,15 @@
 						"defaultValue": [
 							{
 								"textToFind": "{raw_storage_account}",
-								"textForReplace": "kbsmoderndwdevrawst002"
+								"textForReplace": "ivsraw"
+							},
+							{
+								"textToFind": "{enr_storage_account}",
+								"textForReplace": "ivscur"
 							},
 							{
 								"textToFind": "{cur_storage_account}",
-								"textForReplace": "kbsmoderndwdevcurst002"
+								"textForReplace": "ivscur"
 							}
 						]
 					},
