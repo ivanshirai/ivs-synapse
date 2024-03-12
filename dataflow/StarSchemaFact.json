@@ -167,7 +167,7 @@
 				"     postCommands: [],",
 				"     skipDuplicateMapInputs: true,",
 				"     skipDuplicateMapOutputs: true,",
-				"     saveOrder: 1,",
+				"     saveOrder: 2,",
 				"     partitionBy('key',",
 				"          0,",
 				"          byName($c_trg_partition_col)",
