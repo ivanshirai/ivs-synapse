@@ -1885,7 +1885,7 @@
 																"type": "Expression"
 															},
 															"c_key_column_name": {
-																"value": "'@{replace(replace(replace(string(item().keyCol), '[', ''), ']', ''), '\"', '')}'",
+																"value": "@item().keyCol",
 																"type": "Expression"
 															},
 															"c_raw_cdc_column": {
@@ -4191,6 +4191,1428 @@
 			]
 		},
 		{
+			"name": "[concat(parameters('workspaceName'), '/StarSchemaDimension')]",
+			"type": "Microsoft.Synapse/workspaces/pipelines",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"activities": [
+					{
+						"name": "StarSchemaDimension",
+						"type": "ExecuteDataFlow",
+						"dependsOn": [
+							{
+								"activity": "If Target Delta Exists",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataflow": {
+								"referenceName": "StarSchemaDimension",
+								"type": "DataFlowReference",
+								"parameters": {
+									"p_src_key_cols": {
+										"value": "@pipeline().parameters.p_src_key_cols",
+										"type": "Expression"
+									},
+									"p_src_cdc_col": {
+										"value": "'@{pipeline().parameters.p_src_cdc_col}'",
+										"type": "Expression"
+									},
+									"p_surrogate_key_col": {
+										"value": "'@{pipeline().parameters.p_surrogate_key_col}'",
+										"type": "Expression"
+									},
+									"c_trg_dss_update_col": {
+										"value": "'@{pipeline().parameters.c_trg_dss_update_col}'",
+										"type": "Expression"
+									},
+									"c_trg_dss_create_col": {
+										"value": "'@{pipeline().parameters.c_trg_dss_create_col}'",
+										"type": "Expression"
+									},
+									"p_partition_formula": {
+										"value": "@concat('\"', pipeline().parameters.p_partition_formula, '\"')",
+										"type": "Expression"
+									},
+									"c_trg_partition_col": {
+										"value": "'@{pipeline().parameters.c_trg_partition_col}'",
+										"type": "Expression"
+									},
+									"p_src_schema": {
+										"value": "'@{pipeline().parameters.p_src_schema}'",
+										"type": "Expression"
+									},
+									"p_src_object": {
+										"value": "'@{pipeline().parameters.p_src_object}'",
+										"type": "Expression"
+									},
+									"p_datetime_from": {
+										"value": "'@{variables('v_datetime_from')}'",
+										"type": "Expression"
+									},
+									"p_trg_table": {
+										"value": "'@{pipeline().parameters.p_trg_table}'",
+										"type": "Expression"
+									},
+									"p_init_load": {
+										"value": "@not(activity('GetTargetDeltaMetadata').output.exists)",
+										"type": "Expression"
+									},
+									"c_trg_container": {
+										"value": "'@{pipeline().parameters.c_trg_container}'",
+										"type": "Expression"
+									},
+									"c_trg_root_folder": {
+										"value": "'@{pipeline().parameters.c_trg_root_folder}'",
+										"type": "Expression"
+									}
+								},
+								"datasetParameters": {
+									"DataSource": {
+										"p_database": {
+											"value": "@pipeline().parameters.c_serverless_db",
+											"type": "Expression"
+										},
+										"p_schema": "dummy",
+										"p_table": "dummy"
+									},
+									"Dimension": {
+										"p_database": {
+											"value": "@pipeline().parameters.c_serverless_db",
+											"type": "Expression"
+										},
+										"p_schema": "dummy",
+										"p_table": "dummy"
+									},
+									"DimensionMaxKey": {
+										"p_database": {
+											"value": "@pipeline().parameters.c_serverless_db",
+											"type": "Expression"
+										},
+										"p_schema": "dummy",
+										"p_table": "dummy"
+									},
+									"DimensionZeroRow": {
+										"p_database": {
+											"value": "@pipeline().parameters.c_serverless_db",
+											"type": "Expression"
+										},
+										"p_schema": "dummy",
+										"p_table": "dummy"
+									},
+									"SourcePartitionPruning": {
+										"p_database": {
+											"value": "@pipeline().parameters.c_serverless_db",
+											"type": "Expression"
+										},
+										"p_schema": "dummy",
+										"p_table": "dummy"
+									},
+									"dummyPartitionPruning": {
+										"p_database": {
+											"value": "@pipeline().parameters.c_serverless_db",
+											"type": "Expression"
+										},
+										"p_schema": "dummy",
+										"p_table": "dummy"
+									},
+									"CacheMaxKey": {},
+									"sinkZeroRecord": {},
+									"sinkDimension": {},
+									"sinkPartitionPruning": {}
+								}
+							},
+							"staging": {},
+							"compute": {
+								"coreCount": 8,
+								"computeType": "General"
+							},
+							"traceLevel": "Fine"
+						}
+					},
+					{
+						"name": "GetTargetDeltaMetadata",
+						"type": "GetMetadata",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataset": {
+								"referenceName": "GenericCuratedJsonFolder",
+								"type": "DatasetReference",
+								"parameters": {
+									"p_container": {
+										"value": "@pipeline().parameters.c_trg_container",
+										"type": "Expression"
+									},
+									"p_folder": {
+										"value": "@concat(pipeline().parameters.c_trg_root_folder, '/', pipeline().parameters.p_trg_table)",
+										"type": "Expression"
+									}
+								}
+							},
+							"fieldList": [
+								"exists"
+							],
+							"storeSettings": {
+								"type": "AzureBlobFSReadSettings",
+								"recursive": true,
+								"enablePartitionDiscovery": false
+							},
+							"formatSettings": {
+								"type": "JsonReadSettings"
+							}
+						}
+					},
+					{
+						"name": "If Target Delta Exists",
+						"type": "IfCondition",
+						"dependsOn": [
+							{
+								"activity": "GetTargetDeltaMetadata",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "GenericCuratedParquet linked service",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"expression": {
+								"value": "@and(activity('GetTargetDeltaMetadata').output.exists, not(empty(pipeline().parameters.p_src_cdc_col)))",
+								"type": "Expression"
+							},
+							"ifFalseActivities": [
+								{
+									"name": "Set v_datetime_from False",
+									"type": "SetVariable",
+									"dependsOn": [],
+									"policy": {
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "v_datetime_from",
+										"value": {
+											"value": "@pipeline().parameters.p_datetime_from",
+											"type": "Expression"
+										}
+									}
+								}
+							],
+							"ifTrueActivities": [
+								{
+									"name": "DatetimeFrom",
+									"type": "Script",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 2,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"linkedServiceName": {
+										"referenceName": "serverless_ARIR",
+										"type": "LinkedServiceReference",
+										"parameters": {
+											"p_database": {
+												"value": "@pipeline().parameters.c_serverless_db",
+												"type": "Expression"
+											}
+										}
+									},
+									"typeProperties": {
+										"scripts": [
+											{
+												"type": "Query",
+												"text": {
+													"value": "@if(empty(pipeline().parameters.p_datetime_from),\n    concat('select max(', pipeline().parameters.p_src_cdc_col, ') as CDCTimestamp from openrowset( bulk ''',activity('GenericCuratedParquet linked service').output.properties.typeProperties.url, pipeline().parameters.c_trg_container, '/', pipeline().parameters.c_trg_root_folder, '/', pipeline().parameters.p_trg_table, ''', format = ''DELTA'') as result'),\n    concat('select ''', replace(replace(replace(replace(replace(\n                    formatDateTime(\n                        pipeline().parameters.p_datetime_from, \n                        'yyyy-MM-ddTHH:mm:ss.fffffffZ'\n                    ), \n                    '0000Z', 'Z'), '000Z', 'Z'), '00Z', 'Z'), '0Z', 'Z'), '.Z', 'Z'\n                ),\n        ''' as CDCTimestamp'\n    )\n)",
+													"type": "Expression"
+												}
+											}
+										],
+										"scriptBlockExecutionTimeout": "02:00:00"
+									}
+								},
+								{
+									"name": "Set v_datetime_from True",
+									"type": "SetVariable",
+									"dependsOn": [
+										{
+											"activity": "DatetimeFrom",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "v_datetime_from",
+										"value": {
+											"value": "@activity('DatetimeFrom').output.resultSets[0].rows[0].CDCTimestamp",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "GenericCuratedParquet attributes",
+						"type": "WebActivity",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"method": "GET",
+							"headers": {},
+							"url": {
+								"value": "@concat('https://', pipeline().DataFactory, '.dev.azuresynapse.net/datasets/GenericCuratedParquet?api-version=2020-12-01')",
+								"type": "Expression"
+							},
+							"connectVia": {
+								"referenceName": "SHIR",
+								"type": "IntegrationRuntimeReference"
+							},
+							"authentication": {
+								"type": "MSI",
+								"resource": "https://dev.azuresynapse.net/"
+							}
+						}
+					},
+					{
+						"name": "GenericCuratedParquet linked service",
+						"type": "WebActivity",
+						"dependsOn": [
+							{
+								"activity": "GenericCuratedParquet attributes",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"method": "GET",
+							"headers": {},
+							"url": {
+								"value": "@concat('https://', pipeline().DataFactory, '.dev.azuresynapse.net/linkedservices/', activity('GenericCuratedParquet attributes').output.properties.linkedServiceName.referenceName, '?api-version=2020-12-01')",
+								"type": "Expression"
+							},
+							"connectVia": {
+								"referenceName": "SHIR",
+								"type": "IntegrationRuntimeReference"
+							},
+							"authentication": {
+								"type": "MSI",
+								"resource": "https://dev.azuresynapse.net/"
+							}
+						}
+					},
+					{
+						"name": "createTmpView",
+						"type": "Script",
+						"dependsOn": [
+							{
+								"activity": "StarSchemaDimension",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 2,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"linkedServiceName": {
+							"referenceName": "serverless_ARIR",
+							"type": "LinkedServiceReference",
+							"parameters": {
+								"p_database": {
+									"value": "@pipeline().parameters.c_serverless_db",
+									"type": "Expression"
+								}
+							}
+						},
+						"typeProperties": {
+							"scripts": [
+								{
+									"type": "Query",
+									"text": {
+										"value": "create or alter view \n@{pipeline().parameters.p_trg_table}_tmp\nas select * from OPENROWSET(\n\tBULK '@{activity('GenericCuratedParquet linked service').output.properties.typeProperties.url}@{pipeline().parameters.c_trg_container}/@{pipeline().parameters.c_trg_root_folder}/@{pipeline().parameters.p_trg_table}',\n\tFORMAT = 'Delta'\n) as r",
+										"type": "Expression"
+									}
+								}
+							],
+							"scriptBlockExecutionTimeout": "02:00:00"
+						}
+					},
+					{
+						"name": "ExternalTableSQL",
+						"type": "Script",
+						"dependsOn": [
+							{
+								"activity": "createTmpView",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"linkedServiceName": {
+							"referenceName": "serverless_ARIR",
+							"type": "LinkedServiceReference",
+							"parameters": {
+								"p_database": {
+									"value": "@pipeline().parameters.c_serverless_db",
+									"type": "Expression"
+								}
+							}
+						},
+						"typeProperties": {
+							"scripts": [
+								{
+									"type": "Query",
+									"text": {
+										"value": "select 'CREATE EXTERNAL TABLE ' +\n'@{pipeline().parameters.p_trg_table} (' + \nchar(10) +\nSTRING_AGG('[' + \ncast(colName as varchar(max)) + '] ' + \ndataType, ',' + char(10)) \nWITHIN GROUP (ORDER BY column_id ASC) + char(10) +\n') WITH (LOCATION = ''@{pipeline().parameters.c_trg_root_folder}/@{pipeline().parameters.p_trg_table}'', DATA_SOURCE = @{pipeline().parameters.c_cur_data_source},  FILE_FORMAT = Delta)' as SQL\nfrom (select \nc.name colName, coalesce(r.dataType,\nCASE \n      WHEN t.[name] IN ('varchar', 'char', 'varbinary') THEN t.[name] + '(' + IIF(c.max_length = -1, 'max', CAST(c.max_length AS VARCHAR(25))) + ')' \n      WHEN t.[name] IN ('nvarchar','nchar') THEN t.[name] + '(' + IIF(c.max_length = -1, 'max', CAST(c.max_length / 2 AS VARCHAR(25)))+ ')'      \n      WHEN t.[name] IN ('decimal', 'numeric') THEN t.[name] + '(' + CAST(c.[precision] AS VARCHAR(25)) + ', ' + CAST(c.[scale] AS VARCHAR(25)) + ')'\n      WHEN t.[name] IN ('datetime2') THEN t.[name] + '(' + CAST(c.[scale] AS VARCHAR(25)) + ')'\n      ELSE t.[name]\nEND) AS dataType,\nc.column_id\nfrom sys.columns c\njoin sys.views v on v.object_id = c.object_id\njoin sys.schemas s on s.schema_id = v.schema_id\njoin sys.types t on c.user_type_id = t.user_type_id \nleft outer join \n@{if(empty(pipeline().parameters.p_data_type_replace), \n'(select null col, null dataType) r',\nconcat('(select * from OpenJson(N''',\nstring(pipeline().parameters.p_data_type_replace),\n''') WITH (col varchar(255), dataType varchar(255)) as r) r'))}\non r.col = c.name\nwhere s.name = 'dbo' and c.name <> '@{pipeline().parameters.c_trg_partition_col}' and v.name = \n'@{pipeline().parameters.p_trg_table}_tmp') q",
+										"type": "Expression"
+									}
+								}
+							],
+							"scriptBlockExecutionTimeout": "02:00:00"
+						}
+					},
+					{
+						"name": "CreateExternalTable",
+						"type": "Script",
+						"dependsOn": [
+							{
+								"activity": "ExternalTableSQL",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"linkedServiceName": {
+							"referenceName": "serverless_ARIR",
+							"type": "LinkedServiceReference",
+							"parameters": {
+								"p_database": {
+									"value": "@pipeline().parameters.c_serverless_db",
+									"type": "Expression"
+								}
+							}
+						},
+						"typeProperties": {
+							"scripts": [
+								{
+									"type": "Query",
+									"text": {
+										"value": "begin transaction\n\nif exists (select * from sys.external_tables t join sys.schemas s on s.schema_id = t.schema_id where s.name = 'dbo' and t.name = '@{pipeline().parameters.p_trg_table}')\ndrop external table @{pipeline().parameters.p_trg_table};\n\n@{activity('ExternalTableSQL').output.resultSets[0].rows[0].SQL};\n\ndrop view @{pipeline().parameters.p_trg_table}_tmp;\n\ncommit;\n",
+										"type": "Expression"
+									}
+								}
+							],
+							"scriptBlockExecutionTimeout": "02:00:00"
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"parameters": {
+					"p_trg_table": {
+						"type": "string",
+						"defaultValue": "DimDataflows"
+					},
+					"p_datetime_from": {
+						"type": "string"
+					},
+					"p_surrogate_key_col": {
+						"type": "string",
+						"defaultValue": "dataflows_key"
+					},
+					"p_src_schema": {
+						"type": "string",
+						"defaultValue": "enr"
+					},
+					"p_src_object": {
+						"type": "string",
+						"defaultValue": "dataflows_REST_API"
+					},
+					"p_src_key_cols": {
+						"type": "array",
+						"defaultValue": [
+							"name"
+						]
+					},
+					"p_src_cdc_col": {
+						"type": "string",
+						"defaultValue": "enrTimestamp"
+					},
+					"p_data_type_replace": {
+						"type": "array",
+						"defaultValue": [
+							{
+								"col": "name",
+								"dataType": "varchar(255)"
+							}
+						]
+					},
+					"p_partition_formula": {
+						"type": "string",
+						"defaultValue": "'dummy'"
+					},
+					"c_serverless_db": {
+						"type": "string",
+						"defaultValue": "templateDB"
+					},
+					"c_trg_container": {
+						"type": "string",
+						"defaultValue": "template"
+					},
+					"c_trg_root_folder": {
+						"type": "string",
+						"defaultValue": "StarSchemaObjects"
+					},
+					"c_cur_data_source": {
+						"type": "string",
+						"defaultValue": "TemplateCuratedSource"
+					},
+					"c_trg_partition_col": {
+						"type": "string",
+						"defaultValue": "DIM_PARTITION"
+					},
+					"c_trg_dss_update_col": {
+						"type": "string",
+						"defaultValue": "dss_update_time"
+					},
+					"c_trg_dss_create_col": {
+						"type": "string",
+						"defaultValue": "dss_create_time"
+					}
+				},
+				"variables": {
+					"v_datetime_from": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "Templates"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/dataflows/StarSchemaDimension')]",
+				"[concat(variables('workspaceId'), '/integrationRuntimes/AutoResolveIntegrationRuntime')]",
+				"[concat(variables('workspaceId'), '/datasets/GenericCuratedJsonFolder')]",
+				"[concat(variables('workspaceId'), '/integrationRuntimes/SHIR')]",
+				"[concat(variables('workspaceId'), '/linkedServices/serverless_ARIR')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/StarSchemaFact')]",
+			"type": "Microsoft.Synapse/workspaces/pipelines",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"activities": [
+					{
+						"name": "GetTargetDeltaMetadata",
+						"type": "GetMetadata",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataset": {
+								"referenceName": "GenericCuratedJsonFolder",
+								"type": "DatasetReference",
+								"parameters": {
+									"p_container": {
+										"value": "@pipeline().parameters.c_trg_container",
+										"type": "Expression"
+									},
+									"p_folder": {
+										"value": "@concat(pipeline().parameters.c_trg_root_folder, '/', pipeline().parameters.p_trg_table)",
+										"type": "Expression"
+									}
+								}
+							},
+							"fieldList": [
+								"exists"
+							],
+							"storeSettings": {
+								"type": "AzureBlobFSReadSettings",
+								"recursive": true,
+								"enablePartitionDiscovery": false
+							},
+							"formatSettings": {
+								"type": "JsonReadSettings"
+							}
+						}
+					},
+					{
+						"name": "If Target Delta Exists",
+						"type": "IfCondition",
+						"dependsOn": [
+							{
+								"activity": "GetTargetDeltaMetadata",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "GenericCuratedParquet linked service",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"expression": {
+								"value": "@and(activity('GetTargetDeltaMetadata').output.exists, not(empty(pipeline().parameters.p_src_cdc_col)))",
+								"type": "Expression"
+							},
+							"ifFalseActivities": [
+								{
+									"name": "Set v_datetime_from False",
+									"type": "SetVariable",
+									"dependsOn": [],
+									"policy": {
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "v_datetime_from",
+										"value": {
+											"value": "@pipeline().parameters.p_datetime_from",
+											"type": "Expression"
+										}
+									}
+								}
+							],
+							"ifTrueActivities": [
+								{
+									"name": "DatetimeFrom",
+									"type": "Script",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 2,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"linkedServiceName": {
+										"referenceName": "serverless_ARIR",
+										"type": "LinkedServiceReference",
+										"parameters": {
+											"p_database": {
+												"value": "@pipeline().parameters.c_serverless_db",
+												"type": "Expression"
+											}
+										}
+									},
+									"typeProperties": {
+										"scripts": [
+											{
+												"type": "Query",
+												"text": {
+													"value": "@if(empty(pipeline().parameters.p_datetime_from),\n    concat('select max(', pipeline().parameters.p_src_cdc_col, ') as CDCTimestamp from openrowset( bulk ''',activity('GenericCuratedParquet linked service').output.properties.typeProperties.url, pipeline().parameters.c_trg_container, '/', pipeline().parameters.c_trg_root_folder, '/', pipeline().parameters.p_trg_table, ''', format = ''DELTA'') as result'),\n    concat('select ''', replace(replace(replace(replace(replace(\n                    formatDateTime(\n                        pipeline().parameters.p_datetime_from, \n                        'yyyy-MM-ddTHH:mm:ss.fffffffZ'\n                    ), \n                    '0000Z', 'Z'), '000Z', 'Z'), '00Z', 'Z'), '0Z', 'Z'), '.Z', 'Z'\n                ),\n        ''' as CDCTimestamp'\n    )\n)",
+													"type": "Expression"
+												}
+											}
+										],
+										"scriptBlockExecutionTimeout": "02:00:00"
+									}
+								},
+								{
+									"name": "Set v_datetime_from True",
+									"type": "SetVariable",
+									"dependsOn": [
+										{
+											"activity": "DatetimeFrom",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "v_datetime_from",
+										"value": {
+											"value": "@activity('DatetimeFrom').output.resultSets[0].rows[0].CDCTimestamp",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "GenericCuratedParquet attributes",
+						"type": "WebActivity",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"method": "GET",
+							"headers": {},
+							"url": {
+								"value": "@concat('https://', pipeline().DataFactory, '.dev.azuresynapse.net/datasets/GenericCuratedParquet?api-version=2020-12-01')",
+								"type": "Expression"
+							},
+							"connectVia": {
+								"referenceName": "SHIR",
+								"type": "IntegrationRuntimeReference"
+							},
+							"authentication": {
+								"type": "MSI",
+								"resource": "https://dev.azuresynapse.net/"
+							}
+						}
+					},
+					{
+						"name": "GenericCuratedParquet linked service",
+						"type": "WebActivity",
+						"dependsOn": [
+							{
+								"activity": "GenericCuratedParquet attributes",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"method": "GET",
+							"headers": {},
+							"url": {
+								"value": "@concat('https://', pipeline().DataFactory, '.dev.azuresynapse.net/linkedservices/', activity('GenericCuratedParquet attributes').output.properties.linkedServiceName.referenceName, '?api-version=2020-12-01')",
+								"type": "Expression"
+							},
+							"connectVia": {
+								"referenceName": "SHIR",
+								"type": "IntegrationRuntimeReference"
+							},
+							"authentication": {
+								"type": "MSI",
+								"resource": "https://dev.azuresynapse.net/"
+							}
+						}
+					},
+					{
+						"name": "StagingParquet",
+						"type": "Copy",
+						"dependsOn": [
+							{
+								"activity": "If Target Delta Exists",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "SqlDWSource",
+								"sqlReaderQuery": {
+									"value": "select * from @{pipeline().parameters.p_src_schema}.@{pipeline().parameters.p_src_object} \nwhere @{pipeline().parameters.p_src_cdc_col} > '@{variables('v_datetime_from')}'",
+									"type": "Expression"
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"sink": {
+								"type": "ParquetSink",
+								"storeSettings": {
+									"type": "AzureBlobFSWriteSettings"
+								},
+								"formatSettings": {
+									"type": "ParquetWriteSettings"
+								}
+							},
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"typeConversion": true,
+								"typeConversionSettings": {
+									"allowDataTruncation": true,
+									"treatBooleanAsNumber": false
+								}
+							}
+						},
+						"inputs": [
+							{
+								"referenceName": "GenericServerlessSQL",
+								"type": "DatasetReference",
+								"parameters": {
+									"p_database": {
+										"value": "@pipeline().parameters.c_serverless_db",
+										"type": "Expression"
+									},
+									"p_schema": {
+										"value": "@pipeline().parameters.p_src_schema",
+										"type": "Expression"
+									},
+									"p_table": {
+										"value": "@pipeline().parameters.p_src_object",
+										"type": "Expression"
+									}
+								}
+							}
+						],
+						"outputs": [
+							{
+								"referenceName": "GenericEnrichedParquet",
+								"type": "DatasetReference",
+								"parameters": {
+									"p_container": {
+										"value": "@pipeline().parameters.c_stg_container",
+										"type": "Expression"
+									},
+									"p_folder": {
+										"value": "@pipeline().parameters.c_stg_root_folder",
+										"type": "Expression"
+									},
+									"p_file": {
+										"value": "@concat(pipeline().parameters.p_trg_table, 'Stg')",
+										"type": "Expression"
+									}
+								}
+							}
+						]
+					},
+					{
+						"name": "If RowCount above 0",
+						"type": "IfCondition",
+						"dependsOn": [
+							{
+								"activity": "StagingParquet",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "GenericEnrichedParquet linked service",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"expression": {
+								"value": "@greater(activity('StagingParquet').output.rowsCopied, 0)",
+								"type": "Expression"
+							},
+							"ifTrueActivities": [
+								{
+									"name": "StarSchemaDimension",
+									"type": "ExecuteDataFlow",
+									"dependsOn": [
+										{
+											"activity": "ScriptStagingDimKeysSQL",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										},
+										{
+											"activity": "ScriptFactCreateTime",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"dataflow": {
+											"referenceName": "StarSchemaFact",
+											"type": "DataFlowReference",
+											"parameters": {
+												"p_src_key_cols": {
+													"value": "@pipeline().parameters.p_src_key_cols",
+													"type": "Expression"
+												},
+												"c_trg_dss_update_col": {
+													"value": "'@{pipeline().parameters.c_trg_dss_update_col}'",
+													"type": "Expression"
+												},
+												"c_trg_dss_create_col": {
+													"value": "'@{pipeline().parameters.c_trg_dss_create_col}'",
+													"type": "Expression"
+												},
+												"p_partition_formula": {
+													"value": "@concat('\"', pipeline().parameters.p_partition_formula, '\"')",
+													"type": "Expression"
+												},
+												"c_trg_partition_col": {
+													"value": "'@{pipeline().parameters.c_trg_partition_col}'",
+													"type": "Expression"
+												},
+												"p_trg_table": {
+													"value": "'@{pipeline().parameters.p_trg_table}'",
+													"type": "Expression"
+												},
+												"c_trg_container": {
+													"value": "'@{pipeline().parameters.c_trg_container}'",
+													"type": "Expression"
+												},
+												"c_trg_root_folder": {
+													"value": "'@{pipeline().parameters.c_trg_root_folder}'",
+													"type": "Expression"
+												},
+												"p_src_query": {
+													"value": "@concat('\"', activity('ScriptStagingDimKeysSQL').output.resultSets[0].rows[0].sourceQuery, '\"')",
+													"type": "Expression"
+												},
+												"p_trg_query": {
+													"value": "@concat('\"', activity('ScriptFactCreateTime').output.resultSets[0].rows[0].targetQuery, '\"')",
+													"type": "Expression"
+												}
+											},
+											"datasetParameters": {
+												"DataSource": {
+													"p_database": {
+														"value": "@pipeline().parameters.c_serverless_db",
+														"type": "Expression"
+													},
+													"p_schema": "dummy",
+													"p_table": "dummy"
+												},
+												"Fact": {
+													"p_database": {
+														"value": "@pipeline().parameters.c_serverless_db",
+														"type": "Expression"
+													},
+													"p_schema": "dummy",
+													"p_table": "dummy"
+												},
+												"SourcePartitionPruning": {
+													"p_database": {
+														"value": "@pipeline().parameters.c_serverless_db",
+														"type": "Expression"
+													},
+													"p_schema": "dummy",
+													"p_table": "dummy"
+												},
+												"dummyPartitionPruning": {
+													"p_database": {
+														"value": "@pipeline().parameters.c_serverless_db",
+														"type": "Expression"
+													},
+													"p_schema": "dummy",
+													"p_table": "dummy"
+												},
+												"sinkDimension": {},
+												"sinkPartitionPruning": {}
+											},
+											"linkedServiceParameters": {}
+										},
+										"staging": {},
+										"compute": {
+											"coreCount": 8,
+											"computeType": "General"
+										},
+										"traceLevel": "Fine"
+									}
+								},
+								{
+									"name": "createTmpView",
+									"type": "Script",
+									"dependsOn": [
+										{
+											"activity": "StarSchemaDimension",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 2,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"linkedServiceName": {
+										"referenceName": "serverless_ARIR",
+										"type": "LinkedServiceReference",
+										"parameters": {
+											"p_database": {
+												"value": "@pipeline().parameters.c_serverless_db",
+												"type": "Expression"
+											}
+										}
+									},
+									"typeProperties": {
+										"scripts": [
+											{
+												"type": "Query",
+												"text": {
+													"value": "create or alter view \n@{pipeline().parameters.p_trg_table}_tmp\nas select * from OPENROWSET(\n\tBULK '@{activity('GenericCuratedParquet linked service').output.properties.typeProperties.url}@{pipeline().parameters.c_trg_container}/@{pipeline().parameters.c_trg_root_folder}/@{pipeline().parameters.p_trg_table}',\n\tFORMAT = 'Delta'\n) as r",
+													"type": "Expression"
+												}
+											}
+										],
+										"scriptBlockExecutionTimeout": "02:00:00"
+									}
+								},
+								{
+									"name": "ExternalTableSQL",
+									"type": "Script",
+									"dependsOn": [
+										{
+											"activity": "createTmpView",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"linkedServiceName": {
+										"referenceName": "serverless_ARIR",
+										"type": "LinkedServiceReference",
+										"parameters": {
+											"p_database": {
+												"value": "@pipeline().parameters.c_serverless_db",
+												"type": "Expression"
+											}
+										}
+									},
+									"typeProperties": {
+										"scripts": [
+											{
+												"type": "Query",
+												"text": {
+													"value": "select 'CREATE EXTERNAL TABLE ' +\n'@{pipeline().parameters.p_trg_table} (' + \nchar(10) +\nSTRING_AGG('[' + \ncast(colName as varchar(max)) + '] ' + \ndataType, ',' + char(10)) \nWITHIN GROUP (ORDER BY column_id ASC) + char(10) +\n') WITH (LOCATION = ''@{pipeline().parameters.c_trg_root_folder}/@{pipeline().parameters.p_trg_table}'', DATA_SOURCE = @{pipeline().parameters.c_cur_data_source},  FILE_FORMAT = Delta)' as SQL\nfrom (select \nc.name colName, coalesce(r.dataType,\nCASE \n      WHEN t.[name] IN ('varchar', 'char', 'varbinary') THEN t.[name] + '(' + IIF(c.max_length = -1, 'max', CAST(c.max_length AS VARCHAR(25))) + ')' \n      WHEN t.[name] IN ('nvarchar','nchar') THEN t.[name] + '(' + IIF(c.max_length = -1, 'max', CAST(c.max_length / 2 AS VARCHAR(25)))+ ')'      \n      WHEN t.[name] IN ('decimal', 'numeric') THEN t.[name] + '(' + CAST(c.[precision] AS VARCHAR(25)) + ', ' + CAST(c.[scale] AS VARCHAR(25)) + ')'\n      WHEN t.[name] IN ('datetime2') THEN t.[name] + '(' + CAST(c.[scale] AS VARCHAR(25)) + ')'\n      ELSE t.[name]\nEND) AS dataType,\nc.column_id\nfrom sys.columns c\njoin sys.views v on v.object_id = c.object_id\njoin sys.schemas s on s.schema_id = v.schema_id\njoin sys.types t on c.user_type_id = t.user_type_id \nleft outer join \n@{if(empty(pipeline().parameters.p_data_type_replace), \n'(select null col, null dataType) r',\nconcat('(select * from OpenJson(N''',\nstring(pipeline().parameters.p_data_type_replace),\n''') WITH (col varchar(255), dataType varchar(255)) as r) r'))}\non r.col = c.name\nwhere s.name = 'dbo' and c.name <> '@{pipeline().parameters.c_trg_partition_col}' and v.name = \n'@{pipeline().parameters.p_trg_table}_tmp') q",
+													"type": "Expression"
+												}
+											}
+										],
+										"scriptBlockExecutionTimeout": "02:00:00"
+									}
+								},
+								{
+									"name": "CreateExternalTable",
+									"type": "Script",
+									"dependsOn": [
+										{
+											"activity": "ExternalTableSQL",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"linkedServiceName": {
+										"referenceName": "serverless_ARIR",
+										"type": "LinkedServiceReference",
+										"parameters": {
+											"p_database": {
+												"value": "@pipeline().parameters.c_serverless_db",
+												"type": "Expression"
+											}
+										}
+									},
+									"typeProperties": {
+										"scripts": [
+											{
+												"type": "Query",
+												"text": {
+													"value": "begin transaction\n\nif exists (select * from sys.external_tables t join sys.schemas s on s.schema_id = t.schema_id where s.name = 'dbo' and t.name = '@{pipeline().parameters.p_trg_table}')\ndrop external table @{pipeline().parameters.p_trg_table};\n\n@{activity('ExternalTableSQL').output.resultSets[0].rows[0].SQL};\n\ndrop view @{pipeline().parameters.p_trg_table}_tmp;\n\ncommit;\n",
+													"type": "Expression"
+												}
+											}
+										],
+										"scriptBlockExecutionTimeout": "02:00:00"
+									}
+								},
+								{
+									"name": "ScriptStagingDimKeysSQL",
+									"type": "Script",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"linkedServiceName": {
+										"referenceName": "serverless_ARIR",
+										"type": "LinkedServiceReference",
+										"parameters": {
+											"p_database": {
+												"value": "@pipeline().parameters.c_serverless_db",
+												"type": "Expression"
+											}
+										}
+									},
+									"typeProperties": {
+										"scripts": [
+											{
+												"type": "Query",
+												"text": {
+													"value": "select 'select ' + \nSTRING_AGG('coalesce(' + coalesce(dimAlias, dimTab) + '.' + dimKey + ', 0) ' + coalesce(keyAlias, dimKey), ', ') + ', ' + 'stg.*' +\n' from openrowset(bulk ''@{activity('GenericEnrichedParquet linked service').output.properties.typeProperties.url}@{pipeline().parameters.c_stg_container}/@{pipeline().parameters.c_stg_root_folder}/@{pipeline().parameters.p_trg_table}Stg.parquet'', format = ''PARQUET'') as stg ' +\nSTRING_AGG('left outer join ' + dimTab + ' ' + coalesce(dimAlias, dimTab) + ' on ' + replace(joinStatement,  dimTab, coalesce(dimAlias, dimTab)), ' ') sourceQuery\nfrom\n(select * from OPENJSON('@{replace(string(pipeline().parameters.p_dw_dim_tabs), '''', '''''')}')\nWITH (\n    dimTab NVARCHAR(max) '$.dimTab',\n    dimAlias NVARCHAR(max) '$.dimAlias',\n    dimKey NVARCHAR(max) '$.dimKey',\n    keyAlias NVARCHAR(max) '$.keyAlias',\n    joinStatement NVARCHAR(max) '$.joinStatement'\n)) q",
+													"type": "Expression"
+												}
+											}
+										],
+										"scriptBlockExecutionTimeout": "02:00:00"
+									}
+								},
+								{
+									"name": "ScriptFactCreateTime",
+									"type": "Script",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"linkedServiceName": {
+										"referenceName": "serverless_ARIR",
+										"type": "LinkedServiceReference",
+										"parameters": {
+											"p_database": {
+												"value": "@pipeline().parameters.c_serverless_db",
+												"type": "Expression"
+											}
+										}
+									},
+									"typeProperties": {
+										"scripts": [
+											{
+												"type": "Query",
+												"text": {
+													"value": "@if(activity('GetTargetDeltaMetadata').output.exists, \nconcat('select ''select '' + STRING_AGG(value, '', '') + '', ', pipeline().parameters.c_trg_dss_create_col, ' from ', pipeline().parameters.p_trg_table, ''' targetQuery from OPENJSON (''', string(pipeline().parameters.p_src_key_cols), ''')'), \nconcat('select ''select null as '' + STRING_AGG(value, '', null as '') + '', cast(null as datetime) as ', pipeline().parameters.c_trg_dss_create_col, ' where 1 = 0'' targetQuery from OPENJSON (''', string(pipeline().parameters.p_src_key_cols), ''') as r'))\n\n",
+													"type": "Expression"
+												}
+											}
+										],
+										"scriptBlockExecutionTimeout": "02:00:00"
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "GenericEnrichedParquet attributes",
+						"type": "WebActivity",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"method": "GET",
+							"headers": {},
+							"url": {
+								"value": "@concat('https://', pipeline().DataFactory, '.dev.azuresynapse.net/datasets/GenericEnrichedParquet?api-version=2020-12-01')",
+								"type": "Expression"
+							},
+							"connectVia": {
+								"referenceName": "SHIR",
+								"type": "IntegrationRuntimeReference"
+							},
+							"authentication": {
+								"type": "MSI",
+								"resource": "https://dev.azuresynapse.net/"
+							}
+						}
+					},
+					{
+						"name": "GenericEnrichedParquet linked service",
+						"type": "WebActivity",
+						"dependsOn": [
+							{
+								"activity": "GenericEnrichedParquet attributes",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"method": "GET",
+							"headers": {},
+							"url": {
+								"value": "@concat('https://', pipeline().DataFactory, '.dev.azuresynapse.net/linkedservices/', activity('GenericEnrichedParquet attributes').output.properties.linkedServiceName.referenceName, '?api-version=2020-12-01')",
+								"type": "Expression"
+							},
+							"connectVia": {
+								"referenceName": "SHIR",
+								"type": "IntegrationRuntimeReference"
+							},
+							"authentication": {
+								"type": "MSI",
+								"resource": "https://dev.azuresynapse.net/"
+							}
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"parameters": {
+					"p_trg_table": {
+						"type": "string",
+						"defaultValue": "FactDataflowsDatasets"
+					},
+					"p_datetime_from": {
+						"type": "string"
+					},
+					"p_surrogate_key_col": {
+						"type": "string",
+						"defaultValue": "dataflows_key"
+					},
+					"p_src_schema": {
+						"type": "string",
+						"defaultValue": "enr"
+					},
+					"p_src_object": {
+						"type": "string",
+						"defaultValue": "dataflows_datasets_WIDE"
+					},
+					"p_src_key_cols": {
+						"type": "array",
+						"defaultValue": [
+							"dataflows_name",
+							"datasets_name"
+						]
+					},
+					"p_src_cdc_col": {
+						"type": "string",
+						"defaultValue": "_DSS_UPDATE_TIME"
+					},
+					"p_data_type_replace": {
+						"type": "array",
+						"defaultValue": [
+							{
+								"col": "dataflows_datasets_name",
+								"dataType": "varchar(255)"
+							},
+							{
+								"col": "dataflows_name",
+								"dataType": "varchar(255)"
+							},
+							{
+								"col": "datasets_name",
+								"dataType": "varchar(255)"
+							}
+						]
+					},
+					"p_partition_formula": {
+						"type": "string",
+						"defaultValue": "'dummy'"
+					},
+					"c_serverless_db": {
+						"type": "string",
+						"defaultValue": "templateDB"
+					},
+					"c_trg_container": {
+						"type": "string",
+						"defaultValue": "template"
+					},
+					"c_trg_root_folder": {
+						"type": "string",
+						"defaultValue": "StarSchemaObjects"
+					},
+					"c_cur_data_source": {
+						"type": "string",
+						"defaultValue": "TemplateCuratedSource"
+					},
+					"c_trg_partition_col": {
+						"type": "string",
+						"defaultValue": "FACT_PARTITION"
+					},
+					"c_trg_dss_update_col": {
+						"type": "string",
+						"defaultValue": "dss_update_time"
+					},
+					"c_trg_dss_create_col": {
+						"type": "string",
+						"defaultValue": "dss_create_time"
+					},
+					"c_stg_container": {
+						"type": "string",
+						"defaultValue": "template"
+					},
+					"c_stg_root_folder": {
+						"type": "string",
+						"defaultValue": "Staging"
+					},
+					"p_dw_dim_tabs": {
+						"type": "array",
+						"defaultValue": [
+							{
+								"dimTab": "DimDataflows",
+								"dimAlias": "DimDataflows",
+								"dimKey": "dataflows_key",
+								"keyAlias": "dataflows_key",
+								"joinStatement": "stg.dataflows_name = DimDataflows.name"
+							},
+							{
+								"dimTab": "DimDatasets",
+								"dimAlias": "DimDatasets",
+								"dimKey": "datasets_key",
+								"keyAlias": "datasets_key",
+								"joinStatement": "stg.datasets_name = DimDatasets.name"
+							}
+						]
+					}
+				},
+				"variables": {
+					"v_datetime_from": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "Templates"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/datasets/GenericCuratedJsonFolder')]",
+				"[concat(variables('workspaceId'), '/integrationRuntimes/SHIR')]",
+				"[concat(variables('workspaceId'), '/datasets/GenericServerlessSQL')]",
+				"[concat(variables('workspaceId'), '/datasets/GenericEnrichedParquet')]",
+				"[concat(variables('workspaceId'), '/linkedServices/serverless_ARIR')]",
+				"[concat(variables('workspaceId'), '/dataflows/StarSchemaFact')]",
+				"[concat(variables('workspaceId'), '/integrationRuntimes/AutoResolveIntegrationRuntime')]"
+			]
+		},
+		{
 			"name": "[concat(parameters('workspaceName'), '/ADLS_TMPL_DATASOURCE1')]",
 			"type": "Microsoft.Synapse/workspaces/datasets",
 			"apiVersion": "2019-06-01-preview",
@@ -6333,7 +7755,7 @@
 					"scriptLines": [
 						"parameters{",
 						"     c_target_container as string ('template'),",
-						"     c_key_column_name as string ('name'),",
+						"     c_key_column_name as string[] ([\"name\"]),",
 						"     c_raw_cdc_column as string ('rawTimestamp_ParquetToDeltaParquet'),",
 						"     p_dss_update_time as string ('2024-03-06T22:24:32Z'),",
 						"     c_enr_cdc_column as string ('enrTimestamp_ParquetToDeltaParquet'),",
@@ -6367,7 +7789,7 @@
 						"derivedId window(over(keyColumn),",
 						"     desc(toString(byName($c_raw_cdc_column)), true),",
 						"     rowNum = rowNumber()) ~> elicitDuplicates",
-						"RawDataset derive(keyColumn = md5(byNames(split(replace($c_key_column_name, ' ', ''), ','))),",
+						"RawDataset derive(keyColumn = md5(byNames($c_key_column_name)),",
 						"          each(match(name=='fileName'), $c_raw_cdc_column = iif($p_processing_mode == 'incremental', replace(reverse(substring(reverse(toString($$)), 0, locate('_', reverse(toString($$))) - 1)), '.parquet'), toString(null())), $c_enr_cdc_column = toTimestamp($p_dss_update_time, \"yyyy-MM-dd'T'HH:mm:ss'Z'\")),",
 						"          DELTA_PARTITION = expr($p_partition_formula)) ~> derivedId",
 						"elicitDuplicates filter(rowNum == 1 && not(isNull(keyColumn))) ~> filterDuplicates",
@@ -6394,9 +7816,10 @@
 						"     optimizedWrite: false,",
 						"     vacuum: 0,",
 						"     deletable: false,",
-						"     insertable: true,",
+						"     insertable: false,",
 						"     updateable: false,",
-						"     upsertable: false,",
+						"     upsertable: true,",
+						"     keys:($c_key_column_name),",
 						"     pruneCondition: ['DELTA_PARTITION' -> (sinkPartitionPruning#outputs().PARTITION_PRUNING)],",
 						"     umask: 0022,",
 						"     preCommands: [],",
@@ -6425,6 +7848,501 @@
 				"[concat(variables('workspaceId'), '/datasets/GenericRawParquet_NoExtension')]",
 				"[concat(variables('workspaceId'), '/datasets/GenericServerlessSQL')]",
 				"[concat(variables('workspaceId'), '/linkedServices/templateenrst_ARIR')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/StarSchemaDimension')]",
+			"type": "Microsoft.Synapse/workspaces/dataflows",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"folder": {
+					"name": "Templates"
+				},
+				"type": "MappingDataFlow",
+				"typeProperties": {
+					"sources": [
+						{
+							"dataset": {
+								"referenceName": "GenericServerlessSQL",
+								"type": "DatasetReference"
+							},
+							"name": "DataSource"
+						},
+						{
+							"dataset": {
+								"referenceName": "GenericServerlessSQL",
+								"type": "DatasetReference"
+							},
+							"name": "Dimension"
+						},
+						{
+							"dataset": {
+								"referenceName": "GenericServerlessSQL",
+								"type": "DatasetReference"
+							},
+							"name": "DimensionMaxKey"
+						},
+						{
+							"dataset": {
+								"referenceName": "GenericServerlessSQL",
+								"type": "DatasetReference"
+							},
+							"name": "DimensionZeroRow"
+						},
+						{
+							"dataset": {
+								"referenceName": "GenericServerlessSQL",
+								"type": "DatasetReference"
+							},
+							"name": "SourcePartitionPruning"
+						},
+						{
+							"dataset": {
+								"referenceName": "GenericServerlessSQL",
+								"type": "DatasetReference"
+							},
+							"name": "dummyPartitionPruning"
+						}
+					],
+					"sinks": [
+						{
+							"name": "CacheMaxKey"
+						},
+						{
+							"linkedService": {
+								"referenceName": "templatecurst_ARIR",
+								"type": "LinkedServiceReference"
+							},
+							"name": "sinkZeroRecord"
+						},
+						{
+							"linkedService": {
+								"referenceName": "templatecurst_ARIR",
+								"type": "LinkedServiceReference"
+							},
+							"name": "sinkDimension"
+						},
+						{
+							"name": "sinkPartitionPruning"
+						}
+					],
+					"transformations": [
+						{
+							"name": "lookupDimension"
+						},
+						{
+							"name": "selectDimension"
+						},
+						{
+							"name": "derivedNewKey"
+						},
+						{
+							"name": "surrogateKey"
+						},
+						{
+							"name": "split1"
+						},
+						{
+							"name": "derivedColumns"
+						},
+						{
+							"name": "derivedExistingKey"
+						},
+						{
+							"name": "union"
+						},
+						{
+							"name": "selectBeforeSink"
+						},
+						{
+							"name": "alterRow"
+						},
+						{
+							"name": "alterZeroRow"
+						},
+						{
+							"name": "sourceLookupKey"
+						},
+						{
+							"name": "dimLookupKey"
+						},
+						{
+							"name": "derivedMaxKey"
+						},
+						{
+							"name": "aggregatePartitionPruning"
+						},
+						{
+							"name": "unionPartitionPruning"
+						},
+						{
+							"name": "collectPartitionPruning"
+						}
+					],
+					"scriptLines": [
+						"parameters{",
+						"     p_src_key_cols as string[] ([\"name\"]),",
+						"     p_src_cdc_col as string ('enrTimestamp'),",
+						"     p_surrogate_key_col as string,",
+						"     c_trg_dss_update_col as string ('dss_update_time'),",
+						"     c_trg_dss_create_col as string ('dss_create_time'),",
+						"     p_partition_formula as string (\"'dummy'\"),",
+						"     c_trg_partition_col as string ('DIM_PARTITION'),",
+						"     p_src_schema as string ('enr'),",
+						"     p_src_object as string ('dataflows_REST_API'),",
+						"     p_datetime_from as string ('2024-03-06T21:24:57'),",
+						"     p_trg_table as string ('DimDataflows'),",
+						"     p_init_load as boolean (false()),",
+						"     c_trg_container as string ('template'),",
+						"     c_trg_root_folder as string ('StarSchemaObjects')",
+						"}",
+						"source(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     isolationLevel: 'READ_UNCOMMITTED',",
+						"     query: (\"select * from \" + $p_src_schema + \".\" + $p_src_object + iif(length(coalesce($p_src_cdc_col, \"\")) == 0, \"\", \" where \" + $p_src_cdc_col + \" > '\" + iif(length(coalesce($p_datetime_from, \"\")) == 0, \"1900-01-01\", $p_datetime_from) + \"'\")),",
+						"     format: 'query',",
+						"     staged: false) ~> DataSource",
+						"source(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     isolationLevel: 'READ_UNCOMMITTED',",
+						"     query: (iif(not($p_init_load), \"select \" + $p_surrogate_key_col + reduce($p_src_key_cols, \"\", #acc + \", \" + #item, #result) + iif(length(coalesce($c_trg_dss_create_col, \"\")) == 0, \"\", \", \" + $c_trg_dss_create_col) + \" from \" + $p_trg_table, \"select cast(0 as bigint) as \" + $p_surrogate_key_col + reduce($p_src_key_cols, \"\", #acc + \", '' as \" + #item, #result) + iif(length(coalesce($c_trg_dss_create_col, \"\")) == 0, \"\", \", cast('1900-01-01' as datetime) as \" + $c_trg_dss_create_col + \" where 1 = 0\"))),",
+						"     format: 'query',",
+						"     staged: false) ~> Dimension",
+						"source(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     isolationLevel: 'READ_UNCOMMITTED',",
+						"     query: (iif(not($p_init_load), \"select max(\" + $p_surrogate_key_col + \") as \" + $p_surrogate_key_col + \" from \" + $p_trg_table, \"select cast(0 as bigint) as \" + $p_surrogate_key_col)),",
+						"     format: 'query',",
+						"     staged: false) ~> DimensionMaxKey",
+						"source(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     isolationLevel: 'READ_UNCOMMITTED',",
+						"     query: (\"select cast(0 as bigint) as \" + $p_surrogate_key_col + reduce($p_src_key_cols, \"\", #acc + \", '' as \" + #item, #result) + \", 'dummy' as \" + $c_trg_partition_col),",
+						"     format: 'query',",
+						"     staged: false) ~> DimensionZeroRow",
+						"source(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     isolationLevel: 'READ_UNCOMMITTED',",
+						"     query: (\"select * from \" + $p_src_schema + \".\" + $p_src_object + iif(length(coalesce($p_src_cdc_col, \"\")) == 0, \"\", \" where \" + $p_src_cdc_col + \" > '\" + iif(length(coalesce($p_datetime_from, \"\")) == 0, \"1900-01-01\", $p_datetime_from) + \"'\")),",
+						"     format: 'query',",
+						"     staged: false) ~> SourcePartitionPruning",
+						"source(output(",
+						"          PARTITION as string,",
+						"          CONSTANT as string,",
+						"          AGGREGATE as string",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     isolationLevel: 'READ_UNCOMMITTED',",
+						"     query: 'select \\'dummy\\' as PARTITION,\\n\\'CONSTANT\\' as CONSTANT, \\'dummy\\' as AGGREGATE',",
+						"     format: 'query',",
+						"     staged: false) ~> dummyPartitionPruning",
+						"sourceLookupKey, selectDimension lookup(lookupKey == PREFIX_lookupKey,",
+						"     multiple: false,",
+						"     pickup: 'any',",
+						"     broadcast: 'auto')~> lookupDimension",
+						"dimLookupKey select(mapColumn(",
+						"          each(match(true()),",
+						"               'PREFIX_'+$$ = $$)",
+						"     ),",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true) ~> selectDimension",
+						"surrogateKey derive(each(match(name=='surrogateKey'), $p_surrogate_key_col = surrogateKey + coalesce(CacheMaxKey#outputs()[0].surrogateKey, 0))) ~> derivedNewKey",
+						"split1@NullKey keyGenerate(output(surrogateKey as long),",
+						"     startAt: 1L,",
+						"     stepValue: 1L) ~> surrogateKey",
+						"derivedColumns split(isNull(toLong(byName('PREFIX_' + $p_surrogate_key_col))),",
+						"     disjoint: false) ~> split1@(NullKey, NotNullKey)",
+						"lookupDimension derive(each(match(name=='PREFIX_'+$c_trg_dss_create_col), $c_trg_dss_create_col = coalesce($$, currentTimestamp())),",
+						"          each(match(name=='PREFIX_'+$p_surrogate_key_col), $c_trg_dss_update_col = currentTimestamp(), $c_trg_partition_col = expr($p_partition_formula))) ~> derivedColumns",
+						"split1@NotNullKey derive(each(match(name=='PREFIX_'+$p_surrogate_key_col), $p_surrogate_key_col = $$)) ~> derivedExistingKey",
+						"derivedNewKey, derivedExistingKey union(byName: true)~> union",
+						"union select(mapColumn(",
+						"          each(match(left(name,length('PREFIX_'))!='PREFIX_'&&name!='surrogateKey'&&name!='lookupKey'))",
+						"     ),",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true) ~> selectBeforeSink",
+						"selectBeforeSink alterRow(upsertIf(true())) ~> alterRow",
+						"DimensionZeroRow alterRow(upsertIf(true())) ~> alterZeroRow",
+						"DataSource derive(lookupKey = md5(byNames($p_src_key_cols))) ~> sourceLookupKey",
+						"Dimension derive(lookupKey = md5(byNames($p_src_key_cols))) ~> dimLookupKey",
+						"DimensionMaxKey derive(surrogateKey = toLong(byName($p_surrogate_key_col))) ~> derivedMaxKey",
+						"SourcePartitionPruning aggregate(groupBy(PARTITION = expr($p_partition_formula),",
+						"          CONSTANT = 'CONSTANT'),",
+						"     AGGREGATE = first(expr($p_partition_formula))) ~> aggregatePartitionPruning",
+						"aggregatePartitionPruning, dummyPartitionPruning union(byName: true)~> unionPartitionPruning",
+						"unionPartitionPruning aggregate(groupBy(CONSTANT),",
+						"     PARTITION = collect(AGGREGATE)) ~> collectPartitionPruning",
+						"derivedMaxKey sink(validateSchema: false,",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true,",
+						"     store: 'cache',",
+						"     format: 'inline',",
+						"     output: false,",
+						"     saveOrder: 2,",
+						"     mapColumn(",
+						"          surrogateKey",
+						"     )) ~> CacheMaxKey",
+						"alterZeroRow sink(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     format: 'delta',",
+						"     fileSystem: ($c_trg_container),",
+						"     folderPath: ($c_trg_root_folder + \"/\" + $p_trg_table),",
+						"     mergeSchema: true,",
+						"     autoCompact: true,",
+						"     optimizedWrite: true,",
+						"     vacuum: 0,",
+						"     deletable: false,",
+						"     insertable: false,",
+						"     updateable: false,",
+						"     upsertable: true,",
+						"     keys:($p_src_key_cols),",
+						"     pruneCondition: [($c_trg_partition_col) -> ([\"dummy\"])],",
+						"     umask: 0022,",
+						"     preCommands: [],",
+						"     postCommands: [],",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true,",
+						"     saveOrder: 1,",
+						"     partitionBy('key',",
+						"          0,",
+						"          byName($c_trg_partition_col)",
+						"     )) ~> sinkZeroRecord",
+						"alterRow sink(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     format: 'delta',",
+						"     fileSystem: ($c_trg_container),",
+						"     folderPath: ($c_trg_root_folder + \"/\" + $p_trg_table),",
+						"     mergeSchema: true,",
+						"     autoCompact: true,",
+						"     optimizedWrite: true,",
+						"     vacuum: 0,",
+						"     deletable: false,",
+						"     insertable: false,",
+						"     updateable: false,",
+						"     upsertable: true,",
+						"     keys:($p_src_key_cols),",
+						"     pruneCondition: [($c_trg_partition_col) -> (sinkPartitionPruning#outputs().PARTITION_PRUNING)],",
+						"     umask: 0022,",
+						"     preCommands: [],",
+						"     postCommands: [],",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true,",
+						"     saveOrder: 3,",
+						"     partitionBy('key',",
+						"          0,",
+						"          byName($c_trg_partition_col)",
+						"     )) ~> sinkDimension",
+						"collectPartitionPruning sink(validateSchema: false,",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true,",
+						"     store: 'cache',",
+						"     format: 'inline',",
+						"     output: false,",
+						"     saveOrder: 1,",
+						"     mapColumn(",
+						"          PARTITION_PRUNING = PARTITION",
+						"     )) ~> sinkPartitionPruning"
+					]
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/datasets/GenericServerlessSQL')]",
+				"[concat(variables('workspaceId'), '/linkedServices/templatecurst_ARIR')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/StarSchemaFact')]",
+			"type": "Microsoft.Synapse/workspaces/dataflows",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"folder": {
+					"name": "Templates"
+				},
+				"type": "MappingDataFlow",
+				"typeProperties": {
+					"sources": [
+						{
+							"dataset": {
+								"referenceName": "GenericServerlessSQL",
+								"type": "DatasetReference"
+							},
+							"name": "DataSource"
+						},
+						{
+							"dataset": {
+								"referenceName": "GenericServerlessSQL",
+								"type": "DatasetReference"
+							},
+							"name": "Fact"
+						},
+						{
+							"dataset": {
+								"referenceName": "GenericServerlessSQL",
+								"type": "DatasetReference"
+							},
+							"name": "SourcePartitionPruning"
+						},
+						{
+							"dataset": {
+								"referenceName": "GenericServerlessSQL",
+								"type": "DatasetReference"
+							},
+							"name": "dummyPartitionPruning"
+						}
+					],
+					"sinks": [
+						{
+							"linkedService": {
+								"referenceName": "templatecurst_ARIR",
+								"type": "LinkedServiceReference"
+							},
+							"name": "sinkDimension"
+						},
+						{
+							"name": "sinkPartitionPruning"
+						}
+					],
+					"transformations": [
+						{
+							"name": "lookupDimension"
+						},
+						{
+							"name": "selectFact"
+						},
+						{
+							"name": "derivedColumns"
+						},
+						{
+							"name": "selectBeforeSink"
+						},
+						{
+							"name": "alterRow"
+						},
+						{
+							"name": "sourceLookupKey"
+						},
+						{
+							"name": "factLookupKey"
+						},
+						{
+							"name": "aggregatePartitionPruning"
+						},
+						{
+							"name": "unionPartitionPruning"
+						},
+						{
+							"name": "collectPartitionPruning"
+						}
+					],
+					"scriptLines": [
+						"parameters{",
+						"     p_src_key_cols as string[] ([\"dataflows_name\",\"datasets_name\"]),",
+						"     c_trg_dss_update_col as string ('dss_update_time'),",
+						"     c_trg_dss_create_col as string ('dss_create_time'),",
+						"     p_partition_formula as string (\"'dummy'\"),",
+						"     c_trg_partition_col as string ('FACT_PARTITION'),",
+						"     p_trg_table as string ('FactDataflowsDatasets'),",
+						"     c_trg_container as string ('template'),",
+						"     c_trg_root_folder as string ('StarSchemaObjects'),",
+						"     p_src_query as string (\"select coalesce(DimDataflows.dataflows_key, 0) dataflows_key, coalesce(DimDatasets.datasets_key, 0) datasets_key, stg.* from openrowset(bulk 'https://ivsenr.dfs.core.windows.net/template/Staging/FactDataflowsDatasetsStg.parquet', format = 'PARQUET') as stg left outer join DimDataflows DimDataflows on stg.dataflows_name = DimDataflows.name left outer join DimDatasets DimDatasets on stg.datasets_name = DimDatasets.name\"),",
+						"     p_trg_query as string (\"select null as dataflows_name, null as datasets_name, cast(null as datetime) as dss_create_time where 1 = 0\")",
+						"}",
+						"source(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     isolationLevel: 'READ_UNCOMMITTED',",
+						"     query: ($p_src_query),",
+						"     format: 'query',",
+						"     staged: false) ~> DataSource",
+						"source(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     isolationLevel: 'READ_UNCOMMITTED',",
+						"     query: ($p_trg_query),",
+						"     format: 'query',",
+						"     staged: false) ~> Fact",
+						"source(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     isolationLevel: 'READ_UNCOMMITTED',",
+						"     query: ($p_src_query),",
+						"     format: 'query',",
+						"     staged: false) ~> SourcePartitionPruning",
+						"source(output(",
+						"          PARTITION as string,",
+						"          CONSTANT as string,",
+						"          AGGREGATE as string",
+						"     ),",
+						"     allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     isolationLevel: 'READ_UNCOMMITTED',",
+						"     query: 'select \\'dummy\\' as PARTITION,\\n\\'CONSTANT\\' as CONSTANT, \\'dummy\\' as AGGREGATE',",
+						"     format: 'query',",
+						"     staged: false) ~> dummyPartitionPruning",
+						"sourceLookupKey, selectFact lookup(lookupKey == PREFIX_lookupKey,",
+						"     multiple: false,",
+						"     pickup: 'any',",
+						"     broadcast: 'auto')~> lookupDimension",
+						"factLookupKey select(mapColumn(",
+						"          each(match(true()),",
+						"               'PREFIX_'+$$ = $$)",
+						"     ),",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true) ~> selectFact",
+						"lookupDimension derive(each(match(name=='PREFIX_'+$c_trg_dss_create_col), $c_trg_dss_create_col = coalesce($$, currentTimestamp()), $c_trg_dss_update_col = currentTimestamp(), $c_trg_partition_col = expr($p_partition_formula))) ~> derivedColumns",
+						"derivedColumns select(mapColumn(",
+						"          each(match(left(name,length('PREFIX_'))!='PREFIX_'&&name!='surrogateKey'&&name!='lookupKey'))",
+						"     ),",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true) ~> selectBeforeSink",
+						"selectBeforeSink alterRow(upsertIf(true())) ~> alterRow",
+						"DataSource derive(lookupKey = md5(byNames($p_src_key_cols))) ~> sourceLookupKey",
+						"Fact derive(lookupKey = md5(byNames($p_src_key_cols))) ~> factLookupKey",
+						"SourcePartitionPruning aggregate(groupBy(PARTITION = expr($p_partition_formula),",
+						"          CONSTANT = 'CONSTANT'),",
+						"     AGGREGATE = first(expr($p_partition_formula))) ~> aggregatePartitionPruning",
+						"aggregatePartitionPruning, dummyPartitionPruning union(byName: true)~> unionPartitionPruning",
+						"unionPartitionPruning aggregate(groupBy(CONSTANT),",
+						"     PARTITION = collect(AGGREGATE)) ~> collectPartitionPruning",
+						"alterRow sink(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     format: 'delta',",
+						"     fileSystem: ($c_trg_container),",
+						"     folderPath: ($c_trg_root_folder + \"/\" + $p_trg_table),",
+						"     mergeSchema: true,",
+						"     autoCompact: true,",
+						"     optimizedWrite: true,",
+						"     vacuum: 0,",
+						"     deletable: false,",
+						"     insertable: false,",
+						"     updateable: false,",
+						"     upsertable: true,",
+						"     keys:($p_src_key_cols),",
+						"     pruneCondition: [($c_trg_partition_col) -> (sinkPartitionPruning#outputs().PARTITION_PRUNING)],",
+						"     umask: 0022,",
+						"     preCommands: [],",
+						"     postCommands: [],",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true,",
+						"     saveOrder: 2,",
+						"     partitionBy('key',",
+						"          0,",
+						"          byName($c_trg_partition_col)",
+						"     )) ~> sinkDimension",
+						"collectPartitionPruning sink(validateSchema: false,",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true,",
+						"     store: 'cache',",
+						"     format: 'inline',",
+						"     output: false,",
+						"     saveOrder: 1,",
+						"     mapColumn(",
+						"          PARTITION_PRUNING = PARTITION",
+						"     )) ~> sinkPartitionPruning"
+					]
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/datasets/GenericServerlessSQL')]",
+				"[concat(variables('workspaceId'), '/linkedServices/templatecurst_ARIR')]"
 			]
 		},
 		{
@@ -6737,6 +8655,29 @@
 				},
 				"content": {
 					"query": "IF NOT EXISTS (SELECT * FROM sys.external_data_sources WHERE name = 'TemplateCuratedSource') \n\tCREATE EXTERNAL DATA SOURCE [TemplateCuratedSource] \n\tWITH (\n\t\tLOCATION = 'https://ivscur.blob.core.windows.net/template',\n\t\tCREDENTIAL = [SynapseIdentity] \n\t)",
+					"metadata": {
+						"language": "sql"
+					},
+					"currentConnection": {
+						"databaseName": "templateDB",
+						"poolName": "Built-in"
+					},
+					"resultLimit": 5000
+				},
+				"type": "SqlQuery"
+			},
+			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/Template_delta_format')]",
+			"type": "Microsoft.Synapse/workspaces/sqlscripts",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"folder": {
+					"name": "Serverless Deploy"
+				},
+				"content": {
+					"query": "IF NOT EXISTS (SELECT * FROM sys.external_file_formats WHERE name = 'Delta') \n\tCREATE EXTERNAL FILE FORMAT Delta\n\tWITH (\n\t\tFORMAT_TYPE = DELTA\n\t)",
 					"metadata": {
 						"language": "sql"
 					},
@@ -9847,6 +11788,18 @@
 			"dependsOn": []
 		},
 		{
+			"name": "[concat(parameters('workspaceName'), '/ivssql')]",
+			"type": "Microsoft.Synapse/workspaces/sqlPools",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"collation": "SQL_Latin1_General_CP1_CI_AS",
+				"maxSizeBytes": 263882790666240,
+				"annotations": []
+			},
+			"dependsOn": [],
+			"location": "westus"
+		},
+		{
 			"name": "[concat(parameters('workspaceName'), '/ivsspark')]",
 			"type": "Microsoft.Synapse/workspaces/bigDataPools",
 			"apiVersion": "2019-06-01-preview",
@@ -9872,226 +11825,23 @@
 			"location": "westus"
 		},
 		{
-			"name": "[concat(parameters('workspaceName'), '/ivssql')]",
-			"type": "Microsoft.Synapse/workspaces/sqlPools",
-			"apiVersion": "2019-06-01-preview",
-			"properties": {
-				"collation": "SQL_Latin1_General_CP1_CI_AS",
-				"maxSizeBytes": 263882790666240,
-				"annotations": []
-			},
-			"dependsOn": [],
-			"location": "westus"
-		},
-		{
-			"name": "[concat(parameters('workspaceName'), '/Template_delta_format')]",
-			"type": "Microsoft.Synapse/workspaces/sqlscripts",
-			"apiVersion": "2019-06-01-preview",
-			"properties": {
-				"folder": {
-					"name": "Serverless Deploy"
-				},
-				"content": {
-					"query": "IF NOT EXISTS (SELECT * FROM sys.external_file_formats WHERE name = 'Delta') \n\tCREATE EXTERNAL FILE FORMAT Delta\n\tWITH (\n\t\tFORMAT_TYPE = DELTA\n\t)",
-					"metadata": {
-						"language": "sql"
-					},
-					"currentConnection": {
-						"databaseName": "templateDB",
-						"poolName": "Built-in"
-					},
-					"resultLimit": 5000
-				},
-				"type": "SqlQuery"
-			},
-			"dependsOn": []
-		},
-		{
-			"name": "[concat(parameters('workspaceName'), '/StarSchemaDimension')]",
+			"name": "[concat(parameters('workspaceName'), '/ServerlessObjectsDeploy')]",
 			"type": "Microsoft.Synapse/workspaces/pipelines",
 			"apiVersion": "2019-06-01-preview",
 			"properties": {
 				"activities": [
 					{
-						"name": "StarSchemaDimension",
-						"type": "ExecuteDataFlow",
+						"name": "ForEachScript",
+						"type": "ForEach",
 						"dependsOn": [
 							{
-								"activity": "If Target Delta Exists",
-								"dependencyConditions": [
-									"Succeeded"
-								]
-							}
-						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"dataflow": {
-								"referenceName": "StarSchemaDimension",
-								"type": "DataFlowReference",
-								"parameters": {
-									"p_src_key_cols": {
-										"value": "@pipeline().parameters.p_src_key_cols",
-										"type": "Expression"
-									},
-									"p_src_cdc_col": {
-										"value": "'@{pipeline().parameters.p_src_cdc_col}'",
-										"type": "Expression"
-									},
-									"p_surrogate_key_col": {
-										"value": "'@{pipeline().parameters.p_surrogate_key_col}'",
-										"type": "Expression"
-									},
-									"c_trg_dss_update_col": {
-										"value": "'@{pipeline().parameters.c_trg_dss_update_col}'",
-										"type": "Expression"
-									},
-									"c_trg_dss_create_col": {
-										"value": "'@{pipeline().parameters.c_trg_dss_create_col}'",
-										"type": "Expression"
-									},
-									"p_partition_formula": {
-										"value": "@concat('\"', pipeline().parameters.p_partition_formula, '\"')",
-										"type": "Expression"
-									},
-									"c_trg_partition_col": {
-										"value": "'@{pipeline().parameters.c_trg_partition_col}'",
-										"type": "Expression"
-									},
-									"p_src_schema": {
-										"value": "'@{pipeline().parameters.p_src_schema}'",
-										"type": "Expression"
-									},
-									"p_src_object": {
-										"value": "'@{pipeline().parameters.p_src_object}'",
-										"type": "Expression"
-									},
-									"p_datetime_from": {
-										"value": "'@{variables('v_datetime_from')}'",
-										"type": "Expression"
-									},
-									"p_trg_table": {
-										"value": "'@{pipeline().parameters.p_trg_table}'",
-										"type": "Expression"
-									},
-									"p_init_load": {
-										"value": "@not(activity('GetTargetDeltaMetadata').output.exists)",
-										"type": "Expression"
-									},
-									"c_trg_container": {
-										"value": "'@{pipeline().parameters.c_trg_container}'",
-										"type": "Expression"
-									},
-									"c_trg_root_folder": {
-										"value": "'@{pipeline().parameters.c_trg_root_folder}'",
-										"type": "Expression"
-									}
-								},
-								"datasetParameters": {
-									"DataSource": {
-										"p_database": {
-											"value": "@pipeline().parameters.c_serverless_db",
-											"type": "Expression"
-										},
-										"p_schema": "dummy",
-										"p_table": "dummy"
-									},
-									"Dimension": {
-										"p_database": {
-											"value": "@pipeline().parameters.c_serverless_db",
-											"type": "Expression"
-										},
-										"p_schema": "dummy",
-										"p_table": "dummy"
-									},
-									"DimensionMaxKey": {
-										"p_database": {
-											"value": "@pipeline().parameters.c_serverless_db",
-											"type": "Expression"
-										},
-										"p_schema": "dummy",
-										"p_table": "dummy"
-									},
-									"DimensionZeroRow": {
-										"p_database": {
-											"value": "@pipeline().parameters.c_serverless_db",
-											"type": "Expression"
-										},
-										"p_schema": "dummy",
-										"p_table": "dummy"
-									},
-									"CacheMaxKey": {},
-									"sinkZeroRecord": {},
-									"sinkDimension": {}
-								},
-								"linkedServiceParameters": {}
-							},
-							"staging": {},
-							"compute": {
-								"coreCount": 8,
-								"computeType": "General"
-							},
-							"traceLevel": "Fine"
-						}
-					},
-					{
-						"name": "GetTargetDeltaMetadata",
-						"type": "GetMetadata",
-						"dependsOn": [],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"dataset": {
-								"referenceName": "GenericCuratedJsonFolder",
-								"type": "DatasetReference",
-								"parameters": {
-									"p_container": {
-										"value": "@pipeline().parameters.c_trg_container",
-										"type": "Expression"
-									},
-									"p_folder": {
-										"value": "@concat(pipeline().parameters.c_trg_root_folder, '/', pipeline().parameters.p_trg_table)",
-										"type": "Expression"
-									}
-								}
-							},
-							"fieldList": [
-								"exists"
-							],
-							"storeSettings": {
-								"type": "AzureBlobFSReadSettings",
-								"recursive": true,
-								"enablePartitionDiscovery": false
-							},
-							"formatSettings": {
-								"type": "JsonReadSettings"
-							}
-						}
-					},
-					{
-						"name": "If Target Delta Exists",
-						"type": "IfCondition",
-						"dependsOn": [
-							{
-								"activity": "GetTargetDeltaMetadata",
+								"activity": "ForEachInitScript",
 								"dependencyConditions": [
 									"Succeeded"
 								]
 							},
 							{
-								"activity": "GenericCuratedParquet linked service",
+								"activity": "ForEachTextReplaceMap",
 								"dependencyConditions": [
 									"Succeeded"
 								]
@@ -10099,32 +11849,14 @@
 						],
 						"userProperties": [],
 						"typeProperties": {
-							"expression": {
-								"value": "@and(activity('GetTargetDeltaMetadata').output.exists, not(empty(pipeline().parameters.p_src_cdc_col)))",
+							"items": {
+								"value": "@variables('v_scripts')",
 								"type": "Expression"
 							},
-							"ifFalseActivities": [
+							"isSequential": false,
+							"activities": [
 								{
-									"name": "Set v_datetime_from False",
-									"type": "SetVariable",
-									"dependsOn": [],
-									"policy": {
-										"secureOutput": false,
-										"secureInput": false
-									},
-									"userProperties": [],
-									"typeProperties": {
-										"variableName": "v_datetime_from",
-										"value": {
-											"value": "@pipeline().parameters.p_datetime_from",
-											"type": "Expression"
-										}
-									}
-								}
-							],
-							"ifTrueActivities": [
-								{
-									"name": "DatetimeFrom",
+									"name": "Run SQL Script",
 									"type": "Script",
 									"dependsOn": [],
 									"policy": {
@@ -10139,55 +11871,27 @@
 										"referenceName": "serverless_ARIR",
 										"type": "LinkedServiceReference",
 										"parameters": {
-											"p_database": {
-												"value": "@pipeline().parameters.c_serverless_db",
-												"type": "Expression"
-											}
+											"p_database": "master"
 										}
 									},
 									"typeProperties": {
 										"scripts": [
 											{
-												"type": "Query",
+												"type": "NonQuery",
 												"text": {
-													"value": "@if(empty(pipeline().parameters.p_datetime_from),\n    concat('select max(', pipeline().parameters.p_src_cdc_col, ') as CDCTimestamp from openrowset( bulk ''',activity('GenericCuratedParquet linked service').output.properties.typeProperties.url, pipeline().parameters.c_trg_container, '/', pipeline().parameters.c_trg_root_folder, '/', pipeline().parameters.p_trg_table, ''', format = ''DELTA'') as result'),\n    concat('select ''', replace(replace(replace(replace(replace(\n                    formatDateTime(\n                        pipeline().parameters.p_datetime_from, \n                        'yyyy-MM-ddTHH:mm:ss.fffffffZ'\n                    ), \n                    '0000Z', 'Z'), '000Z', 'Z'), '00Z', 'Z'), '0Z', 'Z'), '.Z', 'Z'\n                ),\n        ''' as CDCTimestamp'\n    )\n)",
+													"value": "@replace(item().query, '{raw_storage_account}', pipeline().parameters.c_raw_storage_account)",
 													"type": "Expression"
 												}
 											}
-										],
-										"scriptBlockExecutionTimeout": "02:00:00"
-									}
-								},
-								{
-									"name": "Set v_datetime_from True",
-									"type": "SetVariable",
-									"dependsOn": [
-										{
-											"activity": "DatetimeFrom",
-											"dependencyConditions": [
-												"Succeeded"
-											]
-										}
-									],
-									"policy": {
-										"secureOutput": false,
-										"secureInput": false
-									},
-									"userProperties": [],
-									"typeProperties": {
-										"variableName": "v_datetime_from",
-										"value": {
-											"value": "@activity('DatetimeFrom').output.resultSets[0].rows[0].CDCTimestamp",
-											"type": "Expression"
-										}
+										]
 									}
 								}
 							]
 						}
 					},
 					{
-						"name": "GenericCuratedParquet attributes",
-						"type": "WebActivity",
+						"name": "Copy SQL scripts",
+						"type": "Copy",
 						"dependsOn": [],
 						"policy": {
 							"timeout": "0.12:00:00",
@@ -10198,64 +11902,160 @@
 						},
 						"userProperties": [],
 						"typeProperties": {
-							"method": "GET",
-							"headers": {},
-							"url": {
-								"value": "@concat('https://', pipeline().DataFactory, '.dev.azuresynapse.net/datasets/GenericCuratedParquet?api-version=2020-12-01')",
-								"type": "Expression"
+							"source": {
+								"type": "RestSource",
+								"httpRequestTimeout": "00:01:40",
+								"requestInterval": "00.00:00:00.010",
+								"requestMethod": "GET",
+								"paginationRules": {
+									"AbsoluteUrl": "$.nextLink"
+								}
 							},
-							"connectVia": {
-								"referenceName": "SHIR",
-								"type": "IntegrationRuntimeReference"
+							"sink": {
+								"type": "ParquetSink",
+								"storeSettings": {
+									"type": "AzureBlobFSWriteSettings"
+								},
+								"formatSettings": {
+									"type": "ParquetWriteSettings"
+								}
 							},
-							"authentication": {
-								"type": "MSI",
-								"resource": "https://dev.azuresynapse.net/"
+							"enableStaging": false,
+							"translator": {
+								"type": "TabularTranslator",
+								"mappings": [
+									{
+										"source": {
+											"path": "['id']"
+										},
+										"sink": {
+											"name": "id"
+										}
+									},
+									{
+										"source": {
+											"path": "['name']"
+										},
+										"sink": {
+											"name": "name"
+										}
+									},
+									{
+										"source": {
+											"path": "['type']"
+										},
+										"sink": {
+											"name": "type"
+										}
+									},
+									{
+										"source": {
+											"path": "['etag']"
+										},
+										"sink": {
+											"name": "etag"
+										}
+									},
+									{
+										"source": {
+											"path": "['properties']['folder']['name']"
+										},
+										"sink": {
+											"name": "folderName"
+										}
+									},
+									{
+										"source": {
+											"path": "['properties']['content']['query']"
+										},
+										"sink": {
+											"name": "query"
+										}
+									},
+									{
+										"source": {
+											"path": "['properties']['content']['metadata']['language']"
+										},
+										"sink": {
+											"name": "language"
+										}
+									},
+									{
+										"source": {
+											"path": "['properties']['content']['currentConnection']['databaseName']"
+										},
+										"sink": {
+											"name": "databaseName"
+										}
+									},
+									{
+										"source": {
+											"path": "['properties']['content']['currentConnection']['poolName']"
+										},
+										"sink": {
+											"name": "poolName"
+										}
+									},
+									{
+										"source": {
+											"path": "['properties']['content']['resultLimit']"
+										},
+										"sink": {
+											"name": "resultLimit"
+										}
+									},
+									{
+										"source": {
+											"path": "['properties']['type']"
+										},
+										"sink": {
+											"name": "connectionType"
+										}
+									}
+								],
+								"collectionReference": "$['value']"
 							}
-						}
-					},
-					{
-						"name": "GenericCuratedParquet linked service",
-						"type": "WebActivity",
-						"dependsOn": [
+						},
+						"inputs": [
 							{
-								"activity": "GenericCuratedParquet attributes",
-								"dependencyConditions": [
-									"Succeeded"
-								]
+								"referenceName": "azuresynapse",
+								"type": "DatasetReference",
+								"parameters": {
+									"p_workspace": {
+										"value": "@pipeline().DataFactory",
+										"type": "Expression"
+									},
+									"p_relative_url": "/sqlScripts/?api-version=2020-12-01"
+								}
 							}
 						],
-						"policy": {
-							"timeout": "0.12:00:00",
-							"retry": 0,
-							"retryIntervalInSeconds": 30,
-							"secureOutput": false,
-							"secureInput": false
-						},
-						"userProperties": [],
-						"typeProperties": {
-							"method": "GET",
-							"headers": {},
-							"url": {
-								"value": "@concat('https://', pipeline().DataFactory, '.dev.azuresynapse.net/linkedservices/', activity('GenericCuratedParquet attributes').output.properties.linkedServiceName.referenceName, '?api-version=2020-12-01')",
-								"type": "Expression"
-							},
-							"connectVia": {
-								"referenceName": "SHIR",
-								"type": "IntegrationRuntimeReference"
-							},
-							"authentication": {
-								"type": "MSI",
-								"resource": "https://dev.azuresynapse.net/"
+						"outputs": [
+							{
+								"referenceName": "GenericRawParquet",
+								"type": "DatasetReference",
+								"parameters": {
+									"p_container": {
+										"value": "@pipeline().parameters.c_raw_container",
+										"type": "Expression"
+									},
+									"p_folder": {
+										"value": "@pipeline().parameters.c_raw_folder",
+										"type": "Expression"
+									},
+									"p_file": {
+										"value": "@pipeline().parameters.c_raw_file",
+										"type": "Expression"
+									}
+								}
 							}
-						}
+						]
 					},
 					{
-						"name": "createTmpView",
+						"name": "Filter Scripts",
 						"type": "Script",
 						"dependsOn": [
 							{
-								"activity": "StarSchemaDimension",
+								"activity": "Copy SQL scripts",
 								"dependencyConditions": [
 									"Succeeded"
 								]
@@ -10273,10 +12073,7 @@
 							"referenceName": "serverless_ARIR",
 							"type": "LinkedServiceReference",
 							"parameters": {
-								"p_database": {
-									"value": "@pipeline().parameters.c_serverless_db",
-									"type": "Expression"
-								}
+								"p_database": "master"
 							}
 						},
 						"typeProperties": {
@@ -10284,7 +12081,7 @@
 								{
 									"type": "Query",
 									"text": {
-										"value": "create or alter view \n@{pipeline().parameters.p_trg_table}_tmp\nas select * from OPENROWSET(\n\tBULK '@{activity('GenericCuratedParquet linked service').output.properties.typeProperties.url}@{pipeline().parameters.c_trg_container}/@{pipeline().parameters.c_trg_root_folder}/@{pipeline().parameters.p_trg_table}',\n\tFORMAT = 'Delta'\n) as r",
+										"value": "SELECT\n    *\nFROM\n    OPENROWSET(\n        BULK 'https://@{pipeline().parameters.c_raw_storage_account}.dfs.core.windows.net/@{pipeline().parameters.c_raw_container}/@{pipeline().parameters.c_raw_folder}/@{pipeline().parameters.c_raw_file}.parquet',\n        FORMAT = 'PARQUET'\n    ) \nWITH (id nvarchar(1000),\nname nvarchar(255),\ntype nvarchar(100),\netag nvarchar(100),\nfolderName nvarchar(1000),\nquery nvarchar(max),\nlanguage nvarchar(100),\ndatabaseName nvarchar(100),\npoolName nvarchar(100),\nresultLimit int,\nconnectionType nvarchar(100)\n) AS [result]\nwhere left(folderName, len('@{pipeline().parameters.c_script_folder}')) = '@{pipeline().parameters.c_script_folder}'\nand charindex('@{pipeline().parameters.c_init_script_suffix}', name) = 0",
 										"type": "Expression"
 									}
 								}
@@ -10293,11 +12090,17 @@
 						}
 					},
 					{
-						"name": "ExternalTableSQL",
+						"name": "Filter Init Scripts",
 						"type": "Script",
 						"dependsOn": [
 							{
-								"activity": "createTmpView",
+								"activity": "Copy SQL scripts",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "GenericRawParquet linked service",
 								"dependencyConditions": [
 									"Succeeded"
 								]
@@ -10315,10 +12118,7 @@
 							"referenceName": "serverless_ARIR",
 							"type": "LinkedServiceReference",
 							"parameters": {
-								"p_database": {
-									"value": "@pipeline().parameters.c_serverless_db",
-									"type": "Expression"
-								}
+								"p_database": "master"
 							}
 						},
 						"typeProperties": {
@@ -10326,7 +12126,7 @@
 								{
 									"type": "Query",
 									"text": {
-										"value": "select 'CREATE EXTERNAL TABLE ' +\n'@{pipeline().parameters.p_trg_table} (' + \nchar(10) +\nSTRING_AGG('[' + \ncast(colName as varchar(max)) + '] ' + \ndataType, ',' + char(10)) \nWITHIN GROUP (ORDER BY column_id ASC) + char(10) +\n') WITH (LOCATION = ''@{pipeline().parameters.c_trg_root_folder}/@{pipeline().parameters.p_trg_table}'', DATA_SOURCE = @{pipeline().parameters.c_cur_data_source},  FILE_FORMAT = Delta)' as SQL\nfrom (select \nc.name colName, coalesce(r.dataType,\nCASE \n      WHEN t.[name] IN ('varchar', 'char', 'varbinary') THEN t.[name] + '(' + IIF(c.max_length = -1, 'max', CAST(c.max_length AS VARCHAR(25))) + ')' \n      WHEN t.[name] IN ('nvarchar','nchar') THEN t.[name] + '(' + IIF(c.max_length = -1, 'max', CAST(c.max_length / 2 AS VARCHAR(25)))+ ')'      \n      WHEN t.[name] IN ('decimal', 'numeric') THEN t.[name] + '(' + CAST(c.[precision] AS VARCHAR(25)) + ', ' + CAST(c.[scale] AS VARCHAR(25)) + ')'\n      WHEN t.[name] IN ('datetime2') THEN t.[name] + '(' + CAST(c.[scale] AS VARCHAR(25)) + ')'\n      ELSE t.[name]\nEND) AS dataType,\nc.column_id\nfrom sys.columns c\njoin sys.views v on v.object_id = c.object_id\njoin sys.schemas s on s.schema_id = v.schema_id\njoin sys.types t on c.user_type_id = t.user_type_id \nleft outer join \n@{if(empty(pipeline().parameters.p_data_type_replace), \n'(select null col, null dataType) r',\nconcat('(select * from OpenJson(N''',\nstring(pipeline().parameters.p_data_type_replace),\n''') WITH (col varchar(255), dataType varchar(255)) as r) r'))}\non r.col = c.name\nwhere s.name = 'dbo' and c.name <> '@{pipeline().parameters.c_trg_partition_col}' and v.name = \n'@{pipeline().parameters.p_trg_table}_tmp') q",
+										"value": "SELECT\n    *\nFROM\n    OPENROWSET(\n        BULK '@{activity('GenericRawParquet linked service').output.properties.typeProperties.url}@{pipeline().parameters.c_raw_container}/@{pipeline().parameters.c_raw_folder}/@{pipeline().parameters.c_raw_file}.parquet',\n        FORMAT = 'PARQUET'\n    ) \nWITH (id nvarchar(1000),\nname nvarchar(255),\ntype nvarchar(100),\netag nvarchar(100),\nfolderName nvarchar(1000),\nquery nvarchar(max),\nlanguage nvarchar(100),\ndatabaseName nvarchar(100),\npoolName nvarchar(100),\nresultLimit int,\nconnectionType nvarchar(100)\n) AS [result]\nwhere left(folderName, len('@{pipeline().parameters.c_script_folder}')) = '@{pipeline().parameters.c_script_folder}'\nand charindex('@{pipeline().parameters.c_init_script_suffix}', name) > 0\n\nunion\n\nSELECT\n    *\nFROM\n    OPENROWSET(\n        BULK '@{activity('GenericRawParquet linked service').output.properties.typeProperties.url}@{pipeline().parameters.c_raw_container}/@{pipeline().parameters.c_raw_folder}/@{pipeline().parameters.c_raw_file}.parquet',\n        FORMAT = 'PARQUET'\n    ) \nWITH (id nvarchar(1000),\nname nvarchar(255),\ntype nvarchar(100),\netag nvarchar(100),\nfolderName nvarchar(1000),\nquery nvarchar(max),\nlanguage nvarchar(100),\ndatabaseName nvarchar(100),\npoolName nvarchar(100),\nresultLimit int,\nconnectionType nvarchar(100)\n) AS [result]\nwhere left(folderName, len('@{pipeline().parameters.c_script_folder}')) = '@{pipeline().parameters.c_script_folder}'\nand charindex('@{pipeline().parameters.c_init_script_suffix}', name) = 0\n\norder by name",
 										"type": "Expression"
 									}
 								}
@@ -10335,11 +12135,273 @@
 						}
 					},
 					{
-						"name": "CreateExternalTable",
-						"type": "Script",
+						"name": "ForEachInitScript",
+						"type": "ForEach",
 						"dependsOn": [
 							{
-								"activity": "ExternalTableSQL",
+								"activity": "ForEachTextReplaceMap Init",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@variables('v_scripts')",
+								"type": "Expression"
+							},
+							"isSequential": false,
+							"activities": [
+								{
+									"name": "Run Init Script",
+									"type": "Script",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 2,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"linkedServiceName": {
+										"referenceName": "serverless_ARIR",
+										"type": "LinkedServiceReference",
+										"parameters": {
+											"p_database": "master"
+										}
+									},
+									"typeProperties": {
+										"scripts": [
+											{
+												"type": "NonQuery",
+												"text": {
+													"value": "@item().query",
+													"type": "Expression"
+												}
+											}
+										]
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "ForEachTextReplaceMap Init",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "Set v_scripts Init",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@json(string(pipeline().parameters.c_text_replacement))",
+								"type": "Expression"
+							},
+							"isSequential": true,
+							"activities": [
+								{
+									"name": "Set v_scripts_tmp Init",
+									"type": "SetVariable",
+									"dependsOn": [],
+									"policy": {
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "v_scripts_tmp",
+										"value": {
+											"value": "@replace(string(variables('v_scripts')), item().textToFind, item().textForReplace)",
+											"type": "Expression"
+										}
+									}
+								},
+								{
+									"name": "Update v_scripts Init",
+									"type": "SetVariable",
+									"dependsOn": [
+										{
+											"activity": "Set v_scripts_tmp Init",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "v_scripts",
+										"value": {
+											"value": "@json(variables('v_scripts_tmp'))",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "Set v_scripts Init",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Filter Init Scripts",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "v_scripts",
+							"value": {
+								"value": "@activity('Filter Init Scripts').output.resultSets[0].rows",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "ForEachTextReplaceMap",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "Set v_scripts",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@json(string(pipeline().parameters.c_text_replacement))",
+								"type": "Expression"
+							},
+							"isSequential": true,
+							"activities": [
+								{
+									"name": "Set v_scripts_tmp",
+									"type": "SetVariable",
+									"dependsOn": [],
+									"policy": {
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "v_scripts_tmp",
+										"value": {
+											"value": "@replace(string(variables('v_scripts')), item().textToFind, item().textForReplace)",
+											"type": "Expression"
+										}
+									}
+								},
+								{
+									"name": "Update v_scripts",
+									"type": "SetVariable",
+									"dependsOn": [
+										{
+											"activity": "Set v_scripts_tmp",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "v_scripts",
+										"value": {
+											"value": "@json(variables('v_scripts_tmp'))",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "Set v_scripts",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Filter Scripts",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							},
+							{
+								"activity": "ForEachInitScript",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "v_scripts",
+							"value": {
+								"value": "@activity('Filter Scripts').output.resultSets[0].rows",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "GenericRawParquet attributes",
+						"type": "WebActivity",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"method": "GET",
+							"headers": {},
+							"url": {
+								"value": "@concat('https://', pipeline().DataFactory, '.dev.azuresynapse.net/datasets/GenericRawParquet?api-version=2020-12-01')",
+								"type": "Expression"
+							},
+							"connectVia": {
+								"referenceName": "SHIR",
+								"type": "IntegrationRuntimeReference"
+							},
+							"authentication": {
+								"type": "MSI",
+								"resource": "https://dev.azuresynapse.net/"
+							}
+						}
+					},
+					{
+						"name": "GenericRawParquet linked service",
+						"type": "WebActivity",
+						"dependsOn": [
+							{
+								"activity": "GenericRawParquet attributes",
 								"dependencyConditions": [
 									"Succeeded"
 								]
@@ -10353,27 +12415,21 @@
 							"secureInput": false
 						},
 						"userProperties": [],
-						"linkedServiceName": {
-							"referenceName": "serverless_ARIR",
-							"type": "LinkedServiceReference",
-							"parameters": {
-								"p_database": {
-									"value": "@pipeline().parameters.c_serverless_db",
-									"type": "Expression"
-								}
-							}
-						},
 						"typeProperties": {
-							"scripts": [
-								{
-									"type": "Query",
-									"text": {
-										"value": "begin transaction\n\nif exists (select * from sys.external_tables t join sys.schemas s on s.schema_id = t.schema_id where s.name = 'dbo' and t.name = '@{pipeline().parameters.p_trg_table}')\ndrop external table @{pipeline().parameters.p_trg_table};\n\n@{activity('ExternalTableSQL').output.resultSets[0].rows[0].SQL};\n\ndrop view @{pipeline().parameters.p_trg_table}_tmp;\n\ncommit;\n",
-										"type": "Expression"
-									}
-								}
-							],
-							"scriptBlockExecutionTimeout": "02:00:00"
+							"method": "GET",
+							"headers": {},
+							"url": {
+								"value": "@concat('https://', pipeline().DataFactory, '.dev.azuresynapse.net/linkedservices/', activity('GenericRawParquet attributes').output.properties.linkedServiceName.referenceName, '?api-version=2020-12-01')",
+								"type": "Expression"
+							},
+							"connectVia": {
+								"referenceName": "SHIR",
+								"type": "IntegrationRuntimeReference"
+							},
+							"authentication": {
+								"type": "MSI",
+								"resource": "https://dev.azuresynapse.net/"
+							}
 						}
 					}
 				],
@@ -10381,336 +12437,87 @@
 					"elapsedTimeMetric": {}
 				},
 				"parameters": {
-					"p_trg_table": {
+					"c_script_folder": {
 						"type": "string",
-						"defaultValue": "DimDataflows"
+						"defaultValue": "Serverless Deploy"
 					},
-					"p_datetime_from": {
-						"type": "string"
-					},
-					"p_surrogate_key_col": {
-						"type": "string",
-						"defaultValue": "dataflows_key"
-					},
-					"p_src_schema": {
-						"type": "string",
-						"defaultValue": "enr"
-					},
-					"p_src_object": {
-						"type": "string",
-						"defaultValue": "dataflows_REST_API"
-					},
-					"p_src_key_cols": {
-						"type": "array",
-						"defaultValue": [
-							"name"
-						]
-					},
-					"p_src_cdc_col": {
-						"type": "string",
-						"defaultValue": "enrTimestamp"
-					},
-					"p_data_type_replace": {
-						"type": "array",
-						"defaultValue": [
-							{
-								"col": "name",
-								"dataType": "varchar(255)"
-							}
-						]
-					},
-					"p_partition_formula": {
-						"type": "string",
-						"defaultValue": "'dummy'"
-					},
-					"c_serverless_db": {
-						"type": "string",
-						"defaultValue": "templateDB"
-					},
-					"c_trg_container": {
+					"c_raw_container": {
 						"type": "string",
 						"defaultValue": "template"
 					},
-					"c_trg_root_folder": {
+					"c_raw_folder": {
 						"type": "string",
-						"defaultValue": "StarSchemaObjects"
+						"defaultValue": "ServerlessObjectsDeploy"
 					},
-					"c_cur_data_source": {
+					"c_raw_file": {
 						"type": "string",
-						"defaultValue": "TemplateCuratedSource"
+						"defaultValue": "sqlScripts"
 					},
-					"c_trg_partition_col": {
+					"c_text_replacement": {
 						"type": "string",
-						"defaultValue": "DIM_PARTITION"
+						"defaultValue": [
+							{
+								"textToFind": "{raw_storage_account}",
+								"textForReplace": "kbsmoderndwdevrawst002"
+							},
+							{
+								"textToFind": "{cur_storage_account}",
+								"textForReplace": "kbsmoderndwdevcurst002"
+							}
+						]
 					},
-					"c_trg_dss_update_col": {
+					"c_init_script_suffix": {
 						"type": "string",
-						"defaultValue": "dss_update_time"
+						"defaultValue": "_Init_"
 					},
-					"c_trg_dss_create_col": {
+					"c_raw_storage_account": {
 						"type": "string",
-						"defaultValue": "dss_create_time"
+						"defaultValue": "kbsmoderndwdevrawst002"
 					}
 				},
 				"variables": {
-					"v_datetime_from": {
+					"v_scripts_tmp": {
 						"type": "String"
+					},
+					"v_scripts": {
+						"type": "Array"
 					}
 				},
 				"folder": {
 					"name": "Templates"
 				},
-				"annotations": []
+				"annotations": [],
+				"lastPublishTime": "2023-10-16T14:41:01Z"
 			},
 			"dependsOn": [
-				"[concat(variables('workspaceId'), '/dataflows/StarSchemaDimension')]",
-				"[concat(variables('workspaceId'), '/integrationRuntimes/AutoResolveIntegrationRuntime')]",
-				"[concat(variables('workspaceId'), '/datasets/GenericCuratedJsonFolder')]",
-				"[concat(variables('workspaceId'), '/integrationRuntimes/SHIR')]",
-				"[concat(variables('workspaceId'), '/linkedServices/serverless_ARIR')]"
+				"[concat(variables('workspaceId'), '/datasets/azuresynapse')]",
+				"[concat(variables('workspaceId'), '/datasets/GenericRawParquet')]",
+				"[concat(variables('workspaceId'), '/linkedServices/serverless_ARIR')]",
+				"[concat(variables('workspaceId'), '/integrationRuntimes/SHIR')]"
 			]
 		},
 		{
-			"name": "[concat(parameters('workspaceName'), '/StarSchemaDimension')]",
-			"type": "Microsoft.Synapse/workspaces/dataflows",
+			"name": "[concat(parameters('workspaceName'), '/ZeroRow_Init_Copy1')]",
+			"type": "Microsoft.Synapse/workspaces/sqlscripts",
 			"apiVersion": "2019-06-01-preview",
 			"properties": {
 				"folder": {
-					"name": "Templates"
+					"name": "Serverless Deploy"
 				},
-				"type": "MappingDataFlow",
-				"typeProperties": {
-					"sources": [
-						{
-							"dataset": {
-								"referenceName": "GenericServerlessSQL",
-								"type": "DatasetReference"
-							},
-							"name": "DataSource"
-						},
-						{
-							"dataset": {
-								"referenceName": "GenericServerlessSQL",
-								"type": "DatasetReference"
-							},
-							"name": "Dimension"
-						},
-						{
-							"dataset": {
-								"referenceName": "GenericServerlessSQL",
-								"type": "DatasetReference"
-							},
-							"name": "DimensionMaxKey"
-						},
-						{
-							"dataset": {
-								"referenceName": "GenericServerlessSQL",
-								"type": "DatasetReference"
-							},
-							"name": "DimensionZeroRow"
-						}
-					],
-					"sinks": [
-						{
-							"name": "CacheMaxKey"
-						},
-						{
-							"linkedService": {
-								"referenceName": "templatecurst_ARIR",
-								"type": "LinkedServiceReference"
-							},
-							"name": "sinkZeroRecord"
-						},
-						{
-							"linkedService": {
-								"referenceName": "templatecurst_ARIR",
-								"type": "LinkedServiceReference"
-							},
-							"name": "sinkDimension"
-						}
-					],
-					"transformations": [
-						{
-							"name": "lookupDimension"
-						},
-						{
-							"name": "selectDimension"
-						},
-						{
-							"name": "derivedNewKey"
-						},
-						{
-							"name": "surrogateKey"
-						},
-						{
-							"name": "split1"
-						},
-						{
-							"name": "derivedColumns"
-						},
-						{
-							"name": "derivedExistingKey"
-						},
-						{
-							"name": "union"
-						},
-						{
-							"name": "selectBeforeSink"
-						},
-						{
-							"name": "alterRow"
-						},
-						{
-							"name": "alterZeroRow"
-						},
-						{
-							"name": "sourceLookupKey"
-						},
-						{
-							"name": "dimLookupKey"
-						},
-						{
-							"name": "derivedMaxKey"
-						}
-					],
-					"scriptLines": [
-						"parameters{",
-						"     p_src_key_cols as string[] ([\"name\"]),",
-						"     p_src_cdc_col as string ('enrTimestamp'),",
-						"     p_surrogate_key_col as string,",
-						"     c_trg_dss_update_col as string ('dss_update_time'),",
-						"     c_trg_dss_create_col as string ('dss_create_time'),",
-						"     p_partition_formula as string (\"'dummy'\"),",
-						"     c_trg_partition_col as string ('DIM_PARTITION'),",
-						"     p_src_schema as string ('enr'),",
-						"     p_src_object as string ('dataflows_REST_API'),",
-						"     p_datetime_from as string ('2024-03-06T21:24:57'),",
-						"     p_trg_table as string ('DimDataflows'),",
-						"     p_init_load as boolean (false()),",
-						"     c_trg_container as string ('template'),",
-						"     c_trg_root_folder as string ('StarSchemaObjects')",
-						"}",
-						"source(allowSchemaDrift: true,",
-						"     validateSchema: false,",
-						"     isolationLevel: 'READ_UNCOMMITTED',",
-						"     query: (\"select * from \" + $p_src_schema + \".\" + $p_src_object + iif(length(coalesce($p_src_cdc_col, \"\")) == 0, \"\", \" where \" + $p_src_cdc_col + \" > '\" + iif(length(coalesce($p_datetime_from, \"\")) == 0, \"1900-01-01\", $p_datetime_from) + \"'\")),",
-						"     format: 'query',",
-						"     staged: false) ~> DataSource",
-						"source(allowSchemaDrift: true,",
-						"     validateSchema: false,",
-						"     isolationLevel: 'READ_UNCOMMITTED',",
-						"     query: (iif(not($p_init_load), \"select \" + $p_surrogate_key_col + reduce($p_src_key_cols, \"\", #acc + \", \" + #item, #result) + iif(length(coalesce($c_trg_dss_create_col, \"\")) == 0, \"\", \", \" + $c_trg_dss_create_col) + \" from \" + $p_trg_table, \"select cast(0 as bigint) as \" + $p_surrogate_key_col + reduce($p_src_key_cols, \"\", #acc + \", '' as \" + #item, #result) + iif(length(coalesce($c_trg_dss_create_col, \"\")) == 0, \"\", \", cast('1900-01-01' as datetime) as \" + $c_trg_dss_create_col + \" where 1 = 0\"))),",
-						"     format: 'query',",
-						"     staged: false) ~> Dimension",
-						"source(allowSchemaDrift: true,",
-						"     validateSchema: false,",
-						"     isolationLevel: 'READ_UNCOMMITTED',",
-						"     query: (iif(not($p_init_load), \"select max(\" + $p_surrogate_key_col + \") as \" + $p_surrogate_key_col + \" from \" + $p_trg_table, \"select cast(0 as bigint) as \" + $p_surrogate_key_col)),",
-						"     format: 'query',",
-						"     staged: false) ~> DimensionMaxKey",
-						"source(allowSchemaDrift: true,",
-						"     validateSchema: false,",
-						"     isolationLevel: 'READ_UNCOMMITTED',",
-						"     query: (\"select cast(0 as bigint) as \" + $p_surrogate_key_col + reduce($p_src_key_cols, \"\", #acc + \", '' as \" + #item, #result) + \", 'dummy' as \" + $c_trg_partition_col),",
-						"     format: 'query',",
-						"     staged: false) ~> DimensionZeroRow",
-						"sourceLookupKey, selectDimension lookup(lookupKey == PREFIX_lookupKey,",
-						"     multiple: false,",
-						"     pickup: 'any',",
-						"     broadcast: 'auto')~> lookupDimension",
-						"dimLookupKey select(mapColumn(",
-						"          each(match(true()),",
-						"               'PREFIX_'+$$ = $$)",
-						"     ),",
-						"     skipDuplicateMapInputs: true,",
-						"     skipDuplicateMapOutputs: true) ~> selectDimension",
-						"surrogateKey derive(each(match(name=='surrogateKey'), $p_surrogate_key_col = surrogateKey + coalesce(CacheMaxKey#outputs()[0].surrogateKey, 0))) ~> derivedNewKey",
-						"split1@NullKey keyGenerate(output(surrogateKey as long),",
-						"     startAt: 1L,",
-						"     stepValue: 1L) ~> surrogateKey",
-						"derivedColumns split(isNull(toLong(byName('PREFIX_' + $p_surrogate_key_col))),",
-						"     disjoint: false) ~> split1@(NullKey, NotNullKey)",
-						"lookupDimension derive(each(match(name=='PREFIX_'+$c_trg_dss_create_col), $c_trg_dss_create_col = coalesce($$, currentTimestamp())),",
-						"          each(match(name=='PREFIX_'+$p_surrogate_key_col), $c_trg_dss_update_col = currentTimestamp(), $c_trg_partition_col = expr($p_partition_formula))) ~> derivedColumns",
-						"split1@NotNullKey derive(each(match(name=='PREFIX_'+$p_surrogate_key_col), $p_surrogate_key_col = $$)) ~> derivedExistingKey",
-						"derivedNewKey, derivedExistingKey union(byName: true)~> union",
-						"union select(mapColumn(",
-						"          each(match(left(name,length('PREFIX_'))!='PREFIX_'&&name!='surrogateKey'&&name!='lookupKey'))",
-						"     ),",
-						"     skipDuplicateMapInputs: true,",
-						"     skipDuplicateMapOutputs: true) ~> selectBeforeSink",
-						"selectBeforeSink alterRow(upsertIf(true())) ~> alterRow",
-						"DimensionZeroRow alterRow(upsertIf(true())) ~> alterZeroRow",
-						"DataSource derive(lookupKey = md5(byNames($p_src_key_cols))) ~> sourceLookupKey",
-						"Dimension derive(lookupKey = md5(byNames($p_src_key_cols))) ~> dimLookupKey",
-						"DimensionMaxKey derive(surrogateKey = toLong(byName($p_surrogate_key_col))) ~> derivedMaxKey",
-						"derivedMaxKey sink(validateSchema: false,",
-						"     skipDuplicateMapInputs: true,",
-						"     skipDuplicateMapOutputs: true,",
-						"     store: 'cache',",
-						"     format: 'inline',",
-						"     output: false,",
-						"     saveOrder: 2,",
-						"     mapColumn(",
-						"          surrogateKey",
-						"     )) ~> CacheMaxKey",
-						"alterZeroRow sink(allowSchemaDrift: true,",
-						"     validateSchema: false,",
-						"     format: 'delta',",
-						"     fileSystem: ($c_trg_container),",
-						"     folderPath: ($c_trg_root_folder + \"/\" + $p_trg_table),",
-						"     mergeSchema: true,",
-						"     autoCompact: true,",
-						"     optimizedWrite: true,",
-						"     vacuum: 0,",
-						"     deletable: false,",
-						"     insertable: false,",
-						"     updateable: false,",
-						"     upsertable: true,",
-						"     keys:($p_src_key_cols),",
-						"     pruneCondition: [($c_trg_partition_col) -> ([\"dummy\"])],",
-						"     umask: 0022,",
-						"     preCommands: [],",
-						"     postCommands: [],",
-						"     skipDuplicateMapInputs: true,",
-						"     skipDuplicateMapOutputs: true,",
-						"     saveOrder: 1,",
-						"     partitionBy('key',",
-						"          0,",
-						"          byName($c_trg_partition_col)",
-						"     )) ~> sinkZeroRecord",
-						"alterRow sink(allowSchemaDrift: true,",
-						"     validateSchema: false,",
-						"     format: 'delta',",
-						"     fileSystem: ($c_trg_container),",
-						"     folderPath: ($c_trg_root_folder + \"/\" + $p_trg_table),",
-						"     mergeSchema: true,",
-						"     autoCompact: true,",
-						"     optimizedWrite: true,",
-						"     vacuum: 0,",
-						"     deletable: false,",
-						"     insertable: false,",
-						"     updateable: false,",
-						"     upsertable: true,",
-						"     keys:($p_src_key_cols),",
-						"     pruneCondition: [($c_trg_partition_col) -> ([\"dummy\"])],",
-						"     umask: 0022,",
-						"     preCommands: [],",
-						"     postCommands: [],",
-						"     skipDuplicateMapInputs: true,",
-						"     skipDuplicateMapOutputs: true,",
-						"     saveOrder: 3,",
-						"     partitionBy('key',",
-						"          0,",
-						"          byName($c_trg_partition_col)",
-						"     )) ~> sinkDimension"
-					]
-				}
+				"content": {
+					"query": "CREATE PROC [dbo].[ZeroRow]\n\t@p_tabname [varchar](255),\n\t@p_keycolname [varchar](255),\n\t@p_varchar [varchar](255),\n\t@p_numeric [tinyint],\n\t@p_date [date],\n\t@p_time [time],\n\t@p_bit [bit] \n\t\nAS\n\nDECLARE\n\t@v_return_status integer,\n\t@v_count bit = 0,\n\t@v_column_name varchar(255),\n\t@v_data_type varchar(255),\n\t@v_character_maximum_length integer,\n\t@v_is_nullable varchar(3),\n\t@v_notnull_conv varchar(255),\n\t@v_ins_sql_top varchar(max),\n\t@v_ins_sql_bottom varchar(max),\n\t@v_upd_sql varchar(max),\n\t@v_ctrl_sql nvarchar(max) = '',\n\t@v_sql nvarchar(max) = '',\n\t@v_sql_param nvarchar(max) = ''\n\nBEGIN\n    CREATE TABLE #tbl\n\tWITH\n\t( DISTRIBUTION = ROUND_ROBIN\n\t)\n\tAS\n\tselect \n\tROW_NUMBER() OVER(ORDER BY ordinal_position) AS sequence,\n\tcolumn_name,\n\tis_nullable,\n\tdata_type,\n\tcharacter_maximum_length\n\tfrom information_schema.columns\n\twhere table_name = @p_tabname\n\n\tDECLARE @v_loop_limit int = (SELECT COUNT(*) FROM #tbl)\n\t,       @v_i int = 1\n\n\tSET @v_ins_sql_top = '('\n\tSET @v_ins_sql_bottom = '('\n\tSET @v_upd_sql = ''\n\tSET @v_sql_param = N'@v_column_name varchar(255) OUTPUT, ' +\n\t\t\t\t\tN'@v_is_nullable varchar(3) OUTPUT, ' +\n\t\t\t\t\tN'@v_data_type varchar(255) OUTPUT, ' +\n\t\t\t\t\tN'@v_character_maximum_length integer OUTPUT'\n\n\tWHILE @v_i <= @v_loop_limit\n\t  BEGIN\n\n\t\tSET @v_sql = N'SELECT @v_column_name = column_name, ' +\n\t\t\tN'@v_is_nullable = is_nullable, ' +\n\t\t\tN'@v_data_type = data_type, ' +\n\t\t\tN'@v_character_maximum_length = character_maximum_length FROM #tbl WHERE sequence = ' + CAST(@v_i as nvarchar(20))\n\n\t\tEXECUTE sp_executesql @v_sql, @v_sql_param, \n\t\t\t\t\t\t\t\t@v_column_name OUTPUT, \n\t\t\t\t\t\t\t\t@v_is_nullable OUTPUT,\n\t\t\t\t\t\t\t\t@v_data_type OUTPUT, \n\t\t\t\t\t\t\t\t@v_character_maximum_length OUTPUT\n\n\t\tSET @v_ins_sql_top = @v_ins_sql_top + @v_column_name + char(13) + ', '\n\n\t\tIF (@v_data_type = 'char' or @v_data_type = 'varchar' \n\t\tor @v_data_type = 'text' or @v_data_type = 'nchar' \n\t\tor @v_data_type = 'nvarchar' or @v_data_type = 'ntext')\n\t\t\tBEGIN\n\t\t\t\tSET @v_ins_sql_bottom = @v_ins_sql_bottom + char(39) + LEFT(@p_varchar, @v_character_maximum_length) + char(39) + char(13) + ', '\n\t\t\t\tSET @v_upd_sql = @v_upd_sql + @v_column_name + ' = ' + char(39) + LEFT(@p_varchar, @v_character_maximum_length) + char(39) + char(13) + ', '\n\t\t\tEND\n\t\tELSE\n\t\t\tIF (@v_data_type = 'date' or @v_data_type = 'datetime' \n\t\t\tor @v_data_type = 'datetime2' or @v_data_type = 'datetimeoffset' \n\t\t\tor @v_data_type = 'smalldatetime') \n\t\t\tand (try_cast(@p_date as date) is not null \n\t\t\tor @v_column_name = 'DSS_UPDATE_TIME' or @v_column_name = 'DSS_CREATE_TIME')\n\t\t\t\tBEGIN\n\t\t\t\t\tIF @v_column_name = 'DSS_UPDATE_TIME'\n\t\t\t\t\t\tBEGIN\n\t\t\t\t\t\t\tSET @v_ins_sql_bottom = @v_ins_sql_bottom + char(39) + CONVERT(varchar, getdate(), 121) + char(39) + char(13) + ', '\n\t\t\t\t\t\t\tSET @v_upd_sql = @v_upd_sql + @v_column_name + ' = ' + char(39) + CONVERT(varchar, getdate(), 121) + char(39) + char(13) + ', '\n\t\t\t\t\t\tEND\n\t\t\t\t\tELSE\n\t\t\t\t\t\tBEGIN\n\t\t\t\t\t\t\tIF @v_column_name = 'DSS_CREATE_TIME'\n\t\t\t\t\t\t\t\tBEGIN\n\t\t\t\t\t\t\t\t\tSET @v_ins_sql_bottom = @v_ins_sql_bottom + char(39) + CONVERT(varchar, getdate(), 121) + char(39) + char(13) + ', '\n\t\t\t\t\t\t\t\t\tSET @v_upd_sql = @v_upd_sql + @v_column_name + ' = COALESCE(DSS_CREATE_TIME, getdate())' + char(13) + ', '\n\t\t\t\t\t\t\t\tEND\n\t\t\t\t\t\t\tELSE\n\t\t\t\t\t\t\t\tBEGIN\n\t\t\t\t\t\t\t\t\tSET @v_ins_sql_bottom = @v_ins_sql_bottom + char(39) + cast(@p_date as varchar) + char(39) + char(13) + ', '\n\t\t\t\t\t\t\t\t\tSET @v_upd_sql = @v_upd_sql + @v_column_name + ' = ' + char(39) + cast(@p_date as varchar) + char(39) + char(13) + ', '\n\t\t\t\t\t\t\t\tEND\n\t\t\t\t\t\tEND\n\t\t\t\tEND\n\t\t\tELSE\n\t\t\t\tIF @v_data_type = 'time' and try_cast(@p_time as time) is not null\n\t\t\t\t\tBEGIN\n\t\t\t\t\t\tSET @v_ins_sql_bottom = @v_ins_sql_bottom + char(39) + cast(@p_time as varchar) + char(39) + char(13) + ', '\n\t\t\t\t\t\tSET @v_upd_sql = @v_upd_sql + @v_column_name + ' = ' + char(39) + cast(@p_time as varchar) + char(39) + char(13) + ', '\n\t\t\t\t\tEND\n\t\t\t\tELSE\n\t\t\t\t\tIF (@v_data_type = 'bigint' or @v_data_type = 'numeric' \n\t\t\t\t\tor @v_data_type = 'smallint' or @v_data_type = 'decimal' \n\t\t\t\t\tor @v_data_type = 'smallmoney' or @v_data_type = 'int'\n\t\t\t\t\tor @v_data_type = 'tinyint' or @v_data_type = 'money'\n\t\t\t\t\tor @v_data_type = 'float' or @v_data_type = 'real') \n\t\t\t\t\tand try_cast(@p_numeric as tinyint) is not null\n\t\t\t\t\tand UPPER(@v_column_name) <> UPPER(@p_keycolname)\n\t\t\t\t\t\tBEGIN\n\t\t\t\t\t\t\tSET @v_ins_sql_bottom = @v_ins_sql_bottom + cast(@p_numeric as varchar) + char(13) + ', '\n\t\t\t\t\t\t\tSET @v_upd_sql = @v_upd_sql + @v_column_name + ' = ' + cast(@p_numeric as varchar) + char(13) + ', '\n\t\t\t\t\t\tEND\n\t\t\t\t\tELSE\n\t\t\t\t\t\tIF @v_data_type = 'bit' and try_cast(@p_bit as bit) is not null\n\t\t\t\t\t\t\tBEGIN\n\t\t\t\t\t\t\t\tSET @v_ins_sql_bottom = @v_ins_sql_bottom + cast(@p_bit as varchar) + char(13) + ', '\n\t\t\t\t\t\t\t\tSET @v_upd_sql = @v_upd_sql + @v_column_name + ' = ' + cast(@p_bit as varchar) + char(13) + ', '\n\t\t\t\t\t\t\tEND\n\t\t\t\t\t\tELSE\n\t\t\t\t\t\t\tBEGIN\n\t\t\t\t\t\t\t\tIF UPPER(@v_column_name) = @p_keycolname\n\t\t\t\t\t\t\t\t\tBEGIN\n\t\t\t\t\t\t\t\t\t\tSET @v_ins_sql_bottom = @v_ins_sql_bottom + '0' + char(13) + ', '\n\t\t\t\t\t\t\t\t\tEND\n\t\t\t\t\t\t\t\tELSE\n\t\t\t\t\t\t\t\t\tBEGIN\n\t\t\t\t\t\t\t\t\t\tIF @v_is_nullable = 'YES'\n\t\t\t\t\t\t\t\t\t\t\tBEGIN\n\t\t\t\t\t\t\t\t\t\t\t\tSET @v_ins_sql_bottom  = @v_ins_sql_bottom + 'NULL' + char(13) + ', '\n\t\t\t\t\t\t\t\t\t\t\t\tSET @v_upd_sql = @v_upd_sql + @v_column_name + ' = ' + 'NULL' + char(13) + ', '\n\t\t\t\t\t\t\t\t\t\t\tEND\n\t\t\t\t\t\t\t\t\t\tELSE\n\t\t\t\t\t\t\t\t\t\t\tBEGIN\n\t\t\t\t\t\t\t\t\t\t\t\tSET @v_ctrl_sql = N'select @v_val_conv = cast('+ char(39) + char(39) + ' as ' + @v_data_type + N')'\n\t\t\t\t\t\t\t\t\t\t\t\tEXECUTE sp_executesql @v_ctrl_sql, N'@v_val_conv varchar(255) OUTPUT', @v_notnull_conv OUTPUT\n\t\t\t\t\t\t\t\t\t\t\t\tSET @v_ins_sql_bottom  = @v_ins_sql_bottom + @v_notnull_conv + char(13) + ', '\n\t\t\t\t\t\t\t\t\t\t\t\tSET @v_upd_sql = @v_upd_sql + @v_column_name + ' = ' + char(39) + @v_notnull_conv + char(39) + char(13) + ', '\n\t\t\t\t\t\t\t\t\t\t\tEND\n\t\t\t\t\t\t\t\t\tEND\n\t\t\t\t\t\t\tEND\n\n\t\tSET @v_i += 1\n\n\t  END\n\n\tSET @v_ins_sql_top = LEFT(@v_ins_sql_top, LEN(@v_ins_sql_top) - 2) + ')'\n\tSET @v_ins_sql_bottom = LEFT(@v_ins_sql_bottom, LEN(@v_ins_sql_bottom) - 2) + ')'\n\tSET @v_upd_sql = LEFT(@v_upd_sql, LEN(@v_upd_sql) - 2)\n\n\tSET @v_ctrl_sql = N'SELECT @v_count_out = 1 FROM ' + @p_tabname + N' WHERE ' + @p_keycolname + N' = 0'\n\n\tEXECUTE sp_executesql @v_ctrl_sql, N'@v_count_out bit OUTPUT', @v_count OUTPUT\n\n\tSET @v_sql = N'BEGIN' + char(13) + char(13)\n\n\tIF @v_count = 0\n\t\tBEGIN\n\t\t\tSET @v_sql = @v_sql + N'SET IDENTITY_INSERT ' + @p_tabname + N' ON' + char(13) + char(13)\n\t\t\tSET @v_sql = @v_sql + N'INSERT INTO ' + @p_tabname + char(13) + @v_ins_sql_top + char(13)\n\t\t\tSET @v_sql = @v_sql + N'VALUES ' + @v_ins_sql_bottom + char(13) + char(13)\n\t\t\tSET @v_sql = @v_sql + N'SET IDENTITY_INSERT ' + @p_tabname + N' OFF' + char(13) + char(13)\n\t\tEND\n\n\tIF @v_count = 1\n\t\tBEGIN\n\t\t\tSET @v_sql = @v_sql + N'UPDATE ' + @p_tabname + char(13) + N'SET' + char(13) + @v_upd_sql + char(13)\n\t\t\tSET @v_sql = @v_sql + N'WHERE ' + @p_keycolname + N' = 0' + char(13) + char(13)\n\t\tEND\n\n\tSET @v_sql = @v_sql + N'END'\n\n\tEXECUTE sp_executesql @v_sql\n\n\tDROP TABLE #tbl\nEND\n",
+					"metadata": {
+						"language": "sql"
+					},
+					"currentConnection": {
+						"databaseName": "ivs_sqlpool",
+						"poolName": "ivs_sqlpool"
+					},
+					"resultLimit": 5000
+				},
+				"type": "SqlQuery"
 			},
-			"dependsOn": [
-				"[concat(variables('workspaceId'), '/datasets/GenericServerlessSQL')]",
-				"[concat(variables('workspaceId'), '/linkedServices/templatecurst_ARIR')]"
-			]
+			"dependsOn": []
 		}
 	]
 }
