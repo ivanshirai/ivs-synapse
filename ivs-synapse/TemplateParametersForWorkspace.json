@@ -5,20 +5,14 @@
 		"workspaceName": {
 			"value": "ivs-synapse"
 		},
-		"AdventureWorksSQL_connectionString": {
-			"value": ""
-		},
 		"ivs-synapse-WorkspaceDefaultSqlServer_connectionString": {
 			"value": "Integrated Security=False;Encrypt=True;Connection Timeout=30;Data Source=tcp:ivs-synapse.sql.azuresynapse.net,1433;Initial Catalog=@{linkedService().DBName}"
-		},
-		"ivs_od_sqlpool_connectionString": {
-			"value": "Integrated Security=False;Encrypt=True;Connection Timeout=30;Data Source=ivs-synapse-ondemand.sql.azuresynapse.net;Initial Catalog=ivs_od_sqlpool"
 		},
 		"serverless_ARIR_connectionString": {
 			"value": "Integrated Security=False;Encrypt=True;Connection Timeout=30;Data Source=ivs-synapse-ondemand.sql.azuresynapse.net;Initial Catalog=@{linkedService().p_database}"
 		},
-		"template_dedicated_ARIR_connectionString": {
-			"value": "Integrated Security=False;Encrypt=True;Connection Timeout=30;Data Source=ivs-synapse.sql.azuresynapse.net;Initial Catalog=ivssql"
+		"BloombergAPI_properties_typeProperties_url": {
+			"value": "https://api.bloomberg.com/eap"
 		},
 		"azuresynapse_REST_properties_typeProperties_url": {
 			"value": "@{concat('https://', linkedService().p_workspace, '.dev.azuresynapse.net')}"
@@ -40,6 +34,18 @@
 		},
 		"templaterawst_ARIR_properties_typeProperties_url": {
 			"value": "https://ivsraw.dfs.core.windows.net/"
+		},
+		"SchedSQLPoolPaused_properties_SQLPoolPause_parameters_p_subscription": {
+			"value": "f939f8f3-2652-4a45-88ae-78a7782ec9df"
+		},
+		"SchedSQLPoolPaused_properties_SQLPoolPause_parameters_p_resourceGroup": {
+			"value": "ivs-dwh-rg"
+		},
+		"SchedSQLPoolPaused_properties_SQLPoolPause_parameters_p_workspace": {
+			"value": "ivs-synapse"
+		},
+		"SchedSQLPoolPaused_properties_SQLPoolPause_parameters_p_sqlPool": {
+			"value": "ivs_sqlpool"
 		}
 	}
 }

@@ -7,29 +7,19 @@
 			"metadata": "Workspace name",
 			"defaultValue": "ivs-synapse"
 		},
-		"AdventureWorksSQL_connectionString": {
-			"type": "secureString",
-			"metadata": "Secure string for 'connectionString' of 'AdventureWorksSQL'"
-		},
 		"ivs-synapse-WorkspaceDefaultSqlServer_connectionString": {
 			"type": "secureString",
 			"metadata": "Secure string for 'connectionString' of 'ivs-synapse-WorkspaceDefaultSqlServer'",
 			"defaultValue": "Integrated Security=False;Encrypt=True;Connection Timeout=30;Data Source=tcp:ivs-synapse.sql.azuresynapse.net,1433;Initial Catalog=@{linkedService().DBName}"
-		},
-		"ivs_od_sqlpool_connectionString": {
-			"type": "secureString",
-			"metadata": "Secure string for 'connectionString' of 'ivs_od_sqlpool'",
-			"defaultValue": "Integrated Security=False;Encrypt=True;Connection Timeout=30;Data Source=ivs-synapse-ondemand.sql.azuresynapse.net;Initial Catalog=ivs_od_sqlpool"
 		},
 		"serverless_ARIR_connectionString": {
 			"type": "secureString",
 			"metadata": "Secure string for 'connectionString' of 'serverless_ARIR'",
 			"defaultValue": "Integrated Security=False;Encrypt=True;Connection Timeout=30;Data Source=ivs-synapse-ondemand.sql.azuresynapse.net;Initial Catalog=@{linkedService().p_database}"
 		},
-		"template_dedicated_ARIR_connectionString": {
-			"type": "secureString",
-			"metadata": "Secure string for 'connectionString' of 'template_dedicated_ARIR'",
-			"defaultValue": "Integrated Security=False;Encrypt=True;Connection Timeout=30;Data Source=ivs-synapse.sql.azuresynapse.net;Initial Catalog=ivssql"
+		"BloombergAPI_properties_typeProperties_url": {
+			"type": "string",
+			"defaultValue": "https://api.bloomberg.com/eap"
 		},
 		"azuresynapse_REST_properties_typeProperties_url": {
 			"type": "string",
@@ -58,6 +48,22 @@
 		"templaterawst_ARIR_properties_typeProperties_url": {
 			"type": "string",
 			"defaultValue": "https://ivsraw.dfs.core.windows.net/"
+		},
+		"SchedSQLPoolPaused_properties_SQLPoolPause_parameters_p_subscription": {
+			"type": "string",
+			"defaultValue": "f939f8f3-2652-4a45-88ae-78a7782ec9df"
+		},
+		"SchedSQLPoolPaused_properties_SQLPoolPause_parameters_p_resourceGroup": {
+			"type": "string",
+			"defaultValue": "ivs-dwh-rg"
+		},
+		"SchedSQLPoolPaused_properties_SQLPoolPause_parameters_p_workspace": {
+			"type": "string",
+			"defaultValue": "ivs-synapse"
+		},
+		"SchedSQLPoolPaused_properties_SQLPoolPause_parameters_p_sqlPool": {
+			"type": "string",
+			"defaultValue": "ivs_sqlpool"
 		}
 	},
 	"variables": {
@@ -500,7 +506,7 @@
 					"name": "Templates"
 				},
 				"annotations": [],
-				"lastPublishTime": "2024-01-24T18:40:41Z"
+				"lastPublishTime": "2024-03-13T02:45:16Z"
 			},
 			"dependsOn": [
 				"[concat(variables('workspaceId'), '/datasets/GenericEnrichedJsonFolder')]",
@@ -1489,7 +1495,7 @@
 					"name": "Templates"
 				},
 				"annotations": [],
-				"lastPublishTime": "2023-10-16T14:40:57Z"
+				"lastPublishTime": "2024-03-13T02:45:19Z"
 			},
 			"dependsOn": [
 				"[concat(variables('workspaceId'), '/integrationRuntimes/SHIR')]",
@@ -2254,7 +2260,7 @@
 					"name": "Templates"
 				},
 				"annotations": [],
-				"lastPublishTime": "2023-10-16T14:40:58Z"
+				"lastPublishTime": "2024-03-13T02:45:23Z"
 			},
 			"dependsOn": [
 				"[concat(variables('workspaceId'), '/integrationRuntimes/SHIR')]",
@@ -3112,7 +3118,7 @@
 					"name": "Templates"
 				},
 				"annotations": [],
-				"lastPublishTime": "2023-10-16T14:40:59Z"
+				"lastPublishTime": "2024-03-13T02:44:28Z"
 			},
 			"dependsOn": [
 				"[concat(variables('workspaceId'), '/integrationRuntimes/SHIR')]",
@@ -3845,7 +3851,7 @@
 					"name": "Templates"
 				},
 				"annotations": [],
-				"lastPublishTime": "2023-10-16T14:40:59Z"
+				"lastPublishTime": "2024-03-13T02:44:34Z"
 			},
 			"dependsOn": [
 				"[concat(variables('workspaceId'), '/integrationRuntimes/SHIR')]",
@@ -3854,6 +3860,128 @@
 				"[concat(variables('workspaceId'), '/datasets/GenericRawJson')]",
 				"[concat(variables('workspaceId'), '/datasets/DummyJson')]",
 				"[concat(variables('workspaceId'), '/linkedServices/serverless_ARIR')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/SQLPoolPause')]",
+			"type": "Microsoft.Synapse/workspaces/pipelines",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"activities": [
+					{
+						"name": "SQLPoolGetStatus",
+						"type": "WebActivity",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "7.00:00:00",
+							"retry": 2,
+							"retryIntervalInSeconds": 200,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"method": "GET",
+							"headers": {},
+							"url": {
+								"value": "@concat('https://management.azure.com/subscriptions/', pipeline().parameters.p_subscription, '/resourceGroups/', pipeline().parameters.p_resourceGroup, '/providers/Microsoft.Synapse/workspaces/', pipeline().parameters.p_workspace, '/sqlPools/', pipeline().parameters.p_sqlPool, '/?api-version=2019-06-01-preview')",
+								"type": "Expression"
+							},
+							"connectVia": {
+								"referenceName": "AutoResolveIntegrationRuntime",
+								"type": "IntegrationRuntimeReference"
+							},
+							"body": {
+								"sku": {
+									"name": "DW100c"
+								}
+							},
+							"authentication": {
+								"type": "MSI",
+								"resource": "https://management.azure.com/"
+							}
+						}
+					},
+					{
+						"name": "StatusCheck",
+						"type": "IfCondition",
+						"dependsOn": [
+							{
+								"activity": "SQLPoolGetStatus",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"expression": {
+								"value": "@equals(activity('SQLPoolGetStatus').output.properties.status, 'Paused')",
+								"type": "Expression"
+							},
+							"ifFalseActivities": [
+								{
+									"name": "SQLPoolPause",
+									"type": "WebActivity",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "7.00:00:00",
+										"retry": 2,
+										"retryIntervalInSeconds": 200,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"method": "POST",
+										"headers": {},
+										"url": {
+											"value": "@concat('https://management.azure.com/subscriptions/', pipeline().parameters.p_subscription, '/resourceGroups/', pipeline().parameters.p_resourceGroup, '/providers/Microsoft.Synapse/workspaces/', pipeline().parameters.p_workspace, '/sqlPools/', pipeline().parameters.p_sqlPool, '/pause?api-version=2019-06-01-preview')",
+											"type": "Expression"
+										},
+										"body": {
+											"value": "'{ ]'",
+											"type": "Expression"
+										},
+										"authentication": {
+											"type": "MSI",
+											"resource": "https://management.azure.com/"
+										}
+									}
+								}
+							]
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"parameters": {
+					"p_subscription": {
+						"type": "string",
+						"defaultValue": "f939f8f3-2652-4a45-88ae-78a7782ec9df"
+					},
+					"p_resourceGroup": {
+						"type": "string",
+						"defaultValue": "ivs-dwh-rg"
+					},
+					"p_workspace": {
+						"type": "string",
+						"defaultValue": "ivs-synapse"
+					},
+					"p_sqlPool": {
+						"type": "string",
+						"defaultValue": "ivs_sqlpool"
+					}
+				},
+				"folder": {
+					"name": "Scheduled"
+				},
+				"annotations": [],
+				"lastPublishTime": "2024-03-13T02:41:33Z"
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/integrationRuntimes/AutoResolveIntegrationRuntime')]"
 			]
 		},
 		{
@@ -3956,7 +4084,7 @@
 					"name": "Templates"
 				},
 				"annotations": [],
-				"lastPublishTime": "2023-10-16T14:39:39Z"
+				"lastPublishTime": "2024-03-13T02:41:36Z"
 			},
 			"dependsOn": [
 				"[concat(variables('workspaceId'), '/integrationRuntimes/SHIR')]"
@@ -4183,7 +4311,7 @@
 					"name": "Templates"
 				},
 				"annotations": [],
-				"lastPublishTime": "2023-10-16T14:40:16Z"
+				"lastPublishTime": "2024-03-13T02:42:55Z"
 			},
 			"dependsOn": [
 				"[concat(variables('workspaceId'), '/integrationRuntimes/SHIR')]",
@@ -4662,7 +4790,7 @@
 					"name": "Templates"
 				},
 				"annotations": [],
-				"lastPublishTime": "2023-10-16T14:41:01Z"
+				"lastPublishTime": "2024-03-13T02:44:39Z"
 			},
 			"dependsOn": [
 				"[concat(variables('workspaceId'), '/datasets/azuresynapse')]",
@@ -5241,7 +5369,8 @@
 				"folder": {
 					"name": "Templates"
 				},
-				"annotations": []
+				"annotations": [],
+				"lastPublishTime": "2024-03-13T02:45:30Z"
 			},
 			"dependsOn": [
 				"[concat(variables('workspaceId'), '/dataflows/StarSchemaDimension')]",
@@ -6075,7 +6204,8 @@
 				"folder": {
 					"name": "Templates"
 				},
-				"annotations": []
+				"annotations": [],
+				"lastPublishTime": "2024-03-13T02:45:35Z"
 			},
 			"dependsOn": [
 				"[concat(variables('workspaceId'), '/datasets/GenericCuratedJsonFolder')]",
@@ -6759,7 +6889,8 @@
 				"folder": {
 					"name": "Templates"
 				},
-				"annotations": []
+				"annotations": [],
+				"lastPublishTime": "2024-03-13T02:45:39Z"
 			},
 			"dependsOn": [
 				"[concat(variables('workspaceId'), '/pipelines/ServerlessDBDeploy')]",
@@ -6902,154 +7033,10 @@
 					"name": "Templates"
 				},
 				"annotations": [],
-				"lastPublishTime": "2024-02-21T19:32:20Z"
+				"lastPublishTime": "2024-03-13T02:41:42Z"
 			},
 			"dependsOn": [
 				"[concat(variables('workspaceId'), '/integrationRuntimes/SHIR')]"
-			]
-		},
-		{
-			"name": "[concat(parameters('workspaceName'), '/ADLS_TMPL_DATASOURCE1')]",
-			"type": "Microsoft.Synapse/workspaces/datasets",
-			"apiVersion": "2019-06-01-preview",
-			"properties": {
-				"linkedServiceName": {
-					"referenceName": "ivs-synapse-WorkspaceDefaultSqlServer",
-					"type": "LinkedServiceReference",
-					"parameters": {
-						"DBName": "ivs_sqlpool"
-					}
-				},
-				"annotations": [],
-				"type": "AzureSqlDWTable",
-				"schema": [
-					{
-						"name": "SOURCE1_ID",
-						"type": "int",
-						"precision": 10
-					},
-					{
-						"name": "SOURCE2_REF_ID",
-						"type": "int",
-						"precision": 10
-					},
-					{
-						"name": "SOURCE3_REF_ID",
-						"type": "int",
-						"precision": 10
-					},
-					{
-						"name": "NCHAR_VALUE1",
-						"type": "nvarchar"
-					},
-					{
-						"name": "NCHAR_VALUE2",
-						"type": "nvarchar"
-					},
-					{
-						"name": "NUMERIC_VALUE1",
-						"type": "decimal",
-						"precision": 12,
-						"scale": 6
-					},
-					{
-						"name": "NUMERIC_VALUE2",
-						"type": "decimal",
-						"precision": 12,
-						"scale": 6
-					},
-					{
-						"name": "DATETIME_VALUE1",
-						"type": "datetime",
-						"precision": 23,
-						"scale": 3
-					},
-					{
-						"name": "DATETIME_VALUE2",
-						"type": "datetime",
-						"precision": 23,
-						"scale": 3
-					},
-					{
-						"name": "CDC_TIMESTAMP",
-						"type": "datetime",
-						"precision": 23,
-						"scale": 3
-					}
-				],
-				"typeProperties": {
-					"tableName": "dbo.ADLS_TMPL_DATASOURCE1"
-				}
-			},
-			"dependsOn": [
-				"[concat(variables('workspaceId'), '/linkedServices/ivs-synapse-WorkspaceDefaultSqlServer')]"
-			]
-		},
-		{
-			"name": "[concat(parameters('workspaceName'), '/ADLS_TMPL_DATASOURCE3')]",
-			"type": "Microsoft.Synapse/workspaces/datasets",
-			"apiVersion": "2019-06-01-preview",
-			"properties": {
-				"linkedServiceName": {
-					"referenceName": "ivs-synapse-WorkspaceDefaultSqlServer",
-					"type": "LinkedServiceReference",
-					"parameters": {
-						"DBName": "ivs_sqlpool"
-					}
-				},
-				"annotations": [],
-				"type": "AzureSqlDWTable",
-				"schema": [
-					{
-						"name": "SOURCE3_ID",
-						"type": "int",
-						"precision": 10
-					},
-					{
-						"name": "NCHAR_VALUE1",
-						"type": "nvarchar"
-					},
-					{
-						"name": "NCHAR_VALUE2",
-						"type": "nvarchar"
-					},
-					{
-						"name": "NUMERIC_VALUE1",
-						"type": "decimal",
-						"precision": 12,
-						"scale": 6
-					},
-					{
-						"name": "NUMERIC_VALUE2",
-						"type": "decimal",
-						"precision": 12,
-						"scale": 6
-					},
-					{
-						"name": "DATETIME_VALUE1",
-						"type": "datetime",
-						"precision": 23,
-						"scale": 3
-					},
-					{
-						"name": "DATETIME_VALUE2",
-						"type": "datetime",
-						"precision": 23,
-						"scale": 3
-					},
-					{
-						"name": "CDC_TIMESTAMP",
-						"type": "datetime",
-						"precision": 23,
-						"scale": 3
-					}
-				],
-				"typeProperties": {
-					"tableName": "dbo.ADLS_TMPL_DATASOURCE3"
-				}
-			},
-			"dependsOn": [
-				"[concat(variables('workspaceId'), '/linkedServices/ivs-synapse-WorkspaceDefaultSqlServer')]"
 			]
 		},
 		{
@@ -7853,44 +7840,6 @@
 			]
 		},
 		{
-			"name": "[concat(parameters('workspaceName'), '/TMPL_STAGING_KEY')]",
-			"type": "Microsoft.Synapse/workspaces/datasets",
-			"apiVersion": "2019-06-01-preview",
-			"properties": {
-				"linkedServiceName": {
-					"referenceName": "ivs-synapse-WorkspaceDefaultStorage",
-					"type": "LinkedServiceReference"
-				},
-				"annotations": [],
-				"type": "Parquet",
-				"typeProperties": {
-					"location": {
-						"type": "AzureBlobFSLocation",
-						"folderPath": "staging/key",
-						"fileSystem": "adftemplate"
-					},
-					"compressionCodec": "snappy"
-				},
-				"schema": [
-					{
-						"name": "SRC1_SOURCE1_ID",
-						"type": "INT32"
-					},
-					{
-						"name": "SRC1_SOURCE2_REF_ID",
-						"type": "INT32"
-					},
-					{
-						"name": "SRC1_SOURCE3_REF_ID",
-						"type": "INT32"
-					}
-				]
-			},
-			"dependsOn": [
-				"[concat(variables('workspaceId'), '/linkedServices/ivs-synapse-WorkspaceDefaultStorage')]"
-			]
-		},
-		{
 			"name": "[concat(parameters('workspaceName'), '/azuresynapse')]",
 			"type": "Microsoft.Synapse/workspaces/datasets",
 			"apiVersion": "2019-06-01-preview",
@@ -7928,61 +7877,30 @@
 			]
 		},
 		{
-			"name": "[concat(parameters('workspaceName'), '/serverlessview')]",
-			"type": "Microsoft.Synapse/workspaces/datasets",
-			"apiVersion": "2019-06-01-preview",
-			"properties": {
-				"linkedServiceName": {
-					"referenceName": "ivs_od_sqlpool",
-					"type": "LinkedServiceReference"
-				},
-				"annotations": [],
-				"type": "AzureSqlDWTable",
-				"schema": [
-					{
-						"name": "PartyId",
-						"type": "bigint",
-						"precision": 19
-					},
-					{
-						"name": "PartyName",
-						"type": "varchar"
-					},
-					{
-						"name": "PartyTypeId",
-						"type": "int",
-						"precision": 10
-					},
-					{
-						"name": "GlobalLocationNumber",
-						"type": "decimal",
-						"precision": 13,
-						"scale": 0
-					},
-					{
-						"name": "dte",
-						"type": "date"
-					}
-				],
-				"typeProperties": {
-					"schema": "dbo",
-					"table": "Party_delta"
-				}
-			},
-			"dependsOn": [
-				"[concat(variables('workspaceId'), '/linkedServices/ivs_od_sqlpool')]"
-			]
-		},
-		{
-			"name": "[concat(parameters('workspaceName'), '/AdventureWorksSQL')]",
+			"name": "[concat(parameters('workspaceName'), '/BloombergAPI')]",
 			"type": "Microsoft.Synapse/workspaces/linkedServices",
 			"apiVersion": "2019-06-01-preview",
 			"properties": {
-				"description": "AdventureWorks Cosmos DB SQL API database",
 				"annotations": [],
-				"type": "CosmosDb",
+				"type": "RestService",
 				"typeProperties": {
-					"connectionString": "[parameters('AdventureWorksSQL_connectionString')]"
+					"url": "[parameters('BloombergAPI_properties_typeProperties_url')]",
+					"enableServerCertificateValidation": false,
+					"authenticationType": "Anonymous",
+					"authHeaders": {
+						"Content-Type": {
+							"type": "SecureString",
+							"value": "**********"
+						},
+						"jwt": {
+							"type": "SecureString",
+							"value": "**********"
+						},
+						"Api-version": {
+							"type": "SecureString",
+							"value": "**********"
+						}
+					}
 				},
 				"connectVia": {
 					"referenceName": "AutoResolveIntegrationRuntime",
@@ -8064,25 +7982,6 @@
 			]
 		},
 		{
-			"name": "[concat(parameters('workspaceName'), '/ivs_od_sqlpool')]",
-			"type": "Microsoft.Synapse/workspaces/linkedServices",
-			"apiVersion": "2019-06-01-preview",
-			"properties": {
-				"annotations": [],
-				"type": "AzureSqlDW",
-				"typeProperties": {
-					"connectionString": "[parameters('ivs_od_sqlpool_connectionString')]"
-				},
-				"connectVia": {
-					"referenceName": "AutoResolveIntegrationRuntime",
-					"type": "IntegrationRuntimeReference"
-				}
-			},
-			"dependsOn": [
-				"[concat(variables('workspaceId'), '/integrationRuntimes/AutoResolveIntegrationRuntime')]"
-			]
-		},
-		{
 			"name": "[concat(parameters('workspaceName'), '/serverless_ARIR')]",
 			"type": "Microsoft.Synapse/workspaces/linkedServices",
 			"apiVersion": "2019-06-01-preview",
@@ -8096,25 +7995,6 @@
 				"type": "AzureSqlDW",
 				"typeProperties": {
 					"connectionString": "[parameters('serverless_ARIR_connectionString')]"
-				},
-				"connectVia": {
-					"referenceName": "AutoResolveIntegrationRuntime",
-					"type": "IntegrationRuntimeReference"
-				}
-			},
-			"dependsOn": [
-				"[concat(variables('workspaceId'), '/integrationRuntimes/AutoResolveIntegrationRuntime')]"
-			]
-		},
-		{
-			"name": "[concat(parameters('workspaceName'), '/template_dedicated_ARIR')]",
-			"type": "Microsoft.Synapse/workspaces/linkedServices",
-			"apiVersion": "2019-06-01-preview",
-			"properties": {
-				"annotations": [],
-				"type": "AzureSqlDW",
-				"typeProperties": {
-					"connectionString": "[parameters('template_dedicated_ARIR_connectionString')]"
 				},
 				"connectVia": {
 					"referenceName": "AutoResolveIntegrationRuntime",
@@ -8201,8 +8081,21 @@
 			"apiVersion": "2019-06-01-preview",
 			"properties": {
 				"annotations": [],
-				"runtimeState": "Started",
-				"pipelines": [],
+				"runtimeState": "Stopped",
+				"pipelines": [
+					{
+						"pipelineReference": {
+							"referenceName": "SQLPoolPause",
+							"type": "PipelineReference"
+						},
+						"parameters": {
+							"p_subscription": "[parameters('SchedSQLPoolPaused_properties_SQLPoolPause_parameters_p_subscription')]",
+							"p_resourceGroup": "[parameters('SchedSQLPoolPaused_properties_SQLPoolPause_parameters_p_resourceGroup')]",
+							"p_workspace": "[parameters('SchedSQLPoolPaused_properties_SQLPoolPause_parameters_p_workspace')]",
+							"p_sqlPool": "[parameters('SchedSQLPoolPaused_properties_SQLPoolPause_parameters_p_sqlPool')]"
+						}
+					}
+				],
 				"type": "ScheduleTrigger",
 				"typeProperties": {
 					"recurrence": {
@@ -8221,7 +8114,9 @@
 					}
 				}
 			},
-			"dependsOn": []
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/pipelines/SQLPoolPause')]"
+			]
 		},
 		{
 			"name": "[concat(parameters('workspaceName'), '/AutoResolveIntegrationRuntime')]",
@@ -8258,7 +8153,7 @@
 			"apiVersion": "2019-06-01-preview",
 			"properties": {
 				"folder": {
-					"name": "Audit"
+					"name": "Templates"
 				},
 				"type": "MappingDataFlow",
 				"typeProperties": {
@@ -9642,7 +9537,7 @@
 			]
 		},
 		{
-			"name": "[concat(parameters('workspaceName'), '/TemplateIncrementalStaging')]",
+			"name": "[concat(parameters('workspaceName'), '/TemplateDimension1')]",
 			"type": "Microsoft.Synapse/workspaces/dataflows",
 			"apiVersion": "2019-06-01-preview",
 			"properties": {
@@ -9654,71 +9549,202 @@
 					"sources": [
 						{
 							"dataset": {
-								"referenceName": "ADLS_TMPL_DATASOURCE1",
-								"type": "DatasetReference"
-							},
-							"name": "MainSource"
-						},
-						{
-							"dataset": {
 								"referenceName": "TMPL_DATASOURCE2",
 								"type": "DatasetReference"
 							},
-							"name": "SlaveSource2"
+							"name": "DataSource"
 						},
 						{
 							"dataset": {
-								"referenceName": "ADLS_TMPL_DATASOURCE3",
+								"referenceName": "TMPL_DIMENSION1",
 								"type": "DatasetReference"
 							},
-							"name": "SlaveSource3"
+							"name": "Dimension"
 						}
 					],
 					"sinks": [
 						{
 							"dataset": {
-								"referenceName": "TMPL_STAGING",
+								"referenceName": "TMPL_DIMENSION1",
 								"type": "DatasetReference"
 							},
-							"name": "SinkStaging"
-						},
-						{
-							"dataset": {
-								"referenceName": "TMPL_STAGING_KEY",
-								"type": "DatasetReference"
-							},
-							"name": "SinkStagingKey"
+							"name": "DimensionSink"
 						}
 					],
 					"transformations": [
 						{
-							"name": "SelectMain"
+							"name": "SelectDimension"
 						},
 						{
-							"name": "SelectSource2"
+							"name": "LookupDimension"
 						},
 						{
-							"name": "SelectSource3"
-						},
-						{
-							"name": "JoinSource2"
-						},
-						{
-							"name": "JoinSource3"
+							"name": "SelectColumns"
 						},
 						{
 							"name": "DerivedColumns"
+						},
+						{
+							"name": "AlterRow"
 						}
 					],
-					"script": "parameters{\n\tp_latest_datetime as string ('1900-01-01 00:00:000'),\n\tp_main_source as string ('ADLS_TMPL_DATASOURCE1'),\n\tp_cdc_column as string ('CDC_TIMESTAMP')\n}\nsource(output(\n\t\tSOURCE1_ID as integer,\n\t\tSOURCE2_REF_ID as integer,\n\t\tSOURCE3_REF_ID as integer,\n\t\tNCHAR_VALUE1 as string,\n\t\tNCHAR_VALUE2 as string,\n\t\tNUMERIC_VALUE1 as decimal(12,6),\n\t\tNUMERIC_VALUE2 as decimal(12,6),\n\t\tDATETIME_VALUE1 as timestamp,\n\t\tDATETIME_VALUE2 as timestamp,\n\t\tCDC_TIMESTAMP as timestamp\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tisolationLevel: 'READ_UNCOMMITTED',\n\tformat: 'table',\n\tstaged: false) ~> MainSource\nsource(output(\n\t\tSOURCE2_ID as integer,\n\t\tNCHAR_VALUE1 as string,\n\t\tNCHAR_VALUE2 as string,\n\t\tNUMERIC_VALUE1 as decimal(18,4),\n\t\tNUMERIC_VALUE2 as decimal(18,4),\n\t\tDATETIME_VALUE1 as timestamp,\n\t\tDATETIME_VALUE2 as timestamp\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tignoreNoFilesFound: false) ~> SlaveSource2\nsource(output(\n\t\tSOURCE3_ID as integer,\n\t\tNCHAR_VALUE1 as string,\n\t\tNCHAR_VALUE2 as string,\n\t\tNUMERIC_VALUE1 as decimal(12,6),\n\t\tNUMERIC_VALUE2 as decimal(12,6),\n\t\tDATETIME_VALUE1 as timestamp,\n\t\tDATETIME_VALUE2 as timestamp,\n\t\tCDC_TIMESTAMP as timestamp\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tisolationLevel: 'READ_UNCOMMITTED',\n\tformat: 'table',\n\tstaged: false) ~> SlaveSource3\nMainSource select(mapColumn(\n\t\teach(match(true()),\n\t\t\t'SRC1_'+$$ = $$)\n\t),\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> SelectMain\nSlaveSource2 select(mapColumn(\n\t\teach(match(true()),\n\t\t\t'SRC2_'+$$ = $$)\n\t),\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> SelectSource2\nSlaveSource3 select(mapColumn(\n\t\teach(match(true()),\n\t\t\t'SRC3_'+$$ = $$)\n\t),\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> SelectSource3\nSelectMain, SelectSource2 join(SRC1_SOURCE2_REF_ID == SRC2_SOURCE2_ID,\n\tjoinType:'left',\n\tmatchType:'exact',\n\tignoreSpaces: false,\n\tbroadcast: 'auto')~> JoinSource2\nJoinSource2, SelectSource3 join(SRC1_SOURCE3_REF_ID == SRC3_SOURCE3_ID,\n\tjoinType:'left',\n\tmatchType:'exact',\n\tignoreSpaces: false,\n\tbroadcast: 'auto')~> JoinSource3\nJoinSource3 derive(DSS_CREATE_TIME = currentTimestamp()) ~> DerivedColumns\nDerivedColumns sink(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tformat: 'parquet',\n\ttruncate: true,\n\tumask: 0022,\n\tpreCommands: [],\n\tpostCommands: [],\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> SinkStaging\nDerivedColumns sink(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tinput(\n\t\tSRC1_SOURCE1_ID as integer,\n\t\tSRC1_SOURCE2_REF_ID as integer,\n\t\tSRC1_SOURCE3_REF_ID as integer\n\t),\n\tformat: 'parquet',\n\ttruncate: true,\n\tumask: 0022,\n\tpreCommands: [],\n\tpostCommands: [],\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true,\n\tmapColumn(\n\t\tSRC1_SOURCE1_ID,\n\t\tSRC1_SOURCE2_REF_ID,\n\t\tSRC1_SOURCE3_REF_ID\n\t)) ~> SinkStagingKey"
+					"script": "source(output(\n\t\tSOURCE2_ID as string,\n\t\tNCHAR_VALUE1 as string,\n\t\tNCHAR_VALUE2 as string,\n\t\tNUMERIC_VALUE1 as double,\n\t\tNUMERIC_VALUE2 as double,\n\t\tDATETIME_VALUE1 as string,\n\t\tDATETIME_VALUE2 as string\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tignoreNoFilesFound: false) ~> DataSource\nsource(output(\n\t\tDIMENSION1_KEY as string,\n\t\tSOURCE2_ID as string,\n\t\tNCHAR_ATTRIBUTE1 as string,\n\t\tNCHAR_ATTRIBUTE2 as string,\n\t\tDATETIME_ATTRIBUTE1 as string,\n\t\tDATETIME_ATTRIBUTE2 as string,\n\t\tDSS_CREATE_TIME as string,\n\t\tDSS_UPDATE_TIME as string\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tisolationLevel: 'READ_UNCOMMITTED',\n\tformat: 'table',\n\tstaged: false) ~> Dimension\nDimension select(mapColumn(\n\t\teach(match(true()),\n\t\t\t'DIMPREFIX_'+$$ = $$)\n\t),\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> SelectDimension\nDataSource, SelectDimension lookup(SOURCE2_ID == DIMPREFIX_SOURCE2_ID,\n\tmultiple: false,\n\tpickup: 'any',\n\tbroadcast: 'auto')~> LookupDimension\nLookupDimension select(mapColumn(\n\t\tDSS_CREATE_TIME = DIMPREFIX_DSS_CREATE_TIME,\n\t\teach(match(left(name,length('DIMPREFIX_'))!='DIMPREFIX_'),\n\t\t\treplace($$,'VALUE','ATTRIBUTE') = $$)\n\t),\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> SelectColumns\nSelectColumns derive(DSS_CREATE_TIME = iif(isNull(DSS_CREATE_TIME), toString(currentTimestamp()), DSS_CREATE_TIME),\n\t\tDSS_UPDATE_TIME = toString(currentTimestamp())) ~> DerivedColumns\nDerivedColumns alterRow(upsertIf(true())) ~> AlterRow\nAlterRow sink(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tinput(\n\t\tDIMENSION1_KEY as integer,\n\t\tSOURCE2_ID as integer,\n\t\tNCHAR_ATTRIBUTE1 as string,\n\t\tNCHAR_ATTRIBUTE2 as string,\n\t\tDATETIME_ATTRIBUTE1 as timestamp,\n\t\tDATETIME_ATTRIBUTE2 as timestamp,\n\t\tDSS_CREATE_TIME as timestamp,\n\t\tDSS_UPDATE_TIME as timestamp\n\t),\n\tdeletable:false,\n\tinsertable:false,\n\tupdateable:false,\n\tupsertable:true,\n\tkeys:['SOURCE2_ID'],\n\tformat: 'table',\n\tstaged: true,\n\tpreSQLs:['EXEC\t[dbo].[ZeroRow]\\n\t\t@p_tabname = N\\'TMPL_DIMENSION1\\',\\n\t\t@p_keycolname = N\\'DIMENSION1_KEY\\',\\n\t\t@p_varchar = N\\'Unknown\\',\\n\t\t@p_numeric = NULL,\\n\t\t@p_date = NULL,\\n\t\t@p_time = NULL,\\n\t\t@p_bit = NULL'],\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true,\n\terrorHandlingOption: 'stopOnFirstError') ~> DimensionSink"
 				}
 			},
 			"dependsOn": [
-				"[concat(variables('workspaceId'), '/datasets/ADLS_TMPL_DATASOURCE1')]",
 				"[concat(variables('workspaceId'), '/datasets/TMPL_DATASOURCE2')]",
-				"[concat(variables('workspaceId'), '/datasets/ADLS_TMPL_DATASOURCE3')]",
+				"[concat(variables('workspaceId'), '/datasets/TMPL_DIMENSION1')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/TemplateDimension2')]",
+			"type": "Microsoft.Synapse/workspaces/dataflows",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"folder": {
+					"name": "Templates"
+				},
+				"type": "MappingDataFlow",
+				"typeProperties": {
+					"sources": [
+						{
+							"dataset": {
+								"referenceName": "TMPL_DATASOURCE3",
+								"type": "DatasetReference"
+							},
+							"name": "DataSource"
+						},
+						{
+							"dataset": {
+								"referenceName": "TMPL_DIMENSION2",
+								"type": "DatasetReference"
+							},
+							"name": "Dimension"
+						}
+					],
+					"sinks": [
+						{
+							"dataset": {
+								"referenceName": "TMPL_DIMENSION2",
+								"type": "DatasetReference"
+							},
+							"name": "DimensionSink"
+						}
+					],
+					"transformations": [
+						{
+							"name": "SelectDimension"
+						},
+						{
+							"name": "LookupDimension"
+						},
+						{
+							"name": "SelectColumns"
+						},
+						{
+							"name": "DerivedColumns"
+						},
+						{
+							"name": "AlterRow"
+						}
+					],
+					"script": "source(output(\n\t\tSOURCE3_ID as short,\n\t\tNCHAR_VALUE1 as string,\n\t\tNCHAR_VALUE2 as string,\n\t\tNUMERIC_VALUE1 as double,\n\t\tNUMERIC_VALUE2 as double,\n\t\tDATETIME_VALUE1 as string,\n\t\tDATETIME_VALUE2 as string,\n\t\tCDC_TIMESTAMP as string\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tignoreNoFilesFound: false) ~> DataSource\nsource(output(\n\t\tDIMENSION2_KEY as integer,\n\t\tSOURCE3_ID as integer,\n\t\tNCHAR_ATTRIBUTE1 as string,\n\t\tNCHAR_ATTRIBUTE2 as string,\n\t\tDATETIME_ATTRIBUTE1 as timestamp,\n\t\tDATETIME_ATTRIBUTE2 as timestamp,\n\t\tDSS_CREATE_TIME as timestamp,\n\t\tDSS_UPDATE_TIME as timestamp\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tisolationLevel: 'READ_UNCOMMITTED',\n\tformat: 'table',\n\tstaged: false) ~> Dimension\nDimension select(mapColumn(\n\t\teach(match(true()),\n\t\t\t'DIMPREFIX_'+$$ = $$)\n\t),\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> SelectDimension\nDataSource, SelectDimension lookup(SOURCE3_ID == DIMPREFIX_SOURCE3_ID,\n\tmultiple: false,\n\tpickup: 'any',\n\tbroadcast: 'auto')~> LookupDimension\nLookupDimension select(mapColumn(\n\t\tSOURCE3_ID,\n\t\tDSS_CREATE_TIME = DIMPREFIX_DSS_CREATE_TIME,\n\t\teach(match(left(name,length('DIMPREFIX_'))!='DIMPREFIX_'),\n\t\t\treplace($$,'VALUE','ATTRIBUTE') = $$)\n\t),\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> SelectColumns\nSelectColumns derive(DSS_CREATE_TIME = iif(isNull(DSS_CREATE_TIME), currentTimestamp(), DSS_CREATE_TIME),\n\t\tDSS_UPDATE_TIME = toString(currentTimestamp())) ~> DerivedColumns\nDerivedColumns alterRow(upsertIf(true())) ~> AlterRow\nAlterRow sink(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tinput(\n\t\tDIMENSION2_KEY as integer,\n\t\tSOURCE3_ID as integer,\n\t\tNCHAR_ATTRIBUTE1 as string,\n\t\tNCHAR_ATTRIBUTE2 as string,\n\t\tDATETIME_ATTRIBUTE1 as timestamp,\n\t\tDATETIME_ATTRIBUTE2 as timestamp,\n\t\tDSS_CREATE_TIME as timestamp,\n\t\tDSS_UPDATE_TIME as timestamp\n\t),\n\tdeletable:false,\n\tinsertable:false,\n\tupdateable:false,\n\tupsertable:true,\n\tkeys:['SOURCE3_ID'],\n\tformat: 'table',\n\tstaged: true,\n\tpreSQLs:['EXEC\t[dbo].[ZeroRow]\\n\t\t@p_tabname = N\\'TMPL_DIMENSION2\\',\\n\t\t@p_keycolname = N\\'DIMENSION2_KEY\\',\\n\t\t@p_varchar = N\\'Unknown\\',\\n\t\t@p_numeric = NULL,\\n\t\t@p_date = NULL,\\n\t\t@p_time = NULL,\\n\t\t@p_bit = NULL'],\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true,\n\terrorHandlingOption: 'stopOnFirstError') ~> DimensionSink"
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('workspaceId'), '/datasets/TMPL_DATASOURCE3')]",
+				"[concat(variables('workspaceId'), '/datasets/TMPL_DIMENSION2')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('workspaceName'), '/TemplateFact')]",
+			"type": "Microsoft.Synapse/workspaces/dataflows",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"folder": {
+					"name": "Templates"
+				},
+				"type": "MappingDataFlow",
+				"typeProperties": {
+					"sources": [
+						{
+							"dataset": {
+								"referenceName": "TMPL_STAGING",
+								"type": "DatasetReference"
+							},
+							"name": "Source"
+						},
+						{
+							"dataset": {
+								"referenceName": "TMPL_DIMENSION1",
+								"type": "DatasetReference"
+							},
+							"name": "Dimension1"
+						},
+						{
+							"dataset": {
+								"referenceName": "TMPL_DIMENSION2",
+								"type": "DatasetReference"
+							},
+							"name": "Dimension2"
+						},
+						{
+							"dataset": {
+								"referenceName": "TMPL_FACT",
+								"type": "DatasetReference"
+							},
+							"name": "Fact"
+						}
+					],
+					"sinks": [
+						{
+							"dataset": {
+								"referenceName": "TMPL_FACT",
+								"type": "DatasetReference"
+							},
+							"name": "FactSink"
+						}
+					],
+					"transformations": [
+						{
+							"name": "SelectSource"
+						},
+						{
+							"name": "LookupDimension1"
+						},
+						{
+							"name": "Select1"
+						},
+						{
+							"name": "LookupDimension2"
+						},
+						{
+							"name": "Select2"
+						},
+						{
+							"name": "SelectFact"
+						},
+						{
+							"name": "LookupFact"
+						},
+						{
+							"name": "Select3"
+						},
+						{
+							"name": "DerivedColumns"
+						},
+						{
+							"name": "AlterRow"
+						}
+					],
+					"script": "source(output(\n\t\tSRC1_SOURCE1_ID as integer,\n\t\tSRC1_SOURCE2_REF_ID as integer,\n\t\tSRC1_SOURCE3_REF_ID as integer,\n\t\tSRC1_NCHAR_VALUE1 as string,\n\t\tSRC1_NCHAR_VALUE2 as string,\n\t\tSRC1_NUMERIC_VALUE1 as decimal(18,4),\n\t\tSRC1_NUMERIC_VALUE2 as decimal(18,4),\n\t\tSRC1_DATETIME_VALUE1 as timestamp,\n\t\tSRC1_DATETIME_VALUE2 as timestamp,\n\t\tSRC1_CDC_TIMESTAMP as timestamp,\n\t\tSRC2_SOURCE2_ID as integer,\n\t\tSRC2_NCHAR_VALUE1 as string,\n\t\tSRC2_NCHAR_VALUE2 as string,\n\t\tSRC2_NUMERIC_VALUE1 as decimal(18,4),\n\t\tSRC2_NUMERIC_VALUE2 as decimal(18,4),\n\t\tSRC2_DATETIME_VALUE1 as timestamp,\n\t\tSRC2_DATETIME_VALUE2 as timestamp,\n\t\tSRC3_SOURCE3_ID as integer,\n\t\tSRC3_NCHAR_VALUE1 as string,\n\t\tSRC3_NCHAR_VALUE2 as string,\n\t\tSRC3_NUMERIC_VALUE1 as decimal(18,4),\n\t\tSRC3_NUMERIC_VALUE2 as decimal(18,4),\n\t\tSRC3_DATETIME_VALUE1 as timestamp,\n\t\tSRC3_DATETIME_VALUE2 as timestamp,\n\t\tDSS_CREATE_TIME as timestamp\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tignoreNoFilesFound: false,\n\tformat: 'parquet') ~> Source\nsource(output(\n\t\tDIMENSION1_KEY as integer,\n\t\tSOURCE2_ID as integer,\n\t\tNCHAR_ATTRIBUTE1 as string,\n\t\tNCHAR_ATTRIBUTE2 as string,\n\t\tDATETIME_ATTRIBUTE1 as timestamp,\n\t\tDATETIME_ATTRIBUTE2 as timestamp,\n\t\tDSS_CREATE_TIME as timestamp,\n\t\tDSS_UPDATE_TIME as timestamp\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tisolationLevel: 'READ_UNCOMMITTED',\n\tquery: 'select * from TMPL_DIMENSION1 d where exists (select 1 from ADLS_TMPL_STAGING_KEY k where k.SRC1_SOURCE2_REF_ID = d.SOURCE2_ID)',\n\tformat: 'query',\n\tstaged: false) ~> Dimension1\nsource(output(\n\t\tDIMENSION2_KEY as integer,\n\t\tSOURCE3_ID as integer,\n\t\tNCHAR_ATTRIBUTE1 as string,\n\t\tNCHAR_ATTRIBUTE2 as string,\n\t\tDATETIME_ATTRIBUTE1 as timestamp,\n\t\tDATETIME_ATTRIBUTE2 as timestamp,\n\t\tDSS_CREATE_TIME as timestamp,\n\t\tDSS_UPDATE_TIME as timestamp\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tisolationLevel: 'READ_UNCOMMITTED',\n\tquery: 'select * from TMPL_DIMENSION2 d where exists (select 1 from ADLS_TMPL_STAGING_KEY k where k.SRC1_SOURCE3_REF_ID = d.SOURCE3_ID)',\n\tformat: 'query',\n\tstaged: false) ~> Dimension2\nsource(output(\n\t\tDIMENSION1_KEY as integer,\n\t\tDIMENSION2_KEY as integer,\n\t\tSOURCE1_ID as integer,\n\t\tSRC1_MEASURE1 as decimal(18,4),\n\t\tSRC1_MEASURE2 as decimal(18,4),\n\t\tSRC2_MEASURE1 as decimal(18,4),\n\t\tSRC2_MEASURE2 as decimal(18,4),\n\t\tSRC3_MEASURE1 as decimal(18,4),\n\t\tSRC3_MEASURE2 as decimal(18,4),\n\t\tSRC1_CDC_TIMESTAMP as timestamp,\n\t\tDSS_CREATE_TIME as timestamp,\n\t\tDSS_UPDATE_TIME as timestamp\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tisolationLevel: 'READ_UNCOMMITTED',\n\tformat: 'table',\n\tstaged: false) ~> Fact\nSource select(mapColumn(\n\t\teach(match(true()),\n\t\t\t'SOURCE_'+$$ = $$)\n\t),\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> SelectSource\nSelectSource, Dimension1 lookup(SOURCE_SRC1_SOURCE2_REF_ID == SOURCE2_ID,\n\tmultiple: false,\n\tpickup: 'any',\n\tbroadcast: 'auto')~> LookupDimension1\nLookupDimension1 select(mapColumn(\n\t\teach(match(left(name,length('SOURCE_'))=='SOURCE_')),\n\t\teach(match(right(name,length('_KEY'))=='_KEY'))\n\t),\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> Select1\nSelect1, Dimension2 lookup(SOURCE_SRC1_SOURCE3_REF_ID == SOURCE3_ID,\n\tmultiple: false,\n\tpickup: 'any',\n\tbroadcast: 'auto')~> LookupDimension2\nLookupDimension2 select(mapColumn(\n\t\teach(match(left(name,length('SOURCE_'))=='SOURCE_')),\n\t\teach(match(right(name,length('_KEY'))=='_KEY'))\n\t),\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> Select2\nFact select(mapColumn(\n\t\teach(match(true()),\n\t\t\t'FACT_'+$$ = $$)\n\t),\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> SelectFact\nSelect2, SelectFact lookup(SOURCE_SRC1_SOURCE1_ID == FACT_SOURCE1_ID,\n\tmultiple: false,\n\tpickup: 'any',\n\tbroadcast: 'auto')~> LookupFact\nLookupFact select(mapColumn(\n\t\tSOURCE1_ID = SOURCE_SRC1_SOURCE1_ID,\n\t\tSRC1_CDC_TIMESTAMP = SOURCE_SRC1_CDC_TIMESTAMP,\n\t\tDSS_CREATE_TIME = FACT_DSS_CREATE_TIME,\n\t\teach(match(right(name,length('_KEY'))=='_KEY'&&left(name,length('FACT_'))!='FACT_')),\n\t\teach(match(left(name,length('SOURCE_'))=='SOURCE_'&&instr(name,'NUMERIC')>0),\n\t\t\treplace(right($$,length($$)-length('SOURCE_')),'NUMERIC_VALUE','MEASURE') = $$)\n\t),\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> Select3\nSelect3 derive(each(match(right(name,length('_KEY'))=='_KEY'), $$ = iifNull($$, 0)),\n\t\tDSS_CREATE_TIME = iif(isNull(DSS_CREATE_TIME), currentTimestamp(), DSS_CREATE_TIME),\n\t\tDSS_UPDATE_TIME = currentTimestamp()) ~> DerivedColumns\nDerivedColumns alterRow(upsertIf(true())) ~> AlterRow\nAlterRow sink(allowSchemaDrift: true,\n\tvalidateSchema: false,\n\tinput(\n\t\tDIMENSION1_KEY as integer,\n\t\tDIMENSION2_KEY as integer,\n\t\tSOURCE1_ID as integer,\n\t\tSRC1_MEASURE1 as decimal(18,4),\n\t\tSRC1_MEASURE2 as decimal(18,4),\n\t\tSRC2_MEASURE1 as decimal(18,4),\n\t\tSRC2_MEASURE2 as decimal(18,4),\n\t\tSRC3_MEASURE1 as decimal(18,4),\n\t\tSRC3_MEASURE2 as decimal(18,4),\n\t\tSRC1_CDC_TIMESTAMP as timestamp,\n\t\tDSS_CREATE_TIME as timestamp,\n\t\tDSS_UPDATE_TIME as timestamp\n\t),\n\tdeletable:false,\n\tinsertable:false,\n\tupdateable:false,\n\tupsertable:true,\n\tkeys:['SOURCE1_ID'],\n\tformat: 'table',\n\tstaged: true,\n\tallowCopyCommand: true,\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true,\n\terrorHandlingOption: 'stopOnFirstError') ~> FactSink"
+				}
+			},
+			"dependsOn": [
 				"[concat(variables('workspaceId'), '/datasets/TMPL_STAGING')]",
-				"[concat(variables('workspaceId'), '/datasets/TMPL_STAGING_KEY')]"
+				"[concat(variables('workspaceId'), '/datasets/TMPL_DIMENSION1')]",
+				"[concat(variables('workspaceId'), '/datasets/TMPL_DIMENSION2')]",
+				"[concat(variables('workspaceId'), '/datasets/TMPL_FACT')]"
 			]
 		},
 		{
@@ -9801,6 +9827,18 @@
 			"dependsOn": []
 		},
 		{
+			"name": "[concat(parameters('workspaceName'), '/ivssql')]",
+			"type": "Microsoft.Synapse/workspaces/sqlPools",
+			"apiVersion": "2019-06-01-preview",
+			"properties": {
+				"collation": "SQL_Latin1_General_CP1_CI_AS",
+				"maxSizeBytes": 263882790666240,
+				"annotations": []
+			},
+			"dependsOn": [],
+			"location": "westus"
+		},
+		{
 			"name": "[concat(parameters('workspaceName'), '/ivsspark')]",
 			"type": "Microsoft.Synapse/workspaces/bigDataPools",
 			"apiVersion": "2019-06-01-preview",
@@ -9820,18 +9858,6 @@
 				"sparkVersion": "3.1",
 				"isComputeIsolationEnabled": false,
 				"sessionLevelPackagesEnabled": false,
-				"annotations": []
-			},
-			"dependsOn": [],
-			"location": "westus"
-		},
-		{
-			"name": "[concat(parameters('workspaceName'), '/ivssql')]",
-			"type": "Microsoft.Synapse/workspaces/sqlPools",
-			"apiVersion": "2019-06-01-preview",
-			"properties": {
-				"collation": "SQL_Latin1_General_CP1_CI_AS",
-				"maxSizeBytes": 263882790666240,
 				"annotations": []
 			},
 			"dependsOn": [],
