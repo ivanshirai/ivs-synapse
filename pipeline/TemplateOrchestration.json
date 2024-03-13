@@ -303,6 +303,62 @@
 						}
 					}
 				}
+			},
+			{
+				"name": "WarningEmail",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "Set v_error_array",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "WarningEmail",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true
+				}
+			},
+			{
+				"name": "Set v_error_array",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "FromDeltaToWideDelta",
+						"dependencyConditions": [
+							"Completed"
+						]
+					},
+					{
+						"activity": "Datasets_StarSchemaDimension",
+						"dependencyConditions": [
+							"Completed"
+						]
+					},
+					{
+						"activity": "Dataflows_StarSchemaDimension",
+						"dependencyConditions": [
+							"Completed"
+						]
+					}
+				],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "v_error_array",
+					"value": {
+						"value": "@json(concat('[', replace(concat(\nif(empty(activity('Dataflows_StarSchemaDimension').error?.target), '', activity('Dataflows_StarSchemaDimension').error),\nif(empty(activity('Datasets_StarSchemaDimension').error?.target), '', activity('Datasets_StarSchemaDimension').error),\nif(empty(activity('FromDeltaToWideDelta').error?.target), '', activity('FromDeltaToWideDelta').error)\n), '}{', '},{'), ']'))",
+						"type": "Expression"
+					}
+				}
 			}
 		],
 		"parameters": {
@@ -594,6 +650,11 @@
 			},
 			"p_datetime_from": {
 				"type": "string"
+			}
+		},
+		"variables": {
+			"v_error_array": {
+				"type": "Array"
 			}
 		},
 		"folder": {
