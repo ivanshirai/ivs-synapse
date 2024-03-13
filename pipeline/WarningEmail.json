@@ -1,0 +1,126 @@
+{
+	"name": "WarningEmail",
+	"properties": {
+		"activities": [
+			{
+				"name": "If Errors",
+				"type": "IfCondition",
+				"dependsOn": [],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@greater(length(pipeline().parameters.p_error_array), 0)",
+						"type": "Expression"
+					},
+					"ifTrueActivities": [
+						{
+							"name": "WarningEmail_Ingestion",
+							"type": "WebActivity",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 2,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"method": "POST",
+								"url": {
+									"value": "@pipeline().parameters.c_warning_email_url",
+									"type": "Expression"
+								},
+								"connectVia": {
+									"referenceName": "SHIR",
+									"type": "IntegrationRuntimeReference"
+								},
+								"body": {
+									"value": "{\n    \"CCReceiver\": \"@{pipeline().parameters.c_warning_ccreceiver}\",\n    \"billTo\": \"@{pipeline().parameters.c_warning_bill_to}\",\n    \"errorMessage\": @{pipeline().parameters.p_error_array},\n    \"pipelineName\": \"@{pipeline().parameters.c_warning_pipeline}\",\n    \"priority\": \"@{pipeline().parameters.c_warning_priority}\",\n    \"receiver\": \"@{pipeline().parameters.c_warning_receiver}\",\n    \"subject\": \"@{pipeline().parameters.c_warning_subject}\",\n    \"synapseWorkspaceName\": \"@{pipeline().DataFactory}\",\n    \"triageBox\": \"@{pipeline().parameters.c_warning_triage_box}\",\n    \"warningMessage\": \"@{pipeline().parameters.c_warning_message}\",\n    \"troubleshootInstructions\": \"@{pipeline().parameters.c_warning_troubleshoot_instructions}\",    \n}",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "EnforcedFailure",
+							"type": "Fail",
+							"dependsOn": [
+								{
+									"activity": "WarningEmail_Ingestion",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"message": {
+									"value": "@concat(pipeline().Pipeline, ' failure')",
+									"type": "Expression"
+								},
+								"errorCode": "000"
+							}
+						}
+					]
+				}
+			}
+		],
+		"parameters": {
+			"c_warning_email_url": {
+				"type": "string",
+				"defaultValue": "https://prod-30.westus.logic.azure.com:443/workflows/89eb2a2d7d714262a1c33b4150f77e4d/triggers/manual/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=T9Glr0u4q2YIPjf5mOiOM45c0Ra2rjOTMkQczOEOrVU"
+			},
+			"c_warning_receiver": {
+				"type": "string",
+				"defaultValue": "Shirai.Ivan@jdirving.com"
+			},
+			"c_warning_ccreceiver": {
+				"type": "string",
+				"defaultValue": "Shirai.Ivan@jdirving.com"
+			},
+			"c_warning_bill_to": {
+				"type": "string",
+				"defaultValue": "Bill to Company"
+			},
+			"c_warning_message": {
+				"type": "string",
+				"defaultValue": "Please open incident and contact On Call Team"
+			},
+			"c_warning_troubleshoot_instructions": {
+				"type": "string",
+				"defaultValue": "Contact Synapse Admin"
+			},
+			"c_warning_priority": {
+				"type": "string",
+				"defaultValue": "PR1"
+			},
+			"c_warning_subject": {
+				"type": "string",
+				"defaultValue": "Failure"
+			},
+			"c_warning_triage_box": {
+				"type": "string",
+				"defaultValue": "Triage Box"
+			},
+			"p_error_array": {
+				"type": "array",
+				"defaultValue": []
+			},
+			"c_warning_pipeline": {
+				"type": "string",
+				"defaultValue": "TemplateOrchestration"
+			}
+		},
+		"variables": {
+			"v_error_array": {
+				"type": "Array"
+			}
+		},
+		"folder": {
+			"name": "Templates"
+		},
+		"annotations": [],
+		"lastPublishTime": "2024-02-21T19:32:20Z"
+	},
+	"type": "Microsoft.Synapse/workspaces/pipelines"
+}
