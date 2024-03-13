@@ -5,8 +5,6 @@
 			{
 				"name": "ServerlessDBDeploy",
 				"type": "ExecutePipeline",
-				"state": "Inactive",
-				"onInactiveMarkAs": "Succeeded",
 				"dependsOn": [],
 				"userProperties": [],
 				"typeProperties": {
@@ -26,8 +24,6 @@
 			{
 				"name": "ServerlessObjectsDeploy",
 				"type": "ExecutePipeline",
-				"state": "Inactive",
-				"onInactiveMarkAs": "Succeeded",
 				"dependsOn": [
 					{
 						"activity": "ServerlessDBDeploy",
@@ -54,8 +50,6 @@
 			{
 				"name": "FromRESTAPIToJson",
 				"type": "ExecutePipeline",
-				"state": "Inactive",
-				"onInactiveMarkAs": "Succeeded",
 				"dependsOn": [],
 				"userProperties": [],
 				"typeProperties": {
@@ -79,8 +73,6 @@
 			{
 				"name": "FromJsonToDeltaParquet",
 				"type": "ExecutePipeline",
-				"state": "Inactive",
-				"onInactiveMarkAs": "Succeeded",
 				"dependsOn": [
 					{
 						"activity": "FromRESTAPIToJson",
