@@ -2,7 +2,7 @@
 	"name": "FromDeltaToWideDelta",
 	"properties": {
 		"folder": {
-			"name": "Audit"
+			"name": "Templates"
 		},
 		"type": "MappingDataFlow",
 		"typeProperties": {
@@ -84,6 +84,7 @@
 				"     insertable: true,",
 				"     updateable: false,",
 				"     upsertable: false,",
+				"     pruneCondition: ['_PARTITION' -> (sinkPartitionPruning#outputs().PartitionPruning)],",
 				"     umask: 0022,",
 				"     preCommands: [],",
 				"     postCommands: [],",
@@ -93,8 +94,7 @@
 				"     partitionBy('key',",
 				"          0,",
 				"          {_PARTITION}",
-				"     ),",
-				"     pruneCondition: ['_PARTITION' -> (sinkPartitionPruning#outputs().PartitionPruning)]) ~> sinkWide",
+				"     )) ~> sinkWide",
 				"sourcePartitionPruning sink(validateSchema: false,",
 				"     skipDuplicateMapInputs: true,",
 				"     skipDuplicateMapOutputs: true,",

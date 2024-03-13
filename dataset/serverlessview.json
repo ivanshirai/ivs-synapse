@@ -1,10 +1,6 @@
 {
 	"name": "serverlessview",
 	"properties": {
-		"linkedServiceName": {
-			"referenceName": "ivs_od_sqlpool",
-			"type": "LinkedServiceReference"
-		},
 		"annotations": [],
 		"type": "AzureSqlDWTable",
 		"schema": [
