@@ -425,7 +425,7 @@
 			"name": "Templates"
 		},
 		"annotations": [],
-		"lastPublishTime": "2024-01-24T18:40:41Z"
+		"lastPublishTime": "2024-03-13T02:45:16Z"
 	},
 	"type": "Microsoft.Synapse/workspaces/pipelines"
 }

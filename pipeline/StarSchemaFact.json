@@ -811,6 +811,8 @@
 		"folder": {
 			"name": "Templates"
 		},
-		"annotations": []
-	}
+		"annotations": [],
+		"lastPublishTime": "2024-03-13T02:45:35Z"
+	},
+	"type": "Microsoft.Synapse/workspaces/pipelines"
 }

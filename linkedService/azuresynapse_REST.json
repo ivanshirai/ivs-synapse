@@ -1,5 +1,6 @@
 {
 	"name": "azuresynapse_REST",
+	"type": "Microsoft.Synapse/workspaces/linkedservices",
 	"properties": {
 		"parameters": {
 			"p_workspace": {

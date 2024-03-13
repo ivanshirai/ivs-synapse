@@ -1,0 +1,31 @@
+{
+	"name": "BloombergAPI",
+	"type": "Microsoft.Synapse/workspaces/linkedservices",
+	"properties": {
+		"annotations": [],
+		"type": "RestService",
+		"typeProperties": {
+			"url": "https://api.bloomberg.com/eap",
+			"enableServerCertificateValidation": false,
+			"authenticationType": "Anonymous",
+			"authHeaders": {
+				"Content-Type": {
+					"type": "SecureString",
+					"value": "**********"
+				},
+				"jwt": {
+					"type": "SecureString",
+					"value": "**********"
+				},
+				"Api-version": {
+					"type": "SecureString",
+					"value": "**********"
+				}
+			}
+		},
+		"connectVia": {
+			"referenceName": "AutoResolveIntegrationRuntime",
+			"type": "IntegrationRuntimeReference"
+		}
+	}
+}

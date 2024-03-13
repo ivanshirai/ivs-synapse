@@ -960,7 +960,7 @@
 			"name": "Templates"
 		},
 		"annotations": [],
-		"lastPublishTime": "2023-10-16T14:40:57Z"
+		"lastPublishTime": "2024-03-13T02:45:19Z"
 	},
 	"type": "Microsoft.Synapse/workspaces/pipelines"
 }

@@ -1,20 +1,21 @@
 {
-	"name": "DummyJson",
+	"name": "TMPL_STAGING",
 	"properties": {
 		"linkedServiceName": {
-			"referenceName": "templaterawst_ARIR",
+			"referenceName": "ivs-synapse-WorkspaceDefaultStorage",
 			"type": "LinkedServiceReference"
 		},
 		"annotations": [],
-		"type": "Json",
+		"type": "Parquet",
 		"typeProperties": {
 			"location": {
 				"type": "AzureBlobFSLocation",
-				"fileName": "dummy.json",
-				"fileSystem": "raw"
-			}
+				"folderPath": "staging/data",
+				"fileSystem": "adftemplate"
+			},
+			"compressionCodec": "snappy"
 		},
-		"schema": {}
+		"schema": []
 	},
 	"type": "Microsoft.Synapse/workspaces/datasets"
 }

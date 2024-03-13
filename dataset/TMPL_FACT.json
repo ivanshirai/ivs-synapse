@@ -1,0 +1,89 @@
+{
+	"name": "TMPL_FACT",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "ivs-synapse-WorkspaceDefaultSqlServer",
+			"type": "LinkedServiceReference",
+			"parameters": {
+				"DBName": "ivs_sqlpool"
+			}
+		},
+		"annotations": [],
+		"type": "AzureSqlDWTable",
+		"schema": [
+			{
+				"name": "DIMENSION1_KEY",
+				"type": "int",
+				"precision": 10
+			},
+			{
+				"name": "DIMENSION2_KEY",
+				"type": "int",
+				"precision": 10
+			},
+			{
+				"name": "SOURCE1_ID",
+				"type": "int",
+				"precision": 10
+			},
+			{
+				"name": "SRC1_MEASURE1",
+				"type": "decimal",
+				"precision": 18,
+				"scale": 4
+			},
+			{
+				"name": "SRC1_MEASURE2",
+				"type": "decimal",
+				"precision": 18,
+				"scale": 4
+			},
+			{
+				"name": "SRC2_MEASURE1",
+				"type": "decimal",
+				"precision": 18,
+				"scale": 4
+			},
+			{
+				"name": "SRC2_MEASURE2",
+				"type": "decimal",
+				"precision": 18,
+				"scale": 4
+			},
+			{
+				"name": "SRC3_MEASURE1",
+				"type": "decimal",
+				"precision": 18,
+				"scale": 4
+			},
+			{
+				"name": "SRC3_MEASURE2",
+				"type": "decimal",
+				"precision": 18,
+				"scale": 4
+			},
+			{
+				"name": "SRC1_CDC_TIMESTAMP",
+				"type": "datetime",
+				"precision": 23,
+				"scale": 3
+			},
+			{
+				"name": "DSS_CREATE_TIME",
+				"type": "datetime",
+				"precision": 23,
+				"scale": 3
+			},
+			{
+				"name": "DSS_UPDATE_TIME",
+				"type": "datetime",
+				"precision": 23,
+				"scale": 3
+			}
+		],
+		"typeProperties": {
+			"tableName": "dbo.TMPL_FACT"
+		}
+	},
+	"type": "Microsoft.Synapse/workspaces/datasets"
+}

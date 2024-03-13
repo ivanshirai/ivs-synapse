@@ -323,7 +323,10 @@
 					},
 					"waitOnCompletion": true,
 					"parameters": {
-						"p_error_array": "@variables('v_error_array')"
+						"p_error_array": {
+							"value": "@variables('v_error_array')",
+							"type": "Expression"
+						}
 					}
 				}
 			},
@@ -663,6 +666,8 @@
 		"folder": {
 			"name": "Templates"
 		},
-		"annotations": []
-	}
+		"annotations": [],
+		"lastPublishTime": "2024-03-13T02:45:39Z"
+	},
+	"type": "Microsoft.Synapse/workspaces/pipelines"
 }

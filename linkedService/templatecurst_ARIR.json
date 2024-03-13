@@ -1,5 +1,6 @@
 {
 	"name": "templatecurst_ARIR",
+	"type": "Microsoft.Synapse/workspaces/linkedservices",
 	"properties": {
 		"annotations": [],
 		"type": "AzureBlobFS",
