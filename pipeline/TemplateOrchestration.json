@@ -5,6 +5,8 @@
 			{
 				"name": "ServerlessDBDeploy",
 				"type": "ExecutePipeline",
+				"state": "Inactive",
+				"onInactiveMarkAs": "Succeeded",
 				"dependsOn": [],
 				"userProperties": [],
 				"typeProperties": {
@@ -24,6 +26,8 @@
 			{
 				"name": "ServerlessObjectsDeploy",
 				"type": "ExecutePipeline",
+				"state": "Inactive",
+				"onInactiveMarkAs": "Succeeded",
 				"dependsOn": [
 					{
 						"activity": "ServerlessDBDeploy",
@@ -50,6 +54,8 @@
 			{
 				"name": "FromRESTAPIToJson",
 				"type": "ExecutePipeline",
+				"state": "Inactive",
+				"onInactiveMarkAs": "Succeeded",
 				"dependsOn": [],
 				"userProperties": [],
 				"typeProperties": {
@@ -73,6 +79,8 @@
 			{
 				"name": "FromJsonToDeltaParquet",
 				"type": "ExecutePipeline",
+				"state": "Inactive",
+				"onInactiveMarkAs": "Succeeded",
 				"dependsOn": [
 					{
 						"activity": "FromRESTAPIToJson",
@@ -321,7 +329,10 @@
 						"referenceName": "WarningEmail",
 						"type": "PipelineReference"
 					},
-					"waitOnCompletion": true
+					"waitOnCompletion": true,
+					"parameters": {
+						"p_error_array": "@variables('v_error_array')"
+					}
 				}
 			},
 			{
