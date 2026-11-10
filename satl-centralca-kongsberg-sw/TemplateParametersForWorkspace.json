@@ -1,0 +1,57 @@
+{
+	"$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"workspaceName": {
+			"value": "satl-centralca-kongsberg-sw"
+		},
+		"ivs-synapse-WorkspaceDefaultSqlServer_connectionString": {
+			"value": "Integrated Security=False;Encrypt=True;Connection Timeout=30;Data Source=tcp:ivs-synapse.sql.azuresynapse.net,1433;Initial Catalog=@{linkedService().DBName}"
+		},
+		"satl-centralca-kongsberg-sw-WorkspaceDefaultSqlServer_connectionString": {
+			"value": "Integrated Security=False;Encrypt=True;Connection Timeout=30;Data Source=tcp:satl-centralca-kongsberg-sw.sql.azuresynapse.net,1433;Initial Catalog=@{linkedService().DBName}"
+		},
+		"serverless_ARIR_connectionString": {
+			"value": "Integrated Security=False;Encrypt=True;Connection Timeout=30;Data Source=ivs-synapse-ondemand.sql.azuresynapse.net;Initial Catalog=@{linkedService().p_database}"
+		},
+		"BloombergAPI_properties_typeProperties_url": {
+			"value": "https://api.bloomberg.com/eap"
+		},
+		"azuresynapse_REST_properties_typeProperties_url": {
+			"value": "@{concat('https://', linkedService().p_workspace, '.dev.azuresynapse.net')}"
+		},
+		"azuresynapse_REST_properties_typeProperties_aadResourceId": {
+			"value": "https://dev.azuresynapse.net/"
+		},
+		"ivs-synapse-WorkspaceDefaultStorage_properties_typeProperties_url": {
+			"value": "https://ivsdatastorage.dfs.core.windows.net"
+		},
+		"satl-centralca-kongsberg-sw-WorkspaceDefaultStorage_properties_typeProperties_url": {
+			"value": "https://sterlingatlccstrdata004.dfs.core.windows.net"
+		},
+		"template_kv_properties_typeProperties_baseUrl": {
+			"value": "https://ivs-dwh-kv.vault.azure.net/"
+		},
+		"templatecurst_ARIR_properties_typeProperties_url": {
+			"value": "https://ivscur.dfs.core.windows.net/"
+		},
+		"templateenrst_ARIR_properties_typeProperties_url": {
+			"value": "https://ivsenr.dfs.core.windows.net/"
+		},
+		"templaterawst_ARIR_properties_typeProperties_url": {
+			"value": "https://ivsraw.dfs.core.windows.net/"
+		},
+		"SchedSQLPoolPaused_properties_SQLPoolPause_parameters_p_subscription": {
+			"value": "f939f8f3-2652-4a45-88ae-78a7782ec9df"
+		},
+		"SchedSQLPoolPaused_properties_SQLPoolPause_parameters_p_resourceGroup": {
+			"value": "ivs-dwh-rg"
+		},
+		"SchedSQLPoolPaused_properties_SQLPoolPause_parameters_p_workspace": {
+			"value": "ivs-synapse"
+		},
+		"SchedSQLPoolPaused_properties_SQLPoolPause_parameters_p_sqlPool": {
+			"value": "ivs_sqlpool"
+		}
+	}
+}
